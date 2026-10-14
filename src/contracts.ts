@@ -1,7 +1,7 @@
 import type { Contracts as C } from './reference.js';
 export type * from './reference.js';
 export const ok = <T>(value: T): C.Result<T> => ({ ok: true, value });
-export function fail(code: string, message: string, category: C.Failure['category'] = 'validation', effect?: C.EffectState): C.Result<never> {
+export function fail(code: string, message: string, category: C.Failure['category'] = 'validation', effect?: C.EffectState): { readonly ok: false; readonly error: C.Failure } {
   return { ok: false, error: { code: `part.${code}`, message, category, retry: 'never', ...(effect ? { effect } : {}) } };
 }
 export const emptyCleanup = (): C.CleanupReport => ({ released: [], unresolved: [], errors: [] });

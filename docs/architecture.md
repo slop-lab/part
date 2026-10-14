@@ -36,3 +36,15 @@ implemented protocol subset.
 This environment's Node 26 test subprocess runner reports file-level tests only.
 The project runs `--test-isolation=none` so individual registered tests execute and
 report counts explicitly. Test fixtures own and clean up all resources.
+
+The SQLite reference adapter uses `node:sqlite` (`DatabaseSync`) and explicit
+transactions with FULL synchronous mode. API source: https://nodejs.org/api/sqlite.html .
+It stores one state/journal snapshot per store ID; this is a correctness reference,
+not a backend optimized for large histories. Storage import opens no database.
+Store access is trusted in-process; history and embedded endpoint enforce their
+own principal ownership. No database grants or cross-service atomicity are claimed.
+
+The optional DOM binding concretizes the framework-neutral UI contracts using
+HTMLElement. It supports the composer.actions slot, per-type renderers, safe plain
+text fallbacks, pagination, keyboard/IME handling and CSS tokens. Markdown, artifact
+viewers, custom component substitution, and additional slots remain later UI work.

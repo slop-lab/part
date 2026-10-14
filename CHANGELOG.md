@@ -10,3 +10,7 @@
 - Add validated function tools and allow/deny/substitute/rewrite/redirect/suspend policies.
 - Add context planning/lowering/transforms/source maps and an Ollama NDJSON adapter.
 - Add an embedded agent, basic loop, post-stop validating driver, and non-coding fixture.
+- Add memory and optional SQLite state/journal storage, immutable history, and
+  explicit recovery of incomplete execution intents.
+- Add schema-validated owner actions/queries, memory command dedupe, codec loopback,
+  snapshot/event client state, headless composer, and themed DOM Chat.

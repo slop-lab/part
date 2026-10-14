@@ -20,10 +20,13 @@
     },
     "./reference": {
       "types": "./dist/reference.d.ts"
+    },
+    "./ui.css": {
+      "default": "./dist/ui.css"
     }
   },
   "scripts": {
-    "build": "tsc && cp src/reference.d.ts dist/reference.d.ts",
+    "build": "tsc && cp src/reference.d.ts src/ui.css dist/",
     "test": "npm run build && node --test --test-isolation=none tests/*.test.mjs",
     "check": "tsc --noEmit",
     "example": "npm run build && node examples/basic.mjs"
@@ -33,6 +36,8 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "esbuild": "^0.28.2",
+    "happy-dom": "^21.0.1",
     "typescript": "^5.9.0"
   }
 }

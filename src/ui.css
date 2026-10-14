@@ -1,0 +1,24 @@
+:where(.part-ui) {
+  --part-font: system-ui, sans-serif;
+  --part-content-width: 52rem;
+  --part-radius: .75rem;
+  --part-background: #101825;
+  --part-foreground: #e7edf6;
+  --part-border: #314359;
+  --part-spacing: 1rem;
+  box-sizing: border-box; font-family: var(--part-font); color: var(--part-foreground);
+  background: var(--part-background); border: 1px solid var(--part-border);
+  border-radius: var(--part-radius); max-width: var(--part-content-width); padding: var(--part-spacing);
+  display: grid; gap: var(--part-spacing); margin-inline: auto;
+}
+:where(.part-ui [data-part-part="thread"]) { min-height: 16rem; max-height: 65vh; overflow: auto; display: flex; flex-direction: column; gap: var(--part-spacing); }
+:where(.part-ui [data-part-part="message"]) { border: 1px solid var(--part-border); border-radius: var(--part-radius); padding: var(--part-spacing); overflow-wrap: anywhere; }
+:where(.part-ui pre) { white-space: pre-wrap; font: inherit; line-height: 1.6; margin-block: .5rem; }
+:where(.part-ui form) { display: flex; gap: .75rem; align-items: flex-end; flex-wrap: wrap; }
+:where(.part-ui textarea) { flex: 1 1 16rem; width: 100%; min-height: 5rem; resize: vertical; }
+:where(.part-ui textarea, .part-ui button) { box-sizing: border-box; font: inherit; color: inherit; background: transparent; border: 1px solid var(--part-border); border-radius: .5rem; padding: .65rem .85rem; }
+:where(.part-ui button) { cursor: pointer; background: #244466; }
+:where(.part-ui button:disabled) { opacity: .5; cursor: wait; }
+:where(.part-ui :focus-visible) { outline: 2px solid #9accff; outline-offset: 3px; }
+:where(.part-ui [data-part-part="status"]) { font-size: .85rem; color: #aec0d6; margin: 0; }
+@media (prefers-reduced-motion: reduce) { :where(.part-ui *) { scroll-behavior: auto; } }
