@@ -31,3 +31,7 @@
 No migration from a previous runtime release is required: this is the first local
 integration alpha. The `car` prefix in the local design is renamed to `part`.
 Actual provider smoke is deferred. G-BASE and G-WORKFLOW are not formally certified.
+
+- Add immutable memory/durable file artifacts with authorized ranges and atomic publication.
+- Add explicit processor profiles, pinned result sources and concurrent submission dedupe.
+- Add authenticated script RPC grants with inherited budgets, expiry, revocation and host-owned methods.

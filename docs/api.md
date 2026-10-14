@@ -82,7 +82,13 @@ termination remains unknown/abandoned. Windows execution is unsupported.
 Low-level script completion reports exit status; workflow script steps additionally
 require exit code zero and complete capture. Logs are not automatically captured as
 results. `stdout-json` and declared JSON file capture are supported; channel capture,
-script IPC grants, and workspace/package execution resolvers are rejected.
+and workspace/package execution resolvers are rejected. Optional `part/script-bridge`,
+`part/script-bridge-services`, and `part/script-bridge-node` provide explicit grant
+issuance, authenticated loopback RPC and host-installed model/run/result/wait methods.
+Attach the listener to `createNodeScripts({ bridge })`; a public grant ID cannot
+authenticate a request. Grants inherit owner cancellation/deadlines and combine local
+limits with the parent budget. Stable request IDs deduplicate within the grant lifetime.
+Revocation cancels managed children; it does not sandbox arbitrary script I/O.
 
 ## Wire and UI
 
@@ -117,9 +123,15 @@ Unsupported component/slot options fail explicitly. Headless APIs remain indepen
 - SQLite stores one serialized materialization/journal snapshot per store ID in an
   atomic transaction. It is a correctness reference for bounded local data, not a
   backend optimized for very large histories or distributed writers.
-- Results currently support explicit inline JSON and the `schema` validation profile.
-  Artifact/captured references and processors are unsupported. Artifact storage,
-  admission queues and a general resource manager are not implemented.
+- Results support inline JSON, digest-pinned artifact/captured references, and explicit
+  processor chains with input/output schemas and matching validation evidence.
+  `createResults(types, options)` accepts artifact/capture resolvers, validation
+  profiles and a trusted producer authorization callback for multi-owner hosts.
+  Concurrent identical submissions share processing; changed content conflicts.
+  `part/artifacts` provides bounded memory storage; `part/artifacts-node` explicitly
+  opens a durable directory backend. Finalization publishes immutable bytes only
+  after storage succeeds. Reads authorize the principal and validate digest/range.
+  Admission queues and a general resource manager are pending.
 - Ollama supports text, thinking, complete object function arguments and token usage.
   Media, foreign native content, hosted tools and continuation tokens are rejected.
   Real-provider smoke and broader compatibility remain deferred.
@@ -135,7 +147,7 @@ Unsupported component/slot options fail explicitly. Headless APIs remain indepen
   durable workflow recovery and actual external-engine adapters are unsupported.
   The external engine fixture proves native forwarding, not product compatibility.
 - Workflow actions and waits are available through engine APIs. A generic workflow
-  endpoint/UI, authenticated script bridge, and end-to-end bridge budgets remain
+  endpoint/UI and the remaining conformance fixtures remain
   necessary before G-WORKFLOW signoff.
 
 ## Change procedure

@@ -1,75 +1,199 @@
-import type { Contracts as C, Results as R } from './reference.js';
-import { ok, fail, digest, canonical, freeze } from './contracts.js';
+import type { Contracts as C, Results as R, Storage as D } from './reference.js';
+import { ok, fail, digest, canonical, freeze, isJson } from './contracts.js';
 import { provenance } from './context.js';
-export function createResults(types: readonly R.TypeDefinition<unknown>[]): C.Result<R.Service> {
+export interface ResultsOptions {
+  artifacts?: D.ArtifactStore;
+  capture?: (
+    id: string,
+    context: C.InvocationContext,
+  ) => Promise<C.Result<{ bytes: Uint8Array; producedBy: C.EntityRef }>>;
+  authorizeProducer?: (ref: C.EntityRef, context: C.InvocationContext) => Promise<C.Result<void>>;
+  processors?: readonly R.Processor[];
+  profiles?: Readonly<Record<string, readonly string[]>>;
+  maxBytes?: number;
+}
+export function createResults(
+  types: readonly R.TypeDefinition<unknown>[],
+  options: ResultsOptions = {},
+): C.Result<R.Service> {
   if (
     types.some((type) => type.id !== type.schema.ref.id || type.version !== type.schema.ref.version)
   )
     return fail('results.schema-ref', 'Result type and schema reference must agree');
   const schemas = new Map(types.map((t) => [`${t.id}@${t.version}`, t.schema]));
-  if (schemas.size !== types.length) return fail('results.duplicate', 'Duplicate result type');
+  const processors = new Map((options.processors ?? []).map((p) => [p.id, p]));
+  const profiles = structuredClone(options.profiles ?? {});
+  if (schemas.size !== types.length || processors.size !== (options.processors ?? []).length)
+    return fail('results.duplicate', 'Duplicate result type or processor');
+  if (
+    Object.hasOwn(profiles, 'schema') ||
+    Object.values(profiles).some((ids) => ids.some((id) => !processors.has(id)))
+  )
+    return fail('results.profile', 'Invalid validation profile');
   const records = new Map<
-      string,
-      { accepted: R.Accepted; principal: C.InvocationContext['principal'] }
-    >(),
-    submissions = new Map<string, { digest: string; accepted: R.Accepted }>();
-  return ok({
-    async submit(input, context) {
-      if (context.signal.aborted)
-        return fail('results.cancelled', 'Submission cancelled', 'cancelled');
-      if (input.data.kind !== 'inline')
-        return fail(
-          'results.capture',
-          'Only explicit inline captures are installed',
-          'unsupported',
-        );
-      if (input.validationProfile !== 'schema')
-        return fail('results.profile', 'Unknown validation profile', 'unsupported');
-      const schema = schemas.get(`${input.expectedType.id}@${input.expectedType.version}`);
-      if (!schema) return fail('results.type', 'Result schema not installed', 'unsupported');
-      const checked = schema.validate(input.data.value);
+    string,
+    { accepted: R.Accepted; principal: C.InvocationContext['principal'] }
+  >();
+  const submissions = new Map<string, { digest: string; result: Promise<C.Result<R.Accepted>> }>();
+  const maximum = options.maxBytes ?? 16 * 1024 * 1024;
+  const schemaFor = (ref: C.SchemaRef) => schemas.get(`${ref.id}@${ref.version}`);
+  async function decode(
+    data: R.Input,
+    producer: C.EntityRef,
+    context: C.InvocationContext,
+  ): Promise<C.Result<C.Json>> {
+    if (data.kind === 'inline')
+      return isJson(data.value)
+        ? ok(structuredClone(data.value))
+        : fail('results.json', 'Result must be lossless JSON');
+    let bytes: Uint8Array;
+    if (data.kind === 'artifact') {
+      if (!options.artifacts)
+        return fail('results.artifact', 'Artifact store not installed', 'unsupported');
+      const loaded = await options.artifacts.read(data.ref, undefined, context);
+      if (!loaded.ok) return loaded;
+      const chunks: Uint8Array[] = [];
+      let size = 0;
+      for await (const chunk of loaded.value) {
+        size += chunk.length;
+        if (size > maximum) return fail('results.size', 'Result exceeds byte limit');
+        chunks.push(chunk);
+      }
+      bytes = new Uint8Array(size);
+      let offset = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.length;
+      }
+    } else {
+      if (!options.capture)
+        return fail('results.capture', 'Capture resolver not installed', 'unsupported');
+      const loaded = await options.capture(data.captureId, context);
+      if (!loaded.ok) return loaded;
+      if (
+        canonical(loaded.value.producedBy as unknown as C.Json) !==
+        canonical(producer as unknown as C.Json)
+      )
+        return fail('results.producer', 'Capture producer does not match', 'permission');
+      bytes = loaded.value.bytes.slice();
+    }
+    if (bytes.length > maximum || (await digest(bytes)) !== data.expectedDigest)
+      return fail('results.digest', 'Result bytes changed or exceed the limit', 'conflict');
+    try {
+      const value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+      return isJson(value) ? ok(value) : fail('results.json', 'Invalid JSON');
+    } catch {
+      return fail('results.json', 'Expected exactly one UTF-8 JSON value');
+    }
+  }
+  async function submit(
+    input: R.Submission,
+    context: C.InvocationContext,
+  ): Promise<C.Result<R.Accepted>> {
+    if (context.signal.aborted)
+      return fail('results.cancelled', 'Submission cancelled', 'cancelled');
+    if (options.authorizeProducer) {
+      const allowed = await options.authorizeProducer(input.producedBy, context);
+      if (!allowed.ok) return allowed;
+    }
+    const chain =
+      input.validationProfile === 'schema'
+        ? []
+        : Object.hasOwn(profiles, input.validationProfile)
+          ? profiles[input.validationProfile]!
+          : undefined;
+    if (!chain) return fail('results.profile', 'Unknown validation profile', 'unsupported');
+    const expected = schemaFor(input.expectedType);
+    if (!expected) return fail('results.type', 'Result schema not installed', 'unsupported');
+    let data = input.data;
+    const validation: R.Validation[] = [];
+    async function check(data: R.Input, ref: C.SchemaRef): Promise<C.Result<C.Json>> {
+      const schema = schemaFor(ref);
+      if (!schema) return fail('results.type', 'Processor schema not installed', 'unsupported');
+      const decoded = await decode(data, input.producedBy, context);
+      if (!decoded.ok) return decoded;
+      const checked = schema.validate(decoded.value);
       if (!checked.ok) return fail('results.validation', 'Result schema validation failed');
       const wire = schema.codec?.encode(checked.value);
-      if (!wire?.ok) return fail('results.codec', 'Result requires a lossless codec');
+      return wire?.ok ? wire : fail('results.codec', 'Result requires a lossless codec');
+    }
+    for (const id of chain) {
+      const processor = processors.get(id)!;
+      const checked = await check(data, processor.inputType);
+      if (!checked.ok) return checked;
+      const before = await digest(checked.value);
+      if (context.signal.aborted)
+        return fail('results.cancelled', 'Processing cancelled', 'cancelled');
+      // Pass a fixed explicit capture; processors never re-read mutable source files.
+      const processed = await processor.process(
+        freeze({ kind: 'inline', value: checked.value }),
+        context,
+      );
+      if (!processed.ok) return processed;
+      const output = await check(processed.value.output, processor.outputType);
+      if (!output.ok) return output;
+      const after = await digest(output.value),
+        evidence = processed.value.evidence;
+      if (
+        !isJson(evidence) ||
+        evidence.validator !== processor.id ||
+        evidence.version !== processor.version ||
+        evidence.status !== 'pass' ||
+        evidence.inputDigest !== before ||
+        evidence.outputDigest !== after
+      )
+        return fail('results.evidence', 'Processor evidence does not match the validated bytes');
+      validation.push(structuredClone(evidence));
+      data = { kind: 'inline', value: output.value };
+    }
+    const checked = await check(data, input.expectedType);
+    if (!checked.ok) return checked;
+    if (context.signal.aborted)
+      return fail('results.cancelled', 'Submission cancelled', 'cancelled');
+    const hash = await digest(checked.value);
+    validation.push({
+      validator: expected.ref.id,
+      version: String(expected.ref.version),
+      inputDigest: hash,
+      status: 'pass',
+      diagnostics: [],
+    });
+    const accepted: R.Accepted = freeze({
+      id: crypto.randomUUID(),
+      type: { ...input.expectedType },
+      data: { kind: 'inline', value: checked.value },
+      digest: hash,
+      producedBy: { ...input.producedBy },
+      validation,
+      provenance,
+      commit: [],
+    });
+    records.set(accepted.id, { accepted, principal: { ...context.principal } });
+    return ok(accepted);
+  }
+  return ok({
+    async submit(input, context) {
+      if (!isJson(input)) return fail('results.input', 'Submission must be lossless JSON');
+      input = structuredClone(input);
       const key = canonical({ principal: context.principal, submissionId: input.submissionId }),
-        inputDigest = await digest(input as unknown as C.Json);
+        fingerprint = canonical(input as unknown as C.Json);
       const existing = submissions.get(key);
       if (existing)
-        return existing.digest === inputDigest
-          ? ok(existing.accepted)
+        return existing.digest === fingerprint
+          ? existing.result
           : fail('results.submission', 'Submission ID has different content', 'conflict');
-      const hash = await digest(wire.value),
-        accepted: R.Accepted = freeze({
-          id: crypto.randomUUID(),
-          type: { ...input.expectedType },
-          data: { kind: 'inline', value: structuredClone(wire.value) },
-          digest: hash,
-          producedBy: { ...input.producedBy },
-          validation: [
-            {
-              validator: schema.ref.id,
-              version: String(schema.ref.version),
-              inputDigest: hash,
-              status: 'pass',
-              diagnostics: [],
-            },
-          ],
-          provenance,
-          commit: [],
-        });
-      records.set(accepted.id, { accepted, principal: { ...context.principal } });
-      submissions.set(key, { digest: inputDigest, accepted });
-      return ok(accepted);
+      const result = Promise.resolve()
+        .then(() => submit(input, context))
+        .catch(() => fail('results.processor', 'Result processing failed', 'internal'));
+      submissions.set(key, { digest: fingerprint, result });
+      return result;
     },
     async read(id, context) {
       const record = records.get(id);
       if (!record) return fail('results.missing', 'Result not found');
-      if (
-        record.principal.subject !== context.principal.subject ||
-        record.principal.authority !== context.principal.authority
-      )
-        return fail('results.permission', 'Result access denied', 'permission');
-      return ok(record.accepted);
+      return canonical(record.principal) === canonical(context.principal)
+        ? ok(record.accepted)
+        : fail('results.permission', 'Result access denied', 'permission');
     },
   });
 }

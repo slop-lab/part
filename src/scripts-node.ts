@@ -7,6 +7,7 @@ import type { Operations } from './runtime.js';
 import { ok, fail, digest, isJson } from './contracts.js';
 import { createOperations, createBoundary, managedAttempt } from './runtime.js';
 import { reserve } from './model.js';
+import type { ScriptBridgeEnvironment } from './script-bridge-node.js';
 export function createNodeScripts(options: {
   root: string;
   interpreters: Readonly<Record<string, string>>;
@@ -14,6 +15,7 @@ export function createNodeScripts(options: {
   operations?: Operations;
   boundary?: R.InvocationBoundary;
   maxOutputBytes?: number;
+  bridge?: ScriptBridgeEnvironment;
 }): S.Service {
   const root = resolve(options.root),
     interpreters = { ...options.interpreters },
@@ -37,7 +39,7 @@ export function createNodeScripts(options: {
         !Object.hasOwn(interpreters, request.interpreter)
       )
         return fail('scripts.executor', 'Executor or interpreter not installed', 'unsupported');
-      if (request.bridgeGrant)
+      if (request.bridgeGrant && !options.bridge)
         return fail('scripts.bridge', 'No script IPC bridge is installed', 'unsupported');
       if (request.workspace || request.source.packageId)
         return fail(
@@ -118,9 +120,21 @@ export function createNodeScripts(options: {
               try {
                 await writeFile(snapshot, bytes, { mode: 0o400 });
                 if (c.signal.aborted) return { kind: 'cancelled', effect: 'not-attempted' };
+                const bridgeEnvironment = fixed.bridgeGrant
+                  ? options.bridge!.environment(fixed.bridgeGrant, c)
+                  : ok({});
+                if (!bridgeEnvironment.ok)
+                  return {
+                    kind: 'failed',
+                    error: bridgeEnvironment.error,
+                    effect: 'not-attempted',
+                  };
                 const child = spawn(interpreters[fixed.interpreter]!, [snapshot, ...fixed.args], {
                   cwd: root,
-                  env: fixed.environmentProfile ? environments[fixed.environmentProfile] : {},
+                  env: {
+                    ...(fixed.environmentProfile ? environments[fixed.environmentProfile] : {}),
+                    ...bridgeEnvironment.value,
+                  },
                   stdio: ['pipe', 'pipe', 'pipe'],
                   detached: true,
                 });
