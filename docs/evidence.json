@@ -1,0 +1,128 @@
+{
+  "candidate": {
+    "name": "part",
+    "version": "0.1.0-alpha.1",
+    "revision": "0f384f1614d99304ffee4af023d2282e38649167",
+    "sourceSha256": {
+      "src/agent.ts": "6475c042b4ff0a1ae51150d56999926d6a6c7ac74e87d413913d7c93541875f6",
+      "src/client.ts": "dd0281e63881475171d26b8f6cdf06823a405b6d768ab8e9bd8821e07cdfb4f4",
+      "src/composition.ts": "dd82ec57d65059623ac62fc2c472b762346d1bce78530ceb8d15371dd1a8549a",
+      "src/context.ts": "9c062bc24adb9c1d9897e9ded59ff555d5087289d0f0bf9982703ed677c6b456",
+      "src/contracts.ts": "33fe301981dfb73ebf9d823534154a86e2e14c39442d86a94f4c28364a72e399",
+      "src/control.ts": "c93d065bab2159c386f2bac3a0e393d3a74a864aa6c2186e527a94c06f217c83",
+      "src/core.ts": "1d530da37b8d861a7f243a4fd209b4ad703e2766076a754d4f66948bbc177f90",
+      "src/deadline.ts": "a44c47a6e58693fec101dcb40da28673d125692f920c210c1a1a18ab40f5147f",
+      "src/driver-basic.ts": "e27533c8435b81245b3033bad141b3b987a0cb5229bae4fe9439cc4422d4cc5c",
+      "src/hash.ts": "c898da64bc2e3bfd241fb02ea307d9beefaa8ce7d2deae274a443a87ae5bbc2d",
+      "src/history.ts": "29649a14aceff21f0d62f558dc6e566984e5bd188d45f885606bca340d2f6cb9",
+      "src/hooks.ts": "91c6ee17f681b2b46397350fb33324a24bf4533a3be614fc2e8198eb535c80a5",
+      "src/host-embedded.ts": "c87c249b9182665c382655e631f5e2b9b759ef359cb8703908ce4eb84c540880",
+      "src/host-http.ts": "8f91a10f8d6fd579019db7648c737e05053546b0e6d0e5f9b9649f8ce5a74982",
+      "src/model.ts": "9354aefad5af7e6c0dfb6151024116101398094b6ae4d7461d99c81be7d4a283",
+      "src/packages-node.ts": "8abed14547d2e6ea2a68920aa55c2119374d05cef4c7546a8796f96a231e369a",
+      "src/projection.ts": "e54d33e7ed521649b547b4e18c985b268f655c8048b1c736e9a324d6525c5a29",
+      "src/provider-ollama.ts": "c81161a71cf1b2c59fa7a4f9566ca3315706edb05e95cd045fde70879aa06216",
+      "src/reference.d.ts": "6690fc4d7723f0b42b12d42b5ee4203d63aec541b7a3feae8d7da9da16803829",
+      "src/results.ts": "328e0523806ff2d723c6b17c91430ebe8201a6ff9bd3c1d9f1c0afe3d0e1e718",
+      "src/runs.ts": "d578f624d8a774ccd058dd47ef369f564b0b307a0c6955ea09409349dab56300",
+      "src/runtime.ts": "bb34064b09e090f0e0d7462f5e07a394eff9dfa296e993ccb855ea1dd5aceb7e",
+      "src/scripts-node.ts": "0a246b7df2fc840a77a0a2b8fe15617891b7a012d4cdaecee3af9383b35f0678",
+      "src/skills.ts": "f7008cca8e3f986db27c3b591f5f4787271e2ae6aaac156cc7c8700b048b1336",
+      "src/storage-memory.ts": "62f8c69fa646d8c270f8df57ab2bdf88f9b55e68f9ae4d0bea6923f4b674cc0d",
+      "src/storage-runtime.ts": "9aecf82d59aac57d27766cece4ea5e32e3ea4f1d246f1300f05ad65e72c0d931",
+      "src/storage-sqlite.ts": "bfd824c8afae3847e763f6556f8525b3096387211cf8de67bfec76860378efc1",
+      "src/testing.ts": "d3ac1773d98eab4c2e78caf0c06007ea3e9bea39ccdbb1d3195e09aaee52c379",
+      "src/tools.ts": "65012a0e78df31f4f89b8039adaa12cadeb0b0adcd2f230347750031c8b72fb1",
+      "src/transport-http.ts": "86feec1b43c507725918ef8b94f49c4a268f0ee091ddc7836b81a9fb06be6ce1",
+      "src/ui-dom.ts": "6b29ef1f07b1eb1910d155d1d331c294b7b406e7e1b887629e0c38688b2d303c",
+      "src/ui-headless.ts": "80c5f1f448f31e084a71215bb25f7a299564fce9b75dc4ffda15af3c1930592e",
+      "src/ui.css": "f22dc43fcefa0a9b3b72ef1016baf175d8820976b5e0a673ae210b7aa82e9847",
+      "src/waits.ts": "c3e9e4923b469775a1159452172ea119c614cabf645ac613532e137557e03319",
+      "src/workflow-code.ts": "4701a399bc99520214a51df0fc57ca6e224d3552d0de556e83ae43d6bb732ad8",
+      "src/workflow-host.ts": "8df22f81b0331537e599504ee2f822129460903a2263c057f7cfa5e290bf5089",
+      "src/workflow-memory.ts": "cc971e18a95f338e8c9fcdf94562aace6bade571479862729bd66dd67e652cba",
+      "src/workflow-pipeline.ts": "a9747181d591a61f195dbacfab0def172f11f6eadca5ae5bb7d86f86b8075405",
+      "tests/agent.test.mjs": "cb9fcfe0348e6a13623c310b9886c5d3fcb4805bfb1ab6579a61eccd13a06dae",
+      "tests/client-ui.test.mjs": "d2c63b72ed12ccbbd1ec9d4660421976fee3620df14f17fee414f7f0e48df67b",
+      "tests/experiment.test.mjs": "639dd8eeec0ebf0cc7f77f0f037732ce9bd387ade5426f78ab7645b5c9a7421a",
+      "tests/extensions.test.mjs": "777a207c053667117f01b4d591639e1223b1242ebc89bd711edf437464e802ed",
+      "tests/foundation.test.mjs": "1868a232b6269a96be3ce75ebd8fc9218c4ffa28a178faceba821c749f31a94e",
+      "tests/http.test.mjs": "0c154a6da88492b099b74a51a9a2fcdbdf55b65823713795218411be3428731f",
+      "tests/skills-hooks.test.mjs": "006300ea8ca35d02da4e13ab25f9af129009d73966203e30281558b9d98d5ec9",
+      "tests/storage.test.mjs": "1e40a1b4cdc1c2b8dbf4e0b905e2715780f107b34b21ebd04551f0f1977ba66b",
+      "tests/workflow.test.mjs": "d66e54c8137abe4fc6e35283cc50e69981efed27800cf5255d0e9394603fbc81",
+      "scripts/build-preview.mjs": "4209c09b51570b4845b30bbf60bfdb28292c52942617b73a3ad414ef4acb1458",
+      "scripts/measure.mjs": "0a7425658e05d3bfb9106eb348cfe8acc366eb4624c5525f7e239c4851bac013",
+      "scripts/serve-preview.mjs": "0ed4862c1e3a267b05ef2a51cd6f126354964cd717cb0f291aaf819d02d1c857",
+      "scripts/test-consumers.mjs": "3f8a557e09631f55538b1bc44af81b5b8fd5b19fe745cd2c8925af1323bced0f",
+      "consumers/contracts/index.ts": "6668dda7fa7d4f16546f9cc28f11408a1c76a49407ffa4e40f8dee1da46b2f87",
+      "consumers/non-coding/index.mjs": "7d33c8e3d2c9d2b3936b6715196434a3987366825d82a32bb390745f4729882a",
+      "consumers/swe/index.mjs": "f58251703e59dff42cf6a956b5732d5da651e314a7ac3c0e2a7a0ba7198a9f3d",
+      "experiments/alternate-boundary.mjs": "5c8623ffa7fe368bdce3371ca0eb84a70940106e9d16c657f6502a12e9abcd21"
+    }
+  },
+  "recordedAt": "2026-10-14T18:16:31.724251+00:00",
+  "environment": {
+    "node": "v26.5.1",
+    "platform": "linux",
+    "coreImportMs": 1.8366089999999993,
+    "heapDeltaBytes": 302712,
+    "newActiveResources": [],
+    "runtimeDependencies": 0
+  },
+  "commands": [
+    {
+      "command": "npm test",
+      "result": "pass",
+      "tests": 55,
+      "failures": 0
+    },
+    {
+      "command": "npm run test:consumers",
+      "result": "pass",
+      "consumers": ["non-coding", "swe", "contracts"],
+      "installedVersion": "0.1.0-alpha.1"
+    },
+    {
+      "command": "npm run preview:build",
+      "result": "pass",
+      "artifact": "preview/index.html"
+    },
+    {
+      "command": "node scripts/measure.mjs",
+      "result": "pass",
+      "measurements": {
+        "node": "v26.5.1",
+        "platform": "linux",
+        "coreImportMs": 1.8366089999999993,
+        "heapDeltaBytes": 302712,
+        "newActiveResources": [],
+        "runtimeDependencies": 0
+      }
+    },
+    {
+      "command": "npm run format:check",
+      "result": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass"
+    }
+  ],
+  "gates": {
+    "G-BASE": {
+      "result": "not-certified",
+      "reason": "Actual-provider smoke explicitly deferred by the user; local fake-provider subset validated."
+    },
+    "G-WORKFLOW": {
+      "result": "not-certified",
+      "reason": "Script IPC bridge, full agent/external boundary coverage and generic workflow client/UI remain unimplemented or not run."
+    }
+  },
+  "notRun": [
+    "real-provider smoke",
+    "hosted CI Node 22/24 matrix",
+    "real browser visual/accessibility audit",
+    "actual external-engine adapters"
+  ]
+}
