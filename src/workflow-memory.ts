@@ -29,6 +29,12 @@ export interface PreparedRunner {
     record: (outcome: R.ManagedOutcome<unknown>) => void,
   ): Promise<C.Result<C.Json>>;
 }
+const stepScopes = new WeakMap<W.StepContext, (context: OperationContext) => W.StepContext>();
+export function scopeStepContext(steps: W.StepContext, context: OperationContext): W.StepContext {
+  const bind = stepScopes.get(steps);
+  if (!bind) throw new Error('Step context cannot be rebound by this engine');
+  return bind(context);
+}
 export const memoryGuarantees: W.Guarantees = freeze({
   control: 'runner-enforced',
   effects: 'runner-path-only',
@@ -74,7 +80,7 @@ export function createMemoryWorkflowEngine(options: {
     handle: R.ExecutionHandle<C.Json>;
     native: C.Json;
     nativeRevision: number;
-    waits: Map<string, { ticket: R.WaitTicket; schema: C.Schema<C.Json> }>;
+    waits: Map<string, { ticket: R.WaitTicket; schema: C.Schema<C.Json>; presentation: C.Json }>;
     active: Set<C.EntityRef>;
     output?: W.Output;
   }
@@ -114,7 +120,7 @@ export function createMemoryWorkflowEngine(options: {
       revision: `${state.revision}/${execution.nativeRevision}`,
       definitionDigest: execution.prepared.definition.digest,
       owner: options.descriptor.id,
-      phase,
+      phase: phase === 'running' && waiting.length ? 'waiting' : phase,
       nativeState: {
         schema: { id: `${options.descriptor.id}/state`, version: 1 },
         data: structuredClone(execution.native),
@@ -296,7 +302,10 @@ export function createMemoryWorkflowEngine(options: {
         engineVersion: options.descriptor.version,
         id: crypto.randomUUID(),
       });
-      const waiting = new Map<string, { ticket: R.WaitTicket; schema: C.Schema<C.Json> }>(),
+      const waiting = new Map<
+          string,
+          { ticket: R.WaitTicket; schema: C.Schema<C.Json>; presentation: C.Json }
+        >(),
         active = new Set<C.EntityRef>();
       let execution: Execution | undefined;
       let resolveSubmission!: (result: W.Submission) => void;
@@ -387,105 +396,117 @@ export function createMemoryWorkflowEngine(options: {
             commit.push(...outcome.commit);
             return outcome;
           };
-          const stepContext: W.StepContext = {
-            execution: ref,
-            signal: operationContext.signal,
-            limits: request.limits ?? {},
-            script: (identity, input) =>
-              memoize(identity, input as unknown as C.Json, async () => {
-                const outcome = options.services.scripts
-                  ? await runHandle(await options.services.scripts.execute(input, operationContext))
-                  : missing('scripts');
-                if (
-                  outcome.phase === 'completed' &&
-                  (outcome.result.exitCode !== 0 || outcome.result.completeness !== 'complete')
-                )
-                  return {
-                    phase: 'failed',
-                    effect: outcome.effect,
-                    commit: outcome.commit,
-                    unsettledChildren: outcome.unsettledChildren,
-                    error: fail(
-                      'workflow.script-exit',
-                      'Script exited unsuccessfully or capture is incomplete',
-                    ).error,
-                  };
-                return outcome;
-              }),
-            model: (identity, input) =>
-              memoize(identity, input as unknown as C.Json, async () =>
-                options.services.model
-                  ? runHandle(await options.services.model.invoke(input, operationContext))
-                  : missing('model'),
-              ),
-            agent: (identity, input) =>
-              memoize(
-                identity,
-                {
-                  driver: input.driver,
-                  input: input.input,
-                  compositionRevision: input.composition.inspection.revision,
-                },
-                async () =>
-                  options.services.runs
-                    ? runHandle(await options.services.runs.start(input, operationContext))
-                    : missing('runs'),
-              ),
-            submit: (identity, input) =>
-              memoize(identity, input as unknown as C.Json, async () =>
-                options.services.results
-                  ? options.services.results.submit(input, operationContext)
-                  : fail('workflow.results', 'Results service not installed', 'unsupported'),
-              ),
-            wait: (identity, input) =>
-              memoize(
-                identity,
-                {
-                  type: input.type,
-                  responseSchema: { ...input.responseSchema.ref },
-                  presentation: input.presentation,
-                  bindingDigest: input.bindingDigest,
-                },
-                async () => {
-                  if (!options.services.waits)
-                    return fail('workflow.waits', 'Wait service not installed', 'unsupported');
-                  const opened = await options.services.waits.open(
-                    {
-                      ...input,
-                      bindingDigest: await digest({
-                        definition: request.prepared.definition.digest,
-                        execution: ref.id,
-                        binding: input.bindingDigest,
-                      }),
-                    },
-                    operationContext,
-                  );
-                  if (opened.ok)
-                    waiting.set(opened.value.id, {
-                      ticket: opened.value,
-                      schema: input.responseSchema,
-                    });
-                  return opened;
-                },
-              ),
-            async response(ticket) {
-              const entry = waiting.get(ticket.id);
-              if (!entry || !options.services.waits)
-                return fail('workflow.ticket', 'Ticket not owned by this execution');
-              const response = await operationContext.wait(
-                options.services.waits.wait(entry.ticket, entry.schema, operationContext),
-              );
-              entry.ticket = {
-                ...entry.ticket,
-                state: response.ok
-                  ? 'resolved'
-                  : operationContext.signal.aborted
-                    ? 'cancelled'
-                    : 'expired',
-              };
-              return response;
-            },
+          const makeStepContext = (invocation: OperationContext): W.StepContext => {
+            const scoped: W.StepContext = {
+              execution: ref,
+              signal: invocation.signal,
+              limits: request.limits ?? {},
+              script: (identity, input) =>
+                memoize(identity, input as unknown as C.Json, async () => {
+                  const outcome = options.services.scripts
+                    ? await runHandle(await options.services.scripts.execute(input, invocation))
+                    : missing('scripts');
+                  if (
+                    outcome.phase === 'completed' &&
+                    (outcome.result.exitCode !== 0 || outcome.result.completeness !== 'complete')
+                  )
+                    return {
+                      phase: 'failed',
+                      effect: outcome.effect,
+                      commit: outcome.commit,
+                      unsettledChildren: outcome.unsettledChildren,
+                      error: fail(
+                        'workflow.script-exit',
+                        'Script exited unsuccessfully or capture is incomplete',
+                      ).error,
+                    };
+                  return outcome;
+                }),
+              model: (identity, input) =>
+                memoize(identity, input as unknown as C.Json, async () =>
+                  options.services.model
+                    ? runHandle(await options.services.model.invoke(input, invocation))
+                    : missing('model'),
+                ),
+              agent: (identity, input) =>
+                memoize(
+                  identity,
+                  {
+                    driver: input.driver,
+                    input: input.input,
+                    compositionRevision: input.composition.inspection.revision,
+                  },
+                  async () =>
+                    options.services.runs
+                      ? runHandle(await options.services.runs.start(input, invocation))
+                      : missing('runs'),
+                ),
+              submit: (identity, input) =>
+                memoize(identity, input as unknown as C.Json, async () =>
+                  options.services.results
+                    ? options.services.results.submit(input, invocation)
+                    : fail('workflow.results', 'Results service not installed', 'unsupported'),
+                ),
+              wait: (identity, input) =>
+                memoize(
+                  identity,
+                  {
+                    type: input.type,
+                    responseSchema: { ...input.responseSchema.ref },
+                    presentation: input.presentation,
+                    bindingDigest: input.bindingDigest,
+                  },
+                  async () => {
+                    if (!options.services.waits)
+                      return fail('workflow.waits', 'Wait service not installed', 'unsupported');
+                    const opened = await options.services.waits.open(
+                      {
+                        ...input,
+                        bindingDigest: await digest({
+                          definition: request.prepared.definition.digest,
+                          execution: ref.id,
+                          binding: input.bindingDigest,
+                        }),
+                      },
+                      invocation,
+                    );
+                    if (opened.ok)
+                      waiting.set(opened.value.id, {
+                        ticket: opened.value,
+                        schema: input.responseSchema,
+                        presentation: structuredClone(input.presentation),
+                      });
+                    if (opened.ok) {
+                      if (execution) execution.nativeRevision++;
+                      operationContext.progress.publish('part.workflow/wait', {
+                        ticketId: opened.value.id,
+                      });
+                    }
+                    return opened;
+                  },
+                ),
+              async response(ticket) {
+                const entry = waiting.get(ticket.id);
+                if (!entry || !options.services.waits)
+                  return fail('workflow.ticket', 'Ticket not owned by this execution');
+                const response = await invocation.wait(
+                  options.services.waits.wait(entry.ticket, entry.schema, invocation),
+                );
+                entry.ticket = {
+                  ...entry.ticket,
+                  state: response.ok
+                    ? 'resolved'
+                    : invocation.signal.aborted
+                      ? 'cancelled'
+                      : 'expired',
+                };
+                return response;
+              },
+            };
+            stepScopes.set(scoped, makeStepContext);
+            return scoped;
           };
+          const stepContext = makeStepContext(operationContext);
           let result: C.Result<C.Json>;
           try {
             result = await runner.execute(
@@ -620,6 +641,22 @@ export function createMemoryWorkflowEngine(options: {
         effect: 'not-applicable',
         commit: [],
       };
+    },
+    async inspect(ref, view, context) {
+      const result = getExecution(ref, context);
+      if (!result.ok) return result;
+      if (view !== 'waits')
+        return fail('workflow.view', 'Inspect view not installed', 'unsupported');
+      const open = snapshot(result.value).waitingOn.map((ref) => result.value.waits.get(ref.id)!);
+      return ok({
+        kind: 'waits',
+        schema: { id: 'part/workflow-waits', version: 1 },
+        data: open.map((entry) => ({
+          ticket: { ...entry.ticket },
+          responseSchema: { ...entry.schema.ref },
+          presentation: structuredClone(entry.presentation),
+        })),
+      });
     },
     async reconcileSubmission(key, context) {
       const found = submissions.get(canonical({ principal: context.principal, key }));

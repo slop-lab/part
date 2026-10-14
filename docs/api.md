@@ -131,7 +131,9 @@ Unsupported component/slot options fail explicitly. Headless APIs remain indepen
   `part/artifacts` provides bounded memory storage; `part/artifacts-node` explicitly
   opens a durable directory backend. Finalization publishes immutable bytes only
   after storage succeeds. Reads authorize the principal and validate digest/range.
-  Admission queues and a general resource manager are pending.
+  `part/host-runtime` supplies bounded priority admission, pending replacement,
+  request dedupe and drain/cancel shutdown. `part/host-resources` owns registration,
+  explicit transfer and cleanup with unresolved-resource evidence. Both are optional.
 - Ollama supports text, thinking, complete object function arguments and token usage.
   Media, foreign native content, hosted tools and continuation tokens are rejected.
   Real-provider smoke and broader compatibility remain deferred.
@@ -141,14 +143,22 @@ Unsupported component/slot options fail explicitly. Headless APIs remain indepen
 - Reference workflow engines use one configured service composition named `default`;
   unknown execution profile IDs fail prepare. Code definitions are trusted explicitly registered functions; source hashes cover
   the function text and schema refs, not arbitrary mutable closure state. Code replay
-  is `none`. Pipeline branch/repeat/parallel, per-step timeouts, skill binding and
-  required handler capabilities are rejected by the current subset.
+  is `none`. Pipeline supports lexical branch, bounded repeat (up to 10,000 iterations),
+  bounded parallel (up to 64 workers), step timeouts and installed handler capabilities.
+  Block depth is bounded at 32 and total steps at 10,000. Parallel `collect` joins all
+  required branches and fails if any fails; `cancel-and-join` cancels siblings before
+  returning failure. Results preserve branch order. Skill binding is still pending.
 - Workflow submission dedupe is memory-only. Nested workflow budget composition,
-  durable workflow recovery and actual external-engine adapters are unsupported.
-  The external engine fixture proves native forwarding, not product compatibility.
-- Workflow actions and waits are available through engine APIs. A generic workflow
-  endpoint/UI and the remaining conformance fixtures remain
-  necessary before G-WORKFLOW signoff.
+  and durable code/pipeline recovery are unsupported. `part/workflow-external`
+  adapts a native scheduling/state owner with submit, attach, reconciliation, native
+  actions and observation. Uncertain submission is never automatically repeated.
+  The independent native fixture proves these boundaries, not product compatibility.
+- `part/workflow-endpoint` resolves registered definition/digest/profile/composition
+  references locally; wire never carries Prepared tokens or executable modules.
+  It projects authorized status, result, waits and actions without raw native state.
+  `part/ui-workflow` provides safe default cards and JSON action/approval forms,
+  independent of custom renderers. Unknown delivery preserves the command ID.
+  Closing observation does not cancel the execution; endpoint shutdown does.
 
 ## Change procedure
 

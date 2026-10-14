@@ -1,0 +1,304 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { localContext, ok, fail, jsonSchema } from '../dist/contracts.js';
+import { createOperations, createProgress } from '../dist/runtime.js';
+import { createResourceManager } from '../dist/host-resources.js';
+import { createRuntimeHost } from '../dist/host-runtime.js';
+import { createExternalEngine } from '../dist/workflow-external.js';
+import { provenance } from '../dist/context.js';
+const context = localContext();
+const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+const terminal = (result) => ({
+  phase: 'completed',
+  result,
+  effect: 'not-applied',
+  commit: [],
+  unsettledChildren: [],
+});
+test('Resource ownership transfer and cleanup preserve failed resources for reconciliation', async () => {
+  const resources = createResourceManager({ closeGraceMs: 5 });
+  const a = { kind: 'runtime', id: 'a' },
+    b = { kind: 'runtime', id: 'b' };
+  let closed = 0;
+  const ref = { owner: 'test', kind: 'socket', id: 'one' };
+  assert.equal(
+    resources.register({
+      ref,
+      owner: a,
+      transferable: true,
+      close: async () => {
+        closed++;
+        return ok(undefined);
+      },
+    }).ok,
+    true,
+  );
+  assert.equal(resources.transfer(ref, b).ok, true);
+  assert.equal((await resources.closeOwner(a)).released.length, 0);
+  assert.equal((await resources.closeOwner(b)).released.length, 1);
+  assert.equal(closed, 1);
+  resources.register({
+    ref,
+    owner: a,
+    transferable: false,
+    close: async () => fail('test.close', 'Close failed'),
+  });
+  assert.equal(resources.transfer(ref, b).ok, false);
+  assert.equal((await resources.closeOwner(a)).unresolved.length, 1);
+  assert.equal((await resources.closeOwner(a)).unresolved.length, 1);
+});
+test('Runtime admission enforces capacity, replacement, dedupe, expiry and drain; unknown cleanup stays unresolved', async () => {
+  const operations = createOperations({ cancellationGraceMs: 5 });
+  const effects = [],
+    gates = new Map();
+  const runs = {
+    async start(request, context) {
+      return operations.begin(
+        { kind: 'part/run', childPolicy: 'attached', retryOwner: 'test' },
+        async (c) => {
+          effects.push(request.input);
+          await new Promise((resolve) => {
+            gates.set(request.input, resolve);
+            c.signal.addEventListener('abort', resolve, { once: true });
+          });
+          return terminal(request.input);
+        },
+        context,
+      );
+    },
+  };
+  const host = createRuntimeHost({
+    runs,
+    maxConcurrent: 1,
+    maxQueued: 2,
+    policy: {
+      decide(request, pending) {
+        return ok({
+          action: request.concurrencyKey === 'replace' ? 'replace-pending' : 'queue',
+          affected:
+            request.concurrencyKey === 'replace'
+              ? pending.filter((p) => p.concurrencyKey === 'replace').map((p) => p.requestId)
+              : [],
+        });
+      },
+    },
+  });
+  await host.start(context);
+  const composition = { inspection: { revision: '1' } };
+  const request = (id, extra = {}) => ({
+    requestId: id,
+    run: { driver: 'test', composition, input: id },
+    ...extra,
+  });
+  const one = await host.submit(request('one'), context);
+  await delay(2);
+  assert.equal(host.getJob('one', context).value.kind, 'started');
+  await host.submit(request('old', { concurrencyKey: 'replace' }), context);
+  await host.submit(request('new', { concurrencyKey: 'replace' }), context);
+  assert.equal(host.getJob('old', context).value.kind, 'superseded');
+  assert.equal(
+    (await host.submit(request('new', { concurrencyKey: 'replace' }), context)).value.kind,
+    'queued',
+  );
+  assert.equal(
+    (
+      await host.submit(
+        { ...request('new'), run: { driver: 'test', composition, input: 'changed' } },
+        context,
+      )
+    ).ok,
+    false,
+  );
+  await host.submit(
+    request('expired', { expiresAt: new Date(Date.now() - 1000).toISOString() }),
+    context,
+  );
+  gates.get('one')();
+  await delay(5);
+  assert.deepEqual(effects, ['one', 'new']);
+  gates.get('new')();
+  const report = await host.stop({
+    mode: 'drain',
+    deadline: new Date(Date.now() + 1000).toISOString(),
+  });
+  assert.equal(report.unresolved.length, 0);
+  assert.equal(host.getJob('expired', context).value.kind, 'rejected');
+  assert.equal((await host.submit(request('later'), context)).ok, false);
+  const unknown = createRuntimeHost({
+    runs: {
+      start: (_request, c) =>
+        operations.begin(
+          { kind: 'part/run', childPolicy: 'attached', retryOwner: 'test' },
+          async () => new Promise(() => {}),
+          c,
+        ),
+    },
+  });
+  await unknown.start(context);
+  await unknown.submit(request('uncooperative'), context);
+  await delay(1);
+  assert.equal(
+    (await unknown.stop({ mode: 'cancel', deadline: new Date(Date.now() + 1000).toISOString() }))
+      .unresolved.length,
+    1,
+  );
+});
+test('External adapter attaches native owner state after unknown submission and forwards actions without second scheduling', async () => {
+  let submits = 0,
+    actions = 0;
+  const records = new Map(),
+    keys = new Map();
+  const descriptor = {
+    id: 'test/native',
+    version: '1',
+    forms: ['external'],
+    formats: [{ id: 'native', versions: ['1'] }],
+    capabilities: { revision: '1', entries: [] },
+  };
+  const guarantees = {
+    control: 'runner-enforced',
+    effects: 'runner-path-only',
+    checkpoint: 'engine-native',
+    submissionDedupe: 'durable',
+    scriptCancellation: 'engine-native',
+    nativeSemantics: [
+      'Native owner schedules continuation',
+      'Inner agent effects are not checkpointed',
+    ],
+  };
+  const port = {
+    prepare: async () =>
+      ok({
+        compositionRevision: 'native1',
+        input: jsonSchema.ref,
+        output: jsonSchema.ref,
+        guarantees,
+        compatibility: {
+          format: 'native',
+          sourceVersion: '1',
+          decoder: 'test',
+          unsupportedRequired: [],
+          unsupportedOptional: [],
+          warnings: [],
+        },
+        report: [],
+        localHandle: { code: 'installed' },
+      }),
+    async submit(key, _prepared, input) {
+      submits++;
+      const native = { job: 'one' };
+      keys.set(key, native);
+      records.set(native.job, {
+        revision: 'native/1',
+        definitionDigest: 'native-digest',
+        owner: 'native-owner',
+        phase: 'waiting',
+        nativeState: { schema: jsonSchema.ref, data: { cursor: 'native-node-3', input } },
+        guarantees,
+        activeOperations: [],
+        waitingOn: [],
+        diagnostics: [],
+        actions: [
+          {
+            id: 'native/approve',
+            version: 1,
+            input: jsonSchema.ref,
+            output: jsonSchema.ref,
+            execution: 'immediate',
+            availability: { state: 'available', checkedAt: 'native/1' },
+          },
+        ],
+        effect: 'unknown',
+      });
+      return {
+        kind: 'unknown',
+        reconciliationKey: key,
+        error: fail('test.network', 'Delivery interrupted', 'unavailable', 'unknown').error,
+      };
+    },
+    get: async (native) =>
+      records.has(native.job)
+        ? ok(records.get(native.job))
+        : fail('native.missing', 'Unknown native job'),
+    cancel: async (native) => {
+      records.get(native.job).phase = 'cancelled';
+      return ok({ state: 'confirmed', effect: 'unknown' });
+    },
+    observe: () => ({ async *[Symbol.asyncIterator]() {} }),
+    action: async (native, command) => {
+      actions++;
+      const record = records.get(native.job);
+      record.phase = 'succeeded';
+      record.output = {
+        kind: 'native',
+        data: { done: true },
+        validation: 'unverified',
+        provenance,
+      };
+      return {
+        kind: 'completed',
+        commandId: command.commandId,
+        result: { done: true },
+        effect: 'applied',
+        commit: [],
+      };
+    },
+    reconcile: async (key) => ok(keys.get(key) ?? null),
+  };
+  const engine = createExternalEngine(descriptor, port);
+  const prepared = (
+    await engine.prepare(
+      {
+        engineId: descriptor.id,
+        definition: {
+          id: 'job',
+          digest: 'native-digest',
+          format: 'native',
+          formatVersion: '1',
+          source: { owner: 'native', native: {} },
+        },
+        profileId: 'default',
+        requiredCapabilities: [],
+        requiredControl: 'runner-enforced',
+      },
+      context,
+    )
+  ).value;
+  const request = { requestId: 'one', idempotencyKey: 'stable', prepared, input: { task: 1 } };
+  const [one, two] = await Promise.all([
+    engine.start(request, context),
+    engine.start(request, context),
+  ]);
+  assert.equal(one.kind, 'unknown');
+  assert.equal(two.reconciliationKey, one.reconciliationKey);
+  assert.equal(submits, 1);
+  const attached = (await engine.reconcileSubmission(one.reconciliationKey, context)).value;
+  const snapshot = (await engine.get(attached, context)).value;
+  assert.equal(snapshot.nativeState.data.cursor, 'native-node-3');
+  assert.equal(snapshot.guarantees.checkpoint, 'engine-native');
+  assert.equal((await engine.get({ ...attached, native: { job: 'other' } }, context)).ok, false);
+  assert.equal(
+    (
+      await engine.reconcileSubmission(
+        one.reconciliationKey,
+        localContext({ principal: { subject: 'foreign', authority: 'test' } }),
+      )
+    ).ok,
+    false,
+  );
+  await engine.action(
+    attached,
+    {
+      commandId: 'approve',
+      actionId: 'native/approve',
+      actionVersion: 1,
+      protocolVersion: 1,
+      input: true,
+    },
+    context,
+  );
+  assert.equal((await engine.get(attached, context)).value.phase, 'succeeded');
+  assert.equal(actions, 1);
+  assert.equal(submits, 1);
+  assert.equal((await engine.start({ ...request, input: { task: 2 } }, context)).kind, 'rejected');
+});

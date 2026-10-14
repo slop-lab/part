@@ -35,3 +35,8 @@ Actual provider smoke is deferred. G-BASE and G-WORKFLOW are not formally certif
 - Add immutable memory/durable file artifacts with authorized ranges and atomic publication.
 - Add explicit processor profiles, pinned result sources and concurrent submission dedupe.
 - Add authenticated script RPC grants with inherited budgets, expiry, revocation and host-owned methods.
+
+- Add bounded nested pipeline branches, repeat, parallel, step timeouts and capability validation.
+- Add generic workflow endpoint, default action/approval UI and authorized wait inspection.
+- Add native workflow submission/attach/reconciliation adapters without a second scheduler.
+- Add priority admission, pending replacement, drain/cancel and resource ownership/transfer.
