@@ -1,8 +1,8 @@
 import type { Contracts as C, Model as M, Runtime as R } from './reference.js';
 import { ok, fail, digest, freeze, isJson } from './contracts.js';
-import { createOperations, createBoundary, managedAttempt } from './runtime.js';
+import { createOperations, createBoundary, managedAttempt, budgetKey } from './runtime.js';
 import type { Operations } from './runtime.js';
-export const budgetKey: C.ServiceKey<R.BudgetPort> = { id: 'part/budget', contractVersion: 1, scope: 'run' };
+export { budgetKey } from './runtime.js';
 export function reserve(context: C.InvocationContext, dimension: string, quantity = 1): C.Result<R.BudgetReservation | undefined> {
   const budget = context.services.get(budgetKey); return budget.ok ? budget.value.reserve(dimension, quantity) : ok(undefined);
 }
@@ -19,7 +19,7 @@ export function createModelGateway(options: { profiles: readonly M.Profile[]; ad
     if (request.continuation && (request.continuation.provider !== adapter.id || request.continuation.affinity?.profile && request.continuation.affinity.profile !== profile.id)) return fail('model.affinity', 'Native continuation is incompatible with this profile', 'unsupported');
     if (request.tools.some(t => t.execution === 'provider') && !profile.capabilities.entries.some(c => c.id === 'part/provider-hosted-tools' && c.status === 'supported')) return fail('model.hosted-tool', 'Hosted tools are not enabled by this profile', 'unsupported');
     const fixed = freeze(structuredClone(request));
-    return operations.begin<M.Response>({ kind: 'part/model', retryOwner: 'part/model', childPolicy: 'attached', ...(context.scope.kind === 'operation' ? { parent: { owner: 'part/operations', kind: 'part/run', id: context.scope.id } } : {}) }, async c => {
+    return operations.begin<M.Response>({ kind: 'part/model', retryOwner: 'part/model', childPolicy: 'attached' }, async c => {
       const error = (failure: C.Failure): R.ManagedOutcome<M.Response> => ({ phase: 'failed', error: failure, effect: 'not-attempted', commit: [], unsettledChildren: [] });
       const invocationBudget = reserve(c, 'maxModelInvocations'); if (!invocationBudget.ok) return error(invocationBudget.error);
       let encoded = await adapter.encode(fixed, profile); if (!encoded.ok) return error(encoded.error);

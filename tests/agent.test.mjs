@@ -42,3 +42,20 @@ test('shared invocation/attempt budgets stop the next effect before execution', 
   const agent = createAgent({ model, tools: [functionTool({ id: 'echo', input, output: stringSchema, execute: () => { count++; return 'done'; } })], toolSchemas, limits: { maxExecutorAttempts: 1, maxModelInvocations: 5 } }).value;
   const result = await agent.generate('input'); assert.equal(result.value.phase, 'failed'); assert.equal(count, 0); assert.equal(model.requests.length, 1); await agent.dispose();
 });
+
+test('C07: preset and expanded manual composition execute through the same public parts', async () => {
+  const { expandAgent, modelPoint, toolsPoint } = await import('../dist/agent.js');
+  const { createPlanner, createScopeManager } = await import('../dist/composition.js');
+  const { createRunService, installDriver } = await import('../dist/runs.js');
+  const { localContext } = await import('../dist/contracts.js');
+  const automatic = createAgent({ model: fakeModel([{ text: 'equivalent' }]) }).value;
+  const expanded = expandAgent({ model: fakeModel([{ text: 'equivalent' }]) }).value;
+  const composition = createPlanner().resolve(expanded.specification).value;
+  const lease = (await createScopeManager().open({ kind: 'runtime', id: 'manual' }, composition)).value;
+  const services = { operations: expanded.operations, waits: expanded.waits, services: lease.services,
+    model: lease.services.get(modelPoint).value, tools: lease.services.get(toolsPoint).value, context: lease.services.get(contextPoint).value };
+  const runService = createRunService({ drivers: [installDriver(expanded.driver)], services, operations: expanded.operations }).value;
+  const handle = (await runService.start({ driver: expanded.driver.id, input: 'input', composition }, localContext({ services: lease.services }))).value;
+  assert.equal((await handle.done).result.content[0].text, (await automatic.generate('input')).value.result.content[0].text);
+  await lease.close(); await automatic.dispose();
+});

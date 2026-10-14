@@ -14,3 +14,8 @@
   explicit recovery of incomplete execution intents.
 - Add schema-validated owner actions/queries, memory command dedupe, codec loopback,
   snapshot/event client state, headless composer, and themed DOM Chat.
+- Add authenticated host-context HTTP commands/queries and SSE observation.
+- Validate a custom provider endpoint with a local HTTP fake.
+- Add isolated packed non-coding, SWE, and TypeScript extension consumers.
+- Add a standalone Chat preview, source boundary experiment, core import measurements,
+  deterministic composition hashing, and CI configuration.

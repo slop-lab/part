@@ -29,7 +29,11 @@
     "build": "tsc && cp src/reference.d.ts src/ui.css dist/",
     "test": "npm run build && node --test --test-isolation=none tests/*.test.mjs",
     "check": "tsc --noEmit",
-    "example": "npm run build && node examples/basic.mjs"
+    "example": "npm run build && node examples/basic.mjs",
+    "test:consumers": "npm run build && node scripts/test-consumers.mjs",
+    "preview:build": "node scripts/build-preview.mjs",
+    "preview": "npm run preview:build && node scripts/serve-preview.mjs",
+    "measure": "npm run build && node scripts/measure.mjs"
   },
   "engines": {
     "node": ">=22.18"

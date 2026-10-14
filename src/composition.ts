@@ -1,5 +1,6 @@
+import { sha256 } from './hash.js';
 import type { Composition as P, Contracts as C } from './reference.js';
-import { ok, fail, emptyCleanup, localContext, freeze, isJson } from './contracts.js';
+import { ok, fail, emptyCleanup, localContext, freeze, isJson, canonical } from './contracts.js';
 
 type Point = P.ExtensionPoint<unknown>;
 type Binding = P.Contribution<unknown>;
@@ -85,9 +86,9 @@ export function createPlanner(): P.CompositionPlanner {
     const components = componentOrder.value.map(id => spec.components.find(c => c.descriptor.id === id)!);
     let config: C.Json;
     try { if (!isJson(spec.config)) return fail('composition.config', 'Configuration must be lossless JSON'); config = freeze(structuredClone(spec.config)); } catch { return fail('composition.config', 'Configuration must be cloneable JSON'); }
-    const inspection: P.ResolvedComposition = freeze({ id: crypto.randomUUID(), revision, digest: revision,
+    const inspection: P.ResolvedComposition = freeze({ id: crypto.randomUUID(), revision, digest: sha256(new TextEncoder().encode(canonical({ components: components.map(c => c.descriptor) as unknown as C.Json, config, bindings: [...bindings].map(([point, list]) => ({ point, contributions: list.map(b => ({ id: b.id, key: b.key ?? null })) })) }))),
       components: components.map(c => structuredClone(c.descriptor)), orderedBindings: [...bindings].map(([point, list]) => ({ point, contributions: list.map(b => b.id) })),
-      capabilities: { revision, entries: structuredClone(capabilities) }, configProvenance: [{ key: '*', source: 'explicit', effective: config }], warnings: ['Experimental composition digest is an opaque revision, not a content hash.'] });
+      capabilities: { revision, entries: structuredClone(capabilities) }, configProvenance: [{ key: '*', source: 'explicit', effective: config }], warnings: ['Composition digest covers descriptors, configuration and bindings; executable code is identified by component version.'] });
     plans.set(token, { components, config, points, bindings, factories, factoryOrder: factoryOrder.value });
     return ok({ inspection, localToken: token });
   } };

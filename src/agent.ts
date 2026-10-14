@@ -13,9 +13,7 @@ export const contextPoint: P.ExtensionPoint<X.Compiler> = { id: 'part/context', 
 export const modelPoint: P.ExtensionPoint<M.Gateway> = { id: 'part/model', owner: 'part/model', contractVersion: 1, kind: 'service', scope: 'runtime' };
 export const toolsPoint: P.ExtensionPoint<T.Dispatcher> = { id: 'part/tools', owner: 'part/tools', contractVersion: 1, kind: 'service', scope: 'runtime' };
 export interface AgentOptions extends V.BaseOptions { readonly toolSchemas?: Readonly<Record<string, C.Json>>; readonly middleware?: readonly T.Middleware[]; readonly boundary?: R.InvocationBoundary; readonly principal?: C.InvocationContext['principal']; readonly inspectRequest?: (view: M.RequestInspection) => void }
-export function createAgent(options: AgentOptions & { driver?: never }): C.Result<V.Agent<BasicInput, M.Response>>;
-export function createAgent<I, O>(options: AgentOptions & { driver: D.Factory<I, O> }): C.Result<V.Agent<I, O>>;
-export function createAgent(options: AgentOptions & { driver?: D.Factory<unknown, unknown> }): C.Result<V.Agent<unknown, unknown>> {
+export function expandAgent(options: AgentOptions & { driver?: D.Factory<unknown, unknown> }) {
   const operations = createOperations(), waits = createSuspensions();
   const compiler = createContextCompiler(); if (!compiler.ok) return compiler;
   const gateway = createModelGateway({ profiles: [options.model.profile], adapters: [options.model.adapter], transports: [options.model.transport], auth: { [options.model.profile.authStrategyId]: options.model.auth }, operations, boundary: options.boundary, inspect: options.inspectRequest }); if (!gateway.ok) return gateway;
@@ -37,6 +35,13 @@ export function createAgent(options: AgentOptions & { driver?: D.Factory<unknown
     }, create() { return ok({ initialize: async () => ok(undefined), start: async () => ok(undefined), stop: async () => emptyCleanup(), dispose: async () => emptyCleanup() }); },
   };
   const specification: P.CompositionSpec = { components: [base, ...(options.components ?? [])], config: {} };
+  return ok({ specification, driver, operations, waits });
+}
+export function createAgent(options: AgentOptions & { driver?: never }): C.Result<V.Agent<BasicInput, M.Response>>;
+export function createAgent<I, O>(options: AgentOptions & { driver: D.Factory<I, O> }): C.Result<V.Agent<I, O>>;
+export function createAgent(options: AgentOptions & { driver?: D.Factory<unknown, unknown> }): C.Result<V.Agent<unknown, unknown>> {
+  const expanded = expandAgent(options); if (!expanded.ok) return expanded;
+  const { specification, driver, operations, waits } = expanded.value;
   const resolved = createPlanner().resolve(options.customize ? options.customize(specification) : specification); if (!resolved.ok) return resolved;
   const scope = { kind: 'runtime', id: crypto.randomUUID() }, manager = createScopeManager(), active = new Set<R.ExecutionHandle<unknown>>();
   let opened: Promise<C.Result<P.ScopeLease>> | undefined, disposed = false, disposing: Promise<C.CleanupReport> | undefined;

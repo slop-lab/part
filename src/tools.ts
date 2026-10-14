@@ -52,7 +52,7 @@ export function createToolDispatcher(options: { tools: readonly T.InstalledTool[
     const initial = await validate({ ...call }, []); if (!initial.ok) return initial;
     const timeout = initial.value.definition.timeoutMs;
     const deadline = timeout === undefined ? context.deadline : new Date(Math.min(Date.now() + timeout, context.deadline ? Date.parse(context.deadline) : Infinity)).toISOString();
-    return operations.begin({ kind: 'part/tool', retryOwner: 'part/tools', childPolicy: 'attached', ...(context.scope.kind === 'operation' ? { parent: { owner: 'part/operations', kind: 'part/run', id: context.scope.id } } : {}) }, async c => {
+    return operations.begin({ kind: 'part/tool', retryOwner: 'part/tools', childPolicy: 'attached' }, async c => {
       const dispatchBudget = reserve(c, 'maxToolDispatches'); if (!dispatchBudget.ok) return failed(dispatchBudget.error);
       let plan = initial.value, substitute: T.ResultContent | undefined, changes = 0;
       const approved = new Map<string, string>();
@@ -69,7 +69,7 @@ export function createToolDispatcher(options: { tools: readonly T.InstalledTool[
           if (result.ticket.bindingDigest !== plan.digest) return failed({ code: 'part.tool.binding', category: 'conflict', message: 'Wait is not bound to current plan', retry: 'never' });
           const ticket = await options.waits.open(result.ticket, c); if (!ticket.ok) return failed(ticket.error);
           c.progress.publish('part.tool/wait', ticket.value as unknown as C.Json);
-          const response = await options.waits.wait(ticket.value, result.ticket.responseSchema, c); if (!response.ok) return failed(response.error);
+          const response = await c.wait(options.waits.wait(ticket.value, result.ticket.responseSchema, c)); if (!response.ok) return failed(response.error);
           const resumed = await policy.resume(plan, ticket.value, response.value, c); if (!resumed.ok) return failed(resumed.error);
           result = resumed.value; if (result.kind === 'suspend') return failed({ code: 'part.tool.suspend-loop', category: 'conflict', message: 'Resume cannot immediately suspend again', retry: 'never' });
           if (result.kind === 'allow') approved.set(policy.id, plan.digest);

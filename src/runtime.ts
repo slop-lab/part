@@ -1,6 +1,7 @@
 import type { Contracts as C, Runtime as R } from './reference.js';
-import { ok, fail, digest } from './contracts.js';
+import { ok, fail, digest, isJson } from './contracts.js';
 
+export const budgetKey: C.ServiceKey<R.BudgetPort> = { id: 'part/budget', contractVersion: 1, scope: 'run' };
 export function createBudget(limits: Readonly<Record<string, number>> = {}): R.BudgetPort {
   const used = new Map<string, number>(), reservations = new Map<string, R.BudgetReservation>();
   return {
@@ -28,6 +29,7 @@ export function createProgress(defaultCapacity = 64) {
   const readers = new Set<Reader>();
   const publish: R.ProgressSink['publish'] = (type, payload) => {
     if (ended) return ok({ accepted: false, dropped: 0 });
+    if (!isJson(payload)) return fail('progress.payload', 'Progress payload must be lossless JSON');
     const update: R.Update = { kind: 'data', index: ++index, type, payload: structuredClone(payload) };
     let dropped = 0;
     for (const reader of readers) {
@@ -44,7 +46,7 @@ export function createProgress(defaultCapacity = 64) {
   return { publish, end() { ended = true; for (const reader of readers) reader.wake?.(); },
     observe(options: { signal?: AbortSignal; bufferSize?: number } = {}): AsyncIterable<R.Update> {
       return { [Symbol.asyncIterator]() {
-        const reader: Reader = { queue: [], capacity: Math.max(2, Math.floor(options.bufferSize ?? defaultCapacity)), closed: false };
+        const reader: Reader = { queue: [], capacity: Math.min(4096, Math.max(2, Math.floor(Number.isFinite(options.bufferSize ?? defaultCapacity) ? options.bufferSize ?? defaultCapacity : 64))), closed: false };
         readers.add(reader);
         const close = () => { reader.closed = true; reader.queue.length = 0; readers.delete(reader); reader.wake?.(); options.signal?.removeEventListener('abort', close); };
         options.signal?.addEventListener('abort', close, { once: true }); if (options.signal?.aborted) close();
@@ -58,13 +60,13 @@ export function createProgress(defaultCapacity = 64) {
     },
   };
 }
-export type OperationContext = C.InvocationContext & { readonly progress: R.ProgressSink };
+export type OperationContext = C.InvocationContext & { readonly progress: R.ProgressSink; wait<T>(pending: Promise<T>): Promise<T> };
 export interface Operations extends R.OperationService {
   begin<T>(spec: R.OperationSpec, body: (context: OperationContext) => Promise<R.ManagedOutcome<T>>, context: C.InvocationContext): Promise<C.Result<R.ExecutionHandle<T>>>;
   get(ref: C.EntityRef): C.Result<R.ExecutionSnapshot>;
 }
 export function createOperations(options: { cancellationGraceMs?: number; maxRetained?: number } = {}): Operations {
-  const records = new Map<string, { handle: R.ExecutionHandle<unknown>; children: Set<string>; controller: AbortController }>();
+  const records = new Map<string, { handle: R.ExecutionHandle<unknown>; children: Set<string>; controller: AbortController; deadline?: string; services: C.ServiceAccess }>();
   const grace = options.cancellationGraceMs ?? 100;
   return {
     get(ref) { const record = records.get(ref.id); return record && record.handle.ref.owner === ref.owner ? ok(record.handle.snapshot()) : fail('operation.missing', ref.id); },
@@ -72,11 +74,17 @@ export function createOperations(options: { cancellationGraceMs?: number; maxRet
       if (spec.childPolicy !== 'attached') return fail('operation.transfer', 'Ownership transfer requires an external host', 'unsupported');
       if (parentContext.signal.aborted) return fail('operation.cancelled', 'Parent is cancelled', 'cancelled');
       if (parentContext.deadline && (!Number.isFinite(Date.parse(parentContext.deadline)) || Date.parse(parentContext.deadline) <= Date.now())) return fail('operation.deadline', 'Deadline exceeded or invalid', 'timeout');
-      const parent = spec.parent ? records.get(spec.parent.id) : undefined;
-      if (spec.parent && (!parent || parent.handle.ref.owner !== spec.parent.owner || !['pending', 'running', 'waiting'].includes(parent.handle.snapshot().phase))) return fail('operation.parent', 'Parent is absent or terminal', 'conflict');
+      const parentRef = spec.parent ?? (parentContext.scope.kind === 'operation' ? records.get(parentContext.scope.id)?.handle.ref : undefined);
+      const parent = parentRef ? records.get(parentRef.id) : undefined;
+      if (parentRef && (!parent || parent.handle.ref.owner !== parentRef.owner || !['pending', 'running', 'waiting'].includes(parent.handle.snapshot().phase))) return fail('operation.parent', 'Parent is absent or terminal', 'conflict');
+      const deadlines = [parentContext.deadline, parent?.deadline].filter((v): v is string => !!v).map(Date.parse);
+      const effectiveDeadline = deadlines.length ? new Date(Math.min(...deadlines)).toISOString() : undefined;
+      const budget = parentContext.services.get(budgetKey);
+      const concurrency = spec.kind !== 'part/run' && budget.ok ? budget.value.reserve('maxConcurrentOperations', 1) : ok(undefined);
+      if (!concurrency.ok) return concurrency;
       const ref: C.EntityRef = { owner: 'part/operations', kind: spec.kind, id: crypto.randomUUID() };
       const controller = new AbortController(), progress = createProgress();
-      let snapshot: R.ExecutionSnapshot = { ref, revision: '0', phase: 'pending', cancel: { state: 'not-requested', unresolvedTargets: [] }, effect: 'not-attempted', ...(spec.parent ? { parent: spec.parent } : {}) };
+      let snapshot: R.ExecutionSnapshot = { ref, revision: '0', phase: 'pending', cancel: { state: 'not-requested', unresolvedTargets: [] }, effect: 'not-attempted', ...(parentRef ? { parent: parentRef } : {}) };
       let revision = 0, finished = false, cancelTimer: ReturnType<typeof setTimeout> | undefined, deadlineTimer: ReturnType<typeof setTimeout> | undefined;
       let resolveDone!: (value: R.ManagedOutcome<T>) => void;
       const done = new Promise<R.ManagedOutcome<T>>(resolve => { resolveDone = resolve; });
@@ -84,7 +92,7 @@ export function createOperations(options: { cancellationGraceMs?: number; maxRet
       const update = (change: Partial<R.ExecutionSnapshot>) => { snapshot = { ...snapshot, ...change, revision: String(++revision) }; progress.publish('part.operation/state', snapshot as unknown as C.Json); };
       const finish = (outcome: R.ManagedOutcome<T>) => {
         if (finished) return;
-        finished = true; clearTimeout(cancelTimer); clearTimeout(deadlineTimer);
+        finished = true; if (budget.ok && concurrency.value && outcome.phase !== 'abandoned') budget.value.settle(concurrency.value, 0); clearTimeout(cancelTimer); clearTimeout(deadlineTimer);
         parentContext.signal.removeEventListener('abort', abort); parent?.controller.signal.removeEventListener('abort', abort);
         const cancel: R.Cancellation = controller.signal.aborted ? { state: outcome.phase === 'abandoned' ? 'partial' : 'confirmed', unresolvedTargets: outcome.phase === 'abandoned' ? [ref, ...outcome.unsettledChildren] : outcome.unsettledChildren } : snapshot.cancel;
         update({ phase: outcome.phase, effect: outcome.effect, cancel, ...('error' in outcome && outcome.error ? { error: outcome.error } : {}) });
@@ -104,15 +112,15 @@ export function createOperations(options: { cancellationGraceMs?: number; maxRet
       };
       const abort = () => { void requestCancel('parent-cancelled'); };
       const handle: R.ExecutionHandle<T> = { ref, done, snapshot: () => structuredClone(snapshot), observe: progress.observe, requestCancel };
-      records.set(ref.id, { handle, children, controller }); parent?.children.add(ref.id);
+      records.set(ref.id, { handle, children, controller, deadline: effectiveDeadline, services: parentContext.services }); parent?.children.add(ref.id);
       parentContext.signal.addEventListener('abort', abort, { once: true }); parent?.controller.signal.addEventListener('abort', abort, { once: true });
       if (parentContext.signal.aborted || parent?.controller.signal.aborted) abort();
-      if (parentContext.deadline) deadlineTimer = setTimeout(() => { void requestCancel('deadline'); }, Math.max(0, Date.parse(parentContext.deadline) - Date.now()));
+      if (effectiveDeadline) deadlineTimer = setTimeout(() => { void requestCancel('deadline'); }, Math.max(0, Date.parse(effectiveDeadline) - Date.now()));
       queueMicrotask(async () => {
         if (finished) return;
         if (controller.signal.aborted) { finish({ phase: 'cancelled', effect: 'not-attempted', unsettledChildren: [], commit: [] }); return; }
         update({ phase: 'running' });
-        const context: OperationContext = { ...parentContext, scope: { kind: 'operation', id: ref.id }, signal: controller.signal, progress };
+        const context: OperationContext = { ...parentContext, scope: { kind: 'operation', id: ref.id }, signal: controller.signal, ...(effectiveDeadline ? { deadline: effectiveDeadline } : {}), progress, async wait(pending) { update({ phase: 'waiting' }); try { return await pending; } finally { if (!finished) update({ phase: 'running' }); } } };
         let outcome: R.ManagedOutcome<T>;
         try { outcome = await body(context); }
         catch { outcome = { phase: 'failed', error: { code: 'part.operation.exception', category: 'internal', message: 'Operation failed', retry: 'after-reconciliation' }, effect: 'unknown', unsettledChildren: [], commit: [] }; }

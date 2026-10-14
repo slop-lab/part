@@ -86,3 +86,9 @@ test('waits validate authority, revision, schema and deduplicate responses', asy
   const pending = waits.wait(ticket, stringSchema, context); assert.equal((await waits.respond(ticket, 'yes', 'a', context)).ok, true); assert.equal((await pending).value, 'yes');
   assert.equal((await waits.respond(ticket, 'yes', 'a', context)).ok, true); assert.equal((await waits.respond(ticket, 'no', 'a', context)).ok, false); assert.equal((await waits.respond(ticket, 'yes', 'b', context)).ok, false);
 });
+
+test('synchronous composition hashing matches native SHA-256', async () => {
+  const { sha256 } = await import('../dist/hash.js');
+  const { digest } = await import('../dist/contracts.js');
+  for (const text of ['', 'abc', '한국어', 'x'.repeat(1000)]) { const bytes = new TextEncoder().encode(text); assert.equal(sha256(bytes), await digest(bytes)); }
+});
