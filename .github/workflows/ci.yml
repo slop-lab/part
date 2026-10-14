@@ -17,3 +17,5 @@ jobs:
       - run: npm test
       - run: npm run test:consumers
       - run: npm run preview:build
+      - run: npm run measure
+      - run: npm run measure:ui

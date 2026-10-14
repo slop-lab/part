@@ -1,66 +1,66 @@
 # Integration gate evidence
 
-Candidate: `part@0.1.0-alpha.1`.
+Candidate: `part@0.1.0-alpha.2`.
 
-**Local fake-provider prototypes can start against the pinned tarball.** Formal
-**G-BASE is not certified**: actual-provider smoke was explicitly deferred by the
-user. G-WORKFLOW is not certified. Optional unimplemented modules and production
-profiles must not be inferred from the type-only design reference.
+**Dependent local projects can start against the pinned tarball.** Formal G-BASE
+remains open because actual-provider smoke was explicitly deferred by the user.
+G-WORKFLOW's local reference profile has execution evidence for every gate area.
+This does not certify third-party product compatibility or durable continuation.
+See [implementation coverage](implementation.md) and [support limits](api.md).
 
 ## G-BASE
 
-| Gate | Evidence                                                                                                                   | Status                                             |
-| ---- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| G01  | Architecture ADRs, strict codecs, three packed consumers, zero runtime dependencies                                        | Verified local subset                              |
-| G02  | Non-coding input → model → function tool → result; import resource/heap/time measurement                                   | Verified                                           |
-| G03  | Fake text/tool/error/native/EOF decoding and actual loopback HTTP custom endpoint                                          | Verified fake subset; real provider deferred       |
-| G04  | Allow/rewrite/deny/substitute/redirect/suspend, output validation and zero original substitute calls                       | Verified                                           |
-| G05  | Unobserved completion, cancellation races/unknown/late responses, attached-child/deadline/budget rules, awaited boundaries | Verified tested cases                              |
-| G06  | Immutable CAS history, typed context/source maps/versions, final request digest and authorized public projection           | Verified separate owner services                   |
-| G07  | Consumer semantic lowerer registry and typed action; DOM custom renderer/fallback and CSS path                             | Verified local contracts                           |
-| G08  | Basic and post-stop validating drivers; independent Map-based source boundary experiment                                   | Verified nominal/single-use comparison             |
-| G09  | Real JSON codec loopback command/query/watch/capability parity; HTTP/SSE integration                                       | Verified                                           |
-| G10  | Standalone themed preview, headless IME/draft tests, custom cards, stream/cancel against embedded agent                    | Verified DOM subset; full browser/UI quality later |
-| G11  | Memory and SQLite atomic state/journal, close/reopen, crash-intent recovery without repeating effects                      | Verified local subset                              |
-| G12  | Exact packed consumer version, npm lock, changelog, support limits, local CI commands and CI matrix configuration          | Verified locally; hosted CI not run here           |
-
-The specification's entire conformance catalog is broader than the assertions in
-this alpha. Test titles identify actual covered cases; a grouped test name is not
-a claim that every variation in a catalog family has passed. Runtime tests,
-consumer typechecking and preview building are separate evidence.
+| Gate | Actual evidence                                                                                                                             | Status                                                                                      |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| G01  | ADRs, strict codecs, four isolated packed consumers, zero runtime dependencies                                                              | Verified local profile                                                                      |
+| G02  | Input → fake model → function tool → result, cold import resources/heap/time                                                                | Verified                                                                                    |
+| G03  | Text/tool/error/native/EOF decoding and real loopback custom HTTP endpoint                                                                  | Fake profile verified; actual provider deferred                                             |
+| G04  | Allow/rewrite/deny/substitute/redirect/suspend, output validation, substitute original calls zero                                           | Verified tested cases                                                                       |
+| G05  | Unobserved completion, cancel races, late responses, attached children, cross-service supervision, budgets/deadlines and awaited boundaries | Verified tested cases                                                                       |
+| G06  | Immutable CAS history and run attachment; source versions/maps and authorized public projection                                             | Verified local profile                                                                      |
+| G07  | Packed consumer-owned semantic lowerer/action/renderer; DOM components and ordered slots                                                    | Verified                                                                                    |
+| G08  | Two distinct drivers and independent Map-based boundary source experiment                                                                   | Verified nominal/single-use comparison                                                      |
+| G09  | Actual codec loopback plus authenticated HTTP/SSE command/query/watch                                                                       | Verified                                                                                    |
+| G10  | Themed Chat, IME/draft, stream/tool/cancel, safe Markdown/card/components/artifacts and headless paths                                      | Verified DOM profile and 1,001-item/200-update cache benchmark; real browser audit separate |
+| G11  | Memory/SQLite atomic journal/state, reopen, crash-intent recovery, migration and durable artifacts                                          | Verified local profile                                                                      |
+| G12  | Exact alpha.2 consumers and lockfiles, changelog/migration/support docs, local checks and CI matrix                                         | Verified locally; hosted CI not run                                                         |
 
 ## G-WORKFLOW
 
-| Area               | Actual evidence                                                                                                             | Remaining gate work                                                          |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Optionality        | Core/basic consumers import no skill/workflow/script host; browser bundle has no server executors or credentials            | Track costs as plugins grow                                                  |
-| Skills             | Explicit discovery/activation, content mismatch/path/symlink rejection, owner release; scripts not executed                 | Broader format adapters remain separate                                      |
-| Code               | Actual standalone script → managed model → typed result → approval wait                                                     | Managed child-agent vertical fixture and bridge integration                  |
-| Pipeline           | Sequential validation/assert/wait and managed extension write; failed checks block writes; unsupported branch fails prepare | Only documented subset supported                                             |
-| Approval/lifecycle | Response authority/schema/revision/dedupe, cancel/late response rejection, concurrent start dedupe                          | Full changed-input/binding race matrix                                       |
-| External engine    | Native guarantee metadata and unknown/reconciliation key forwarding                                                         | Actual submit/attach/reconcile adapter and full native fixture               |
-| Hooks              | Awaited checks, invalid decisions, once consumption, scope release and recursion rejection                                  | Full timeout/parallel failure-policy matrix                                  |
-| Results/scripts    | Explicit bounded JSON capture, stale source rejection, schema result acceptance, nonzero exit enforcement                   | Authenticated script IPC grants, bridge budgets/cancel, processors/artifacts |
-| Generic client/UI  | Engine snapshots/actions/observation exist                                                                                  | Generic workflow endpoint/UI still required                                  |
+| Gate | Actual local evidence                                                                                                                                                                             | Status                                                    |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| GW01 | Basic/core consumers work without workflow imports; browser excludes executors/auth/DB; core import starts no resources                                                                           | Verified                                                  |
+| GW02 | Skill discovery/activation pins content and never auto-executes; explicit pipeline binding releases activation                                                                                    | Verified                                                  |
+| GW03 | Actual script → managed child agent/model → schema result → memory approval and final output                                                                                                      | Verified                                                  |
+| GW04 | Separate pipeline compiler/interpreter with sequential checks, lexical branches, bounded repeat/parallel and step timeouts                                                                        | Verified supported profile                                |
+| GW05 | Missing engine/profile/format/capability/handler, invalid block/field/digest fail before the unsupported execution                                                                                | Verified tested cases                                     |
+| GW06 | Failed assertions block writes; changed submission inputs conflict; duplicate approval applies once; cancel/late responses cannot resume                                                          | Verified tested races                                     |
+| GW07 | Independent native state owner: submit receipt loss, attach/reconcile, native actions/guarantees; stable agent-step attachment                                                                    | Verified fake native port; no product compatibility claim |
+| GW08 | Required hook timeout/malformed output blocks; report policy, matcher, scope, concurrent once and recursion                                                                                       | Verified tested policies                                  |
+| GW09 | Fixed script bytes, explicit channels/capture/schema/processor errors and timeout; authenticated audience/method/profile/expiry grants; parent budgets/revocation/cancel; one shared tool attempt | Verified local IPC/process profile                        |
+| GW10 | Generic endpoint/controller/default DOM shows phase/result/wait/action, owner response works without custom renderer, native raw state stays private                                              | Verified                                                  |
+
+The conformance catalog is broader than these assertions. Durable/native production
+adapters require their own WD recovery suites and exact source/version evidence.
+Checkpoint storage does not enable resume. Closing observation never cancels work;
+explicit owner cancellation/shutdown does, with unresolved cleanup preserved.
 
 ## Reproduction
 
 ```sh
 npm ci
+npm run format:check
 npm test
 npm run test:consumers
 npm run preview:build
 npm run measure
-npm run format:check
+npm run measure:ui
 ```
 
-Tests require loopback socket and subprocess permissions. The workspace sandbox
-blocks those operations, so integration commands were run with reviewed sandbox
-escalation. They use temporary local roots and no provider credentials. The failed
-initial sandbox-only HTTP run was an `EPERM` listen failure; its retried integration
-run passed. No real-provider success or remote hosted CI run is claimed.
+Integration tests need loopback socket/subprocess permissions. They were executed
+with reviewed workspace sandbox escalation, use temporary local roots and require
+no provider credentials. No real-provider success or remote CI execution is claimed.
 
-[Validation log](validation.log) records executed tests and consumer commands.
-[Candidate evidence](evidence.json) records the environment, revision/source digests,
-measurements and command results. Cold-import numbers describe one local run and
-are not a universal performance guarantee.
+[Validation log](validation.log) records commands and outcomes. [Candidate evidence](evidence.json)
+records environment, code revision/digests and measurements. Cold-import numbers
+are one local measurement, not a universal performance guarantee.

@@ -27,7 +27,7 @@ export const transformsKey: C.ServiceKey<readonly X.SetTransform[]> = {
 };
 export const provenance: C.Provenance = Object.freeze({
   component: 'part/context',
-  componentVersion: '0.1.0-alpha.1',
+  componentVersion: '0.1.0-alpha.2',
   origin: 'module',
 });
 const sourceKey = (source: X.SourceRef) => JSON.stringify(source);

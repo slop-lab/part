@@ -1,6 +1,6 @@
 {
   "name": "part",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "description": "Progressive agent runtime",
   "type": "module",
   "private": true,
@@ -37,7 +37,8 @@
     "preview": "npm run preview:build && node scripts/serve-preview.mjs",
     "measure": "npm run build && node scripts/measure.mjs",
     "format": "prettier --write src tests scripts examples consumers experiments docs README.md CHANGELOG.md package.json tsconfig.json .github",
-    "format:check": "prettier --check src tests scripts examples consumers experiments docs README.md CHANGELOG.md package.json tsconfig.json .github"
+    "format:check": "prettier --check src tests scripts examples consumers experiments docs README.md CHANGELOG.md package.json tsconfig.json .github",
+    "measure:ui": "npm run build && node scripts/measure-ui.mjs"
   },
   "engines": {
     "node": ">=22.18"

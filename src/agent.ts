@@ -118,7 +118,7 @@ export function expandAgent(options: AgentOptions & { driver?: D.Factory<unknown
   const base: P.ComponentFactory = {
     descriptor: {
       id: 'part/base',
-      version: '0.1.0-alpha.1',
+      version: '0.1.0-alpha.2',
       surfaces: ['local', 'server', 'test'],
       scope: 'runtime',
       requires: [],

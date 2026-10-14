@@ -19,7 +19,7 @@ function run(command, args, cwd = root) {
 try {
   const packed = JSON.parse(run('npm', ['pack', '--json', '--pack-destination', temporary]));
   const tarball = join(temporary, packed[0].filename);
-  for (const name of ['non-coding', 'swe', 'contracts']) {
+  for (const name of ['non-coding', 'swe', 'contracts', 'workflow']) {
     const directory = join(temporary, name);
     cpSync(join(root, 'consumers', name), directory, { recursive: true });
     writeFileSync(
@@ -56,7 +56,7 @@ try {
       process.stdout.write(run(process.execPath, ['out/index.js'], directory));
     } else process.stdout.write(run(process.execPath, ['index.mjs'], directory));
     const lock = JSON.parse(readFileSync(join(directory, 'package-lock.json'), 'utf8'));
-    if (lock.packages['node_modules/part'].version !== '0.1.0-alpha.1')
+    if (lock.packages['node_modules/part'].version !== '0.1.0-alpha.2')
       throw Error('Unpinned consumer version');
   }
 } finally {

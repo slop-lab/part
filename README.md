@@ -3,11 +3,14 @@
 Progressive agent runtime: an embedded agent SDK with optional composition,
 model/tool execution, context, persistence, client/UI, skills, scripts, and workflows.
 
-**Local integration alpha:** non-coding, SWE, and contract consumers run against a
-packed `0.1.0-alpha.1` package. Fake-provider prototypes can start against this
+**Local integration alpha:** non-coding, SWE, contract and workflow consumers run against a
+packed `0.1.0-alpha.2` package. Fake-provider prototypes can start against this
 version. Formal G-BASE signoff remains pending the real-provider smoke test, which
 was explicitly deferred. See [gate evidence](docs/gates.md) and
-[supported contracts and limits](docs/api.md).
+[supported contracts and limits](docs/api.md). Code/pipeline/recipe workflows,
+authenticated script bridges, generic workflow UI, history, artifacts and local
+host ownership are available as optional modules. See the
+[implementation coverage](docs/implementation.md) for the initial and later scope boundaries.
 
 ```sh
 npm ci
@@ -38,7 +41,7 @@ For a dependent repository, build and install the local tarball:
 npm run build
 npm pack --cache /tmp/part-npm-cache
 # In the consumer repository:
-npm install /path/to/part-0.1.0-alpha.1.tgz
+npm install /path/to/part-0.1.0-alpha.2.tgz
 ```
 
 Commit the consumer lockfile and pin the package exactly. This package is private
