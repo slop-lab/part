@@ -1,107 +1,143 @@
-Candidate: 0f384f1614d99304ffee4af023d2282e38649167
-Version: part@0.1.0-alpha.1
-
-$ npm test
-
-> part@0.1.0-alpha.1 test
-> npm run build && node --test --test-isolation=none tests/*.test.mjs
-
-
-> part@0.1.0-alpha.1 build
-> tsc && cp src/reference.d.ts src/ui.css dist/
-
-✔ G02: minimal non-coding input -> model -> function tool -> result (11.620411ms)
-✔ C02/C08: runtime configuration and model request histories remain isolated (3.789785ms)
-✔ G08/E11: a second driver can reject completion after provider stop (1.885921ms)
-✔ G06/G07: replacing the middle context service preserves the convenience agent (1.459981ms)
-✔ shared invocation/attempt budgets stop the next effect before execution (1.635246ms)
-✔ C07: preset and expanded manual composition execute through the same public parts (2.978048ms)
-✔ C09: context-owned registry accepts a new semantic type without replacing the compiler (1.749598ms)
-✔ disposing an agent during admission blocks new driver effects (0.896544ms)
-✔ G09/G10: in-process and codec loopback have command/query/watch parity (27.073567ms)
-✔ DU05/DU06/DU08: snapshot subscription includes intervening updates and authorization reset clears cache (3.945254ms)
-✔ DU07: not-sent and delivery-unknown are distinct; disconnect does not cancel runs (0.42574ms)
-✔ DU09: composing Enter cannot submit and late success preserves a new draft (0.403299ms)
-✔ G10/X05/X06: DOM Chat supports custom cards, safe fallback, IME, CSS and cleanup (11.879362ms)
-✔ C01/C10: browser entrypoint excludes storage, executor, provider and credential implementations (9.803489ms)
-✔ G10: themed Chat sends to the real embedded agent, streams text and cancels through the owner action (27.89422ms)
-✔ C12/G08: independent source boundary variant preserves nominal effect count and single-use settlement (1.2713ms)
-✔ MT05/MT06/MT07: deny, substitute, argument rewrite and redirect revalidation (2.664436ms)
-✔ suspend waits for validated response before executing exactly once (0.736907ms)
-✔ MT10: invalid output after a write preserves the applied effect (0.341163ms)
-✔ X01-X04: custom semantic lowering supports multiple fragments, versions and required failures (0.66806ms)
-✔ MT02/MT03: decoder handles byte boundaries, native thinking, malformed arguments and unfinished EOF (0.474581ms)
-✔ MT04: inspection digest matches bytes after final request transform (0.696513ms)
-✔ X06: inspector targets confer no authority and unknown projections never expose raw payload (0.499417ms)
-✔ X08: codecs reject lossy wire values, sparse arrays, custom array properties, and cycles (0.289568ms)
-✔ C03-C05: missing dependencies, duplicate keys, replacement, deterministic ordering and cycles (0.462709ms)
-✔ C06: initialization failure disposes created modules in reverse order (0.299246ms)
-✔ E01-E02: execution proceeds without subscribers and closing observation does not cancel (11.702213ms)
-✔ E04/E09: unacknowledged cancellation remains abandoned when late results arrive (10.944916ms)
-✔ E06: successful parents cannot leave uncooperative attached children (7.766798ms)
-✔ E07/E08/E10: prepare blocks execution and settle failure preserves applied effects (2.251009ms)
-✔ E05: synchronous budget reservations prevent oversubscription (0.093584ms)
-✔ bounded observation signals gaps to slow consumers (0.121586ms)
-✔ waits validate authority, revision, schema and deduplicate responses (0.200372ms)
-✔ synchronous composition hashing matches native SHA-256 (0.703025ms)
-✔ E03: cancellation during awaited prepare prevents the next executor attempt (1.23931ms)
-✔ E05: attached operations inherit deadlines and share concurrent reservations (11.49605ms)
-✔ long wait expiry does not overflow into immediate expiration (6.947497ms)
-✔ factory replacement preserves dependent service construction and exposes cleanup evidence (0.927161ms)
-✔ E05: a child cannot widen its parent deadline (0.310517ms)
-✔ G03: provider adapter uses a real HTTP custom endpoint with a local fake response (19.70021ms)
-✔ HTTP/SSE commands, queries, snapshots and owner authentication (23.095152ms)
-✔ SR02/SR03/SR12: skill discovery and activation pin content and never execute bundled scripts (10.230771ms)
-✔ W15/SR12: awaited script hooks block malformed decisions, consume once and release scope (52.96569ms)
-✔ W16: a hook cannot recursively invoke the same point through its script service (0.276684ms)
-✔ W06/W07: cancelling a waiting pipeline rejects late responses and never starts a write (6.117536ms)
-✔ workflow submission dedupe prevents concurrent starts from executing twice (2.875037ms)
-✔ DU01/DU02: memory commits state+journal atomically and preserves CAS/dedupe (1.521886ms)
-✔ DU01/DU02: sqlite commits state+journal atomically and preserves CAS/dedupe (1.857137ms)
-✔ G06: immutable history, stale append rejection and forks preserve source paths (1.437949ms)
-✔ DU04/G11: committed intents recover as unknown/abandoned without repeating effects (1.133735ms)
-✔ SR03-SR05/SR08: standalone scripts pin bytes, capture explicit JSON and reject extra/truncated output (99.113244ms)
-✔ GW03/W01: code workflow executes script -> managed model -> validated result -> memory wait (34.438789ms)
-✔ GW04/W02/W04: pipeline enforces validation/assert before write and executes all required steps (7.260939ms)
-✔ W03/W14: missing engines, unsupported primitives and durable code requirements fail before effects (0.85623ms)
-✔ W10: workflow host preserves independent native engine metadata and unknown submissions (0.33407ms)
-ℹ tests 55
-ℹ suites 0
-ℹ pass 55
-ℹ fail 0
-ℹ cancelled 0
-ℹ skipped 0
-ℹ todo 0
-ℹ duration_ms 593.067616
-
-$ npm run test:consumers
-
-> part@0.1.0-alpha.1 test:consumers
-> npm run build && node scripts/test-consumers.mjs
-
-
-> part@0.1.0-alpha.1 build
-> tsc && cp src/reference.d.ts src/ui.css dist/
-
-non-coding consumer passed
-swe consumer passed
-contract consumer passed
-
-$ node scripts/measure.mjs
-{
-  "node": "v26.5.1",
-  "platform": "linux",
-  "coreImportMs": 1.8366089999999993,
-  "heapDeltaBytes": 302712,
-  "newActiveResources": [],
-  "runtimeDependencies": 0
-}
-
-$ npm run preview:build
-Preview built: preview/index.html
+part@0.1.0-alpha.2
+Code candidate: 78f5b54e7f53ec21f203d52f1e152ae1d5ed08ba
 
 $ npm run format:check
 All matched files use Prettier code style.
 
-$ git diff --check
-No whitespace errors.
+$ npm test
+
+> part@0.1.0-alpha.2 test
+> npm run build && node --test --test-isolation=none tests/*.test.mjs
+
+
+> part@0.1.0-alpha.2 build
+> tsc && cp src/reference.d.ts src/ui.css dist/
+
+✔ G02: minimal non-coding input -> model -> function tool -> result (12.717768ms)
+✔ C02/C08: runtime configuration and model request histories remain isolated (2.939677ms)
+✔ G08/E11: a second driver can reject completion after provider stop (1.978323ms)
+✔ G06/G07: replacing the middle context service preserves the convenience agent (1.862598ms)
+✔ shared invocation/attempt budgets stop the next effect before execution (2.130725ms)
+✔ C07: preset and expanded manual composition execute through the same public parts (3.164385ms)
+✔ C09: context-owned registry accepts a new semantic type without replacing the compiler (2.126087ms)
+✔ disposing an agent during admission blocks new driver effects (0.939714ms)
+✔ Artifacts publish only complete immutable bytes, authorize ranges and survive reopening (3.820993ms)
+✔ Results pin artifact bytes and deduplicate concurrent processors; bad processor evidence never accepts (8.142425ms)
+✔ Authenticated bridge rejects public IDs, profile widening and changed IDs; script uses real RPC with parent budget (73.578548ms)
+✔ Script tools share one prepared executor attempt; direct workflow scripts retain their own boundary (51.442544ms)
+✔ Processor timeout rejects acceptance and late normalization cannot revive the submission (13.844921ms)
+✔ G09/G10: in-process and codec loopback have command/query/watch parity (24.699671ms)
+✔ DU05/DU06/DU08: snapshot subscription includes intervening updates and authorization reset clears cache (2.719588ms)
+✔ DU07: not-sent and delivery-unknown are distinct; disconnect does not cancel runs (0.289347ms)
+✔ DU09: composing Enter cannot submit and late success preserves a new draft (0.269981ms)
+✔ G10/X05/X06: DOM Chat supports custom cards, safe fallback, IME, CSS and cleanup (13.651141ms)
+✔ C01/C10: browser entrypoint excludes storage, executor, provider and credential implementations (10.073179ms)
+✔ G10: themed Chat sends to the real embedded agent, streams text and cancels through the owner action (25.446097ms)
+✔ C12/G08: independent source boundary variant preserves nominal effect count and single-use settlement (1.251894ms)
+✔ MT05/MT06/MT07: deny, substitute, argument rewrite and redirect revalidation (2.742581ms)
+✔ suspend waits for validated response before executing exactly once (1.170272ms)
+✔ MT10: invalid output after a write preserves the applied effect (0.595004ms)
+✔ X01-X04: custom semantic lowering supports multiple fragments, versions and required failures (1.108047ms)
+✔ MT02/MT03: decoder handles byte boundaries, native thinking, malformed arguments and unfinished EOF (0.679181ms)
+✔ MT04: inspection digest matches bytes after final request transform (1.094371ms)
+✔ X06: inspector targets confer no authority and unknown projections never expose raw payload (0.518573ms)
+✔ X08: codecs reject lossy wire values, sparse arrays, custom array properties, and cycles (0.247339ms)
+✔ C03-C05: missing dependencies, duplicate keys, replacement, deterministic ordering and cycles (0.587551ms)
+✔ C06: initialization failure disposes created modules in reverse order (0.393811ms)
+✔ E01-E02: execution proceeds without subscribers and closing observation does not cancel (10.433338ms)
+✔ E04/E09: unacknowledged cancellation remains abandoned when late results arrive (8.124081ms)
+✔ E06: successful parents cannot leave uncooperative attached children (7.743234ms)
+✔ E07/E08/E10: prepare blocks execution and settle failure preserves applied effects (2.536599ms)
+✔ E05: synchronous budget reservations prevent oversubscription (0.132155ms)
+✔ bounded observation signals gaps to slow consumers (0.194942ms)
+✔ waits validate authority, revision, schema and deduplicate responses (0.303304ms)
+✔ synchronous composition hashing matches native SHA-256 (1.197653ms)
+✔ E03: cancellation during awaited prepare prevents the next executor attempt (1.296717ms)
+✔ E05: attached operations inherit deadlines and share concurrent reservations (11.571431ms)
+✔ long wait expiry does not overflow into immediate expiration (6.056112ms)
+✔ factory replacement preserves dependent service construction and exposes cleanup evidence (1.354725ms)
+✔ E05: a child cannot widen its parent deadline (0.53869ms)
+✔ Attached work from a separately configured service joins the parent supervisor (6.868319ms)
+✔ Unresolved driver cleanup is abandoned and retains the actual resource reference (1.038778ms)
+✔ Resource ownership transfer and cleanup preserve failed resources for reconciliation (0.568516ms)
+✔ Runtime admission enforces capacity, replacement, dedupe, expiry and drain; unknown cleanup stays unresolved (17.181334ms)
+✔ External adapter attaches native owner state after unknown submission and forwards actions without second scheduling (0.927782ms)
+✔ G03: provider adapter uses a real HTTP custom endpoint with a local fake response (6.786578ms)
+✔ HTTP/SSE commands, queries, snapshots and owner authentication (177.975624ms)
+✔ Versioned result channel separates stdout logs/progress and rejects partial or duplicate result frames (68.056607ms)
+✔ Namespace migration publishes atomically and failed transformations leave old bytes unreadable as the new schema (1.268905ms)
+✔ Checkpoint storage binds engine/definition, enforces CAS and keeps native scheduling with its owner (0.526788ms)
+✔ Safe Markdown caches completed blocks and renderer/slot registries enforce explicit priorities/order (1.84232ms)
+✔ Trace metadata strips body/credentials, bounds retention and authorizes manifest access (0.469933ms)
+✔ Run history attachment appends immutable messages, rejects stale heads and supplies the next compiled request (4.427689ms)
+✔ Recipe retries explicit read-only validation, but never retries failed or uncertain effects (4.090393ms)
+✔ Estimated cost ceilings reserve before transport, require explicit pricing and preserve actual effect evidence (3.903115ms)
+✔ DOM components, ordered slots, inspector and artifact viewers use only public client contracts (8.975722ms)
+✔ Script source/workspace resolvers pin packaged bytes and capture only declared workspace JSON (24.376752ms)
+✔ SR02/SR03/SR12: skill discovery and activation pin content and never execute bundled scripts (2.836716ms)
+✔ W15/SR12: awaited script hooks block malformed decisions, consume once and release scope (48.841516ms)
+✔ W16: a hook cannot recursively invoke the same point through its script service (0.24235ms)
+✔ W06/W07: cancelling a waiting pipeline rejects late responses and never starts a write (4.512878ms)
+✔ workflow submission dedupe prevents concurrent starts from executing twice (2.581472ms)
+✔ DU01/DU02: memory commits state+journal atomically and preserves CAS/dedupe (0.875155ms)
+✔ DU01/DU02: sqlite commits state+journal atomically and preserves CAS/dedupe (2.20299ms)
+✔ G06: immutable history, stale append rejection and forks preserve source paths (1.054518ms)
+✔ DU04/G11: committed intents recover as unknown/abandoned without repeating effects (3.989746ms)
+✔ Pipeline lexical branches, bounded repeat and ordered parallel results execute required blocks (9.881643ms)
+✔ Pipeline cancel-and-join aborts sibling managed steps; per-step timeout prevents later writes (10.548101ms)
+✔ Generic workflow endpoint and default DOM show waits, invoke owner response and display results without native state (9.42721ms)
+✔ GW03/GW06: actual script -> managed child agent -> typed result -> approval applies pinned data once (33.128488ms)
+✔ GW08: hook timeout/failure policies, matcher, scope and concurrent once admission are explicit (20.097528ms)
+✔ GW09: bridge expiry/revocation propagate cancellation and never widen parent reservations (12.052975ms)
+✔ Pinned pipeline skill binding contributes explicit user instructions and releases the activation (7.785222ms)
+✔ Bridge service adapter executes the configured gateway and exposes only its owner handles (5.36566ms)
+✔ W12: native logical step keys attach the same managed agent run and reject changed input (1.969526ms)
+✔ SR03-SR05/SR08: standalone scripts pin bytes, capture explicit JSON and reject extra/truncated output (99.423555ms)
+✔ GW03/W01: code workflow executes script -> managed model -> validated result -> memory wait (32.071675ms)
+✔ GW04/W02/W04: pipeline enforces validation/assert before write and executes all required steps (8.671558ms)
+✔ W03/W14: missing engines, unsupported primitives and durable code requirements fail before effects (0.704317ms)
+✔ W10: workflow host preserves independent native engine metadata and unknown submissions (0.339ms)
+ℹ tests 84
+ℹ suites 0
+ℹ pass 84
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1145.760276
+
+$ npm run test:consumers
+non-coding consumer passed
+swe consumer passed
+contract consumer passed
+Packed workflow consumer passed
+
+$ npm run preview:build
+Preview built: preview/index.html
+
+$ npm run build && node scripts/measure.mjs
+{
+  "node": "v26.5.1",
+  "platform": "linux",
+  "coreImportMs": 1.7093129999999999,
+  "heapDeltaBytes": 1025480,
+  "newActiveResources": [],
+  "runtimeDependencies": 0
+}
+
+$ npm run measure:ui
+{
+  "environment": "Node/happy-dom; excludes browser layout/paint",
+  "historyItems": 1001,
+  "visibleItems": 100,
+  "updates": 200,
+  "bootstrapMs": 13.407638999999989,
+  "updateMs": 125.275845,
+  "meanUpdateMs": 0.626379225,
+  "completedRendererCallsDuringStream": 0,
+  "completedNodeRetained": true
+}
+
+Actual-provider smoke: explicitly deferred by the user.
+Hosted CI: configured; not executed here.
+Integration permission profile: reviewed loopback/subprocess sandbox escalation.
