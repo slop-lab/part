@@ -4,18 +4,35 @@
   "description": "Progressive agent runtime",
   "type": "module",
   "private": true,
-  "files": ["dist", "README.md", "CHANGELOG.md"],
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
   "exports": {
-    ".": {"types": "./dist/core.d.ts", "default": "./dist/core.js"},
-    "./*": {"types": "./dist/*.d.ts", "default": "./dist/*.js"},
-    "./reference": {"types": "./dist/reference.d.ts"}
+    ".": {
+      "types": "./dist/core.d.ts",
+      "default": "./dist/core.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
+    "./reference": {
+      "types": "./dist/reference.d.ts"
+    }
   },
   "scripts": {
     "build": "tsc && cp src/reference.d.ts dist/reference.d.ts",
-    "test": "npm run build && node --test tests/*.test.mjs",
+    "test": "npm run build && node --test --test-isolation=none tests/*.test.mjs",
     "check": "tsc --noEmit",
     "example": "npm run build && node examples/basic.mjs"
   },
-  "engines": {"node": ">=22.18"},
-  "devDependencies": {"@types/node": "^22.0.0", "typescript": "^5.9.0"}
+  "engines": {
+    "node": ">=22.18"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0"
+  }
 }

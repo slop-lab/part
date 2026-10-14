@@ -26,3 +26,13 @@ all optional modules are implemented.
 
 Public APIs are experimental until G-BASE passes. Consumers must pin exact versions.
 Breaking changes require a changelog, migration guidance, and consumer fixture runs.
+
+The initial provider adapter targets the documented Ollama `/api/chat` NDJSON
+subset: text, thinking, function calls, and usage. Media and foreign native content
+require explicit projection. See https://docs.ollama.com/api/chat . Real provider
+smoke testing is deferred at the user's request; fake fixtures establish only the
+implemented protocol subset.
+
+This environment's Node 26 test subprocess runner reports file-level tests only.
+The project runs `--test-isolation=none` so individual registered tests execute and
+report counts explicitly. Test fixtures own and clean up all resources.
