@@ -19,3 +19,15 @@
 - Add isolated packed non-coding, SWE, and TypeScript extension consumers.
 - Add a standalone Chat preview, source boundary experiment, core import measurements,
   deterministic composition hashing, and CI configuration.
+- Add optional pinned directory packages, restricted skill activation, script hook
+  enforcement, explicit JSON results, standalone POSIX script execution, and actual
+  code/pipeline workflow engines with memory waits and submission dedupe.
+- Expose context-owned lowerer and transform registries for consumer extensions.
+- Preserve unresolved resource cleanup evidence and unconfirmed process groups;
+  guard input mutation, long deadline overflow, and native workflow revisions.
+- Add authorized public projection and reject unknown wire envelope fields.
+- Add consistent formatting and documented experimental support/change procedures.
+
+No migration from a previous runtime release is required: this is the first local
+integration alpha. The `car` prefix in the local design is renamed to `part`.
+Actual provider smoke is deferred. G-BASE and G-WORKFLOW are not formally certified.

@@ -6,6 +6,8 @@
   "private": true,
   "files": [
     "dist",
+    "docs",
+    "examples/basic.mjs",
     "README.md",
     "CHANGELOG.md"
   ],
@@ -33,7 +35,9 @@
     "test:consumers": "npm run build && node scripts/test-consumers.mjs",
     "preview:build": "node scripts/build-preview.mjs",
     "preview": "npm run preview:build && node scripts/serve-preview.mjs",
-    "measure": "npm run build && node scripts/measure.mjs"
+    "measure": "npm run build && node scripts/measure.mjs",
+    "format": "prettier --write src tests scripts examples consumers experiments docs README.md CHANGELOG.md package.json tsconfig.json .github",
+    "format:check": "prettier --check src tests scripts examples consumers experiments docs README.md CHANGELOG.md package.json tsconfig.json .github"
   },
   "engines": {
     "node": ">=22.18"
@@ -42,6 +46,7 @@
     "@types/node": "^22.0.0",
     "esbuild": "^0.28.2",
     "happy-dom": "^21.0.1",
+    "prettier": "^3.9.10",
     "typescript": "^5.9.0"
   }
 }

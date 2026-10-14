@@ -1,0 +1,146 @@
+# Implemented contracts
+
+Version: `0.1.0-alpha.1`, experimental local integration profile.
+All concrete JavaScript APIs are generated from `src/*.ts`. `part/reference` is a
+**type-only design reference**, including future optional contracts; it does not
+mean every namespace has an implementation.
+
+| Export                                           | Implemented surface                                                                                             |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `part`, `part/core`                              | Small schema/composition/operation/boundary helpers                                                             |
+| `part/contracts`                                 | Results/errors, runtime schemas, strict JSON codecs, local invocation contexts                                  |
+| `part/composition`                               | Planner, exact requirements, ordering, replacement, service factories, scopes/rollback                          |
+| `part/runtime`                                   | Independent handles, best-effort observation/gaps, attached operations, cancellation, budgets, awaited attempts |
+| `part/runs`                                      | Validated installed drivers and run service                                                                     |
+| `part/agent`                                     | Typed embedded agent; `expandAgent` exposes manual composition                                                  |
+| `part/driver-basic`                              | Own model/tool loop and a post-stop validating driver                                                           |
+| `part/model`                                     | Gateway, request transforms/inspection, fetch transport, explicit authentication strategies                     |
+| `part/provider-ollama`                           | Strict Ollama chat NDJSON subset                                                                                |
+| `part/tools`                                     | Installed function bindings, external executor port, six middleware decisions                                   |
+| `part/context`                                   | Planner/resolver/lowerer/transforms/assembler, source versions/maps and digests                                 |
+| `part/history`                                   | Immutable records, branch CAS, forks and path reads; memory or supplied store                                   |
+| `part/projection`                                | Authorized projector dispatch; unknown types use a payload-free fallback                                        |
+| `part/storage-memory`                            | Atomic state/journal, CAS, change-ID dedupe, committed command receipts                                         |
+| `part/storage-sqlite`                            | Explicit local SQLite open/close; durable atomic state/journal snapshots                                        |
+| `part/storage-runtime`                           | Durable intent/settlement boundary and explicit unknown/abandoned recovery                                      |
+| `part/control`                                   | Schema-validated owner action/query bindings and memory command dedupe                                          |
+| `part/client`                                    | Local/codec-loopback port, snapshot/watch hub, normalized controller, UTF-16 deltas                             |
+| `part/host-embedded`                             | Principal-owned start/cancel/get/actions/composition/capability endpoint                                        |
+| `part/host-http`, `part/transport-http`          | Explicit authenticated context injection, HTTP commands/queries, bounded SSE observation                        |
+| `part/ui-headless`, `part/ui-dom`, `part/ui.css` | Composer/scroll controllers, scoped themed Chat, custom renderers, composer action slots                        |
+| `part/results`                                   | Explicit inline result validation, lossless codecs, producer evidence and submission dedupe                     |
+| `part/scripts-node`                              | Explicit standalone POSIX scripts, fixed source bytes, argv/JSON stdin, bounded JSON capture, group termination |
+| `part/packages-node`, `part/skills`              | Explicit directory snapshots and restricted SKILL.md reader/activation; no executable loading                   |
+| `part/hooks`                                     | Validated script hook points, awaited enforcement, once/scope/reentrancy handling                               |
+| `part/workflow-host`                             | Engine selection, format/capability/control checks and native submission forwarding                             |
+| `part/workflow-code`                             | Explicitly registered trusted async code, managed calls, memory wait, schema completion                         |
+| `part/workflow-pipeline`                         | Sequential dependency ordering, script/agent/validate/assert/wait/extension subset                              |
+| `part/workflow-memory`                           | Reference engine lifecycle, bounded managed calls, fixed prepared handles and memory submission dedupe          |
+| `part/testing`                                   | Deterministic fake model fixtures; no real-provider compatibility claim                                         |
+
+## Extension contracts
+
+`lowerersPoint` is a context-owned registry and `transformsPoint` is a context-owned
+pipeline. A consumer component may contribute a new type or ordered transform
+without replacing the compiler. Contributions use structural point identity and
+explicit IDs; duplicate keys and ordering cycles fail before opening a scope.
+Whole-service replacement remains available through `contextPoint`, `modelPoint`,
+and `toolsPoint`. `handlersPoint` and `enginesPoint` belong to optional workflow modules.
+
+`installTool`, `installDriver`, `installAction`, `installQuery`, and
+`installStepHandler` create local validated bindings. Their opaque handles cannot
+be manufactured by serializing a similarly shaped object. Schemas validate actual
+inputs and outputs. Provider tool advertisement JSON Schema is separately supplied
+through `toolSchemas`; there is no implicit TypeScript-to-JSON-Schema conversion.
+
+`createPlanner({ schemas, surface })` can validate component configuration schemas
+and target surfaces. Factories currently depend on services in the same scope;
+parent-scope lookup and ownership transfer are unsupported. Cleanup failures expose
+released/unresolved refs and errors. Scope registries expose read-only views.
+
+## Execution guarantees
+
+Observation close/disconnect/unmount does not cancel execution. Cancellation
+requests propagate to attached work; confirmation follows termination. Unacknowledged
+work becomes abandoned with unknown effects and unresolved refs. Late results do
+not revive terminal runs. Operation signals end when their owning execution ends. Active snapshots report
+unknown effects conservatively until a terminal outcome supplies evidence.
+
+`managedAttempt` waits for prepare, executes at most once, validates its local
+single-use permit, and awaits settlement. A failed settlement preserves applied or
+unknown effects. No layer automatically retries writes. Shared invocation, dispatch,
+attempt, concurrency, child-run, known-token and deadline budgets are supported.
+Known token accounting cannot prevent already-incurred provider usage. Estimated
+cost budgets and ownership transfer are explicitly rejected.
+
+The node script host runs a snapshot file using a configured interpreter. Scripts
+must be standalone; relative imports from the original script directory are not
+preserved. Configured environment profiles are copied; the default child environment
+is empty. Process-group termination is best effort, covers the selected POSIX group,
+and does not sandbox escaped processes or arbitrary network calls. Unconfirmed
+termination remains unknown/abandoned. Windows execution is unsupported.
+Low-level script completion reports exit status; workflow script steps additionally
+require exit code zero and complete capture. Logs are not automatically captured as
+results. `stdout-json` and declared JSON file capture are supported; channel capture,
+script IPC grants, and workspace/package execution resolvers are rejected.
+
+## Wire and UI
+
+Embedded action v1 inputs are a string for `part.run/start` and `null` plus a run
+target for `part.run/cancel`. These concrete alpha inputs differ from the broader
+proposed `ControlCatalog` DTOs. Commands never carry trusted invocation contexts.
+The HTTP host requires a context/authentication callback; no client actor field is
+promoted to authority. Host bind and transport origin allowlists are explicit.
+
+Memory command dedupe is principal plus command/idempotency key, for endpoint
+lifetime, with a capacity of 1,000 entries. Capacity exhaustion rejects admission
+rather than evicting a key and silently re-running a write. Same-key content changes
+are conflicts. Lost command responses remain delivery-unknown; aborting an HTTP
+request is independent of cancelling the run.
+
+Watch setup registers observation before capturing its watermark. Slow observers
+receive a gap and the controller reconnects to a snapshot. UTF-16 generation/offset
+mismatches do not concatenate arbitrary text. Audience reset clears cached items
+and streaming parts. The reference watch hub owns one already-authorized audience;
+applications must maintain separate hubs or re-project/reset when rights change.
+
+DOM Chat supports plain text/code-safe fallbacks, cached message bodies, custom
+cards, theme tokens, basic pagination, IME/draft safety and owner cancellation.
+Markdown parsing, artifact viewers, full component substitution, ordered/additional
+slots, browser visual/a11y audits and large-history performance are later UI work.
+Unsupported component/slot options fail explicitly. Headless APIs remain independent.
+
+## Optional-module limits
+
+- History is usable as a separate owner service; automatic `RunRequest.history`
+  attachment is rejected. No driver stack, durable wait or workflow step resume is claimed.
+- SQLite stores one serialized materialization/journal snapshot per store ID in an
+  atomic transaction. It is a correctness reference for bounded local data, not a
+  backend optimized for very large histories or distributed writers.
+- Results currently support explicit inline JSON and the `schema` validation profile.
+  Artifact/captured references and processors are unsupported. Artifact storage,
+  admission queues and a general resource manager are not implemented.
+- Ollama supports text, thinking, complete object function arguments and token usage.
+  Media, foreign native content, hosted tools and continuation tokens are rejected.
+  Real-provider smoke and broader compatibility remain deferred.
+- SKILL.md supports scalar `name`, `description`, and `license` frontmatter. Other
+  fields or YAML constructs fail explicitly. Activation returns instructions and
+  references only; it does not install hooks, tools, scripts or workflow engines.
+- Reference workflow engines use one configured service composition named `default`;
+  unknown execution profile IDs fail prepare. Code definitions are trusted explicitly registered functions; source hashes cover
+  the function text and schema refs, not arbitrary mutable closure state. Code replay
+  is `none`. Pipeline branch/repeat/parallel, per-step timeouts, skill binding and
+  required handler capabilities are rejected by the current subset.
+- Workflow submission dedupe is memory-only. Nested workflow budget composition,
+  durable workflow recovery and actual external-engine adapters are unsupported.
+  The external engine fixture proves native forwarding, not product compatibility.
+- Workflow actions and waits are available through engine APIs. A generic workflow
+  endpoint/UI, authenticated script bridge, and end-to-end bridge budgets remain
+  necessary before G-WORKFLOW signoff.
+
+## Change procedure
+
+Pin the exact tarball and lockfile. Before changing a used contract, update the
+changelog, record migration guidance, and run runtime plus packed consumer tests.
+Do not create a second dispatcher/history/workflow owner in a consumer to bypass a
+runtime defect. Replace public parts or propose a generic boundary change instead.

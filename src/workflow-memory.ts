@@ -1,0 +1,629 @@
+import type {
+  Contracts as C,
+  Workflows as W,
+  Runtime as R,
+  Model as M,
+  Scripts as S,
+  Results as O,
+} from './reference.js';
+import type { Operations, OperationContext } from './runtime.js';
+import { ok, fail, digest, canonical, jsonSchema, freeze, isJson } from './contracts.js';
+import { createOperations, createBudget, budgetKey } from './runtime.js';
+import { combineEffects } from './driver-basic.js';
+import { provenance } from './context.js';
+export interface WorkflowServices {
+  readonly operations?: Operations;
+  readonly model?: M.Gateway;
+  readonly scripts?: S.Service;
+  readonly runs?: R.RunService;
+  readonly results?: O.Service;
+  readonly waits?: R.SuspensionPort;
+}
+export interface PreparedRunner {
+  readonly input: C.Schema<C.Json>;
+  readonly output: C.Schema<C.Json>;
+  execute(
+    input: C.Json,
+    steps: W.StepContext,
+    context: OperationContext,
+    record: (outcome: R.ManagedOutcome<unknown>) => void,
+  ): Promise<C.Result<C.Json>>;
+}
+export const memoryGuarantees: W.Guarantees = freeze({
+  control: 'runner-enforced',
+  effects: 'runner-path-only',
+  checkpoint: 'none',
+  submissionDedupe: 'memory',
+  scriptCancellation: 'cooperative',
+  nativeSemantics: [
+    'Trusted in-process definitions',
+    'No stack recovery or automatic effect retry',
+  ],
+});
+export async function callIdentity(
+  execution: W.ExecutionRef,
+  stepKey: string,
+  input: C.Json,
+  iterationPath: readonly (string | number)[] = [],
+  attempt = 1,
+): Promise<W.CallIdentity> {
+  return { workflow: execution, stepKey, iterationPath, attempt, inputDigest: await digest(input) };
+}
+export function createMemoryWorkflowEngine(options: {
+  descriptor: W.EngineDescriptor;
+  services: WorkflowServices;
+  compile(
+    request: W.PrepareRequest,
+    context: C.InvocationContext,
+  ): Promise<C.Result<PreparedRunner>>;
+  profileIds?: readonly string[];
+}): W.Engine {
+  options = {
+    ...options,
+    descriptor: freeze(structuredClone(options.descriptor)),
+    services: { ...options.services },
+  };
+  const issued = new WeakSet<W.Prepared>();
+  const pendingSubmissions = new Map<string, Promise<W.Submission>>();
+  const operations = options.services.operations ?? createOperations(),
+    preparedTokens = new WeakMap<object, PreparedRunner>();
+  interface Execution {
+    ref: W.ExecutionRef;
+    prepared: W.Prepared;
+    context: C.InvocationContext;
+    handle: R.ExecutionHandle<C.Json>;
+    native: C.Json;
+    nativeRevision: number;
+    waits: Map<string, { ticket: R.WaitTicket; schema: C.Schema<C.Json> }>;
+    active: Set<C.EntityRef>;
+    output?: W.Output;
+  }
+  const executions = new Map<string, Execution>(),
+    submissions = new Map<string, { digest: string; ref: W.ExecutionRef }>();
+  const authorized = (execution: Execution, context: C.InvocationContext) =>
+    execution.context.principal.subject === context.principal.subject &&
+    execution.context.principal.authority === context.principal.authority;
+  const getExecution = (ref: W.ExecutionRef, context: C.InvocationContext): C.Result<Execution> => {
+    const execution = executions.get(ref.id);
+    return !execution ||
+      ref.engine !== options.descriptor.id ||
+      ref.engineVersion !== options.descriptor.version
+      ? fail('workflow.execution', 'Workflow execution not found')
+      : authorized(execution, context)
+        ? ok(execution)
+        : fail('workflow.permission', 'Workflow access denied', 'permission');
+  };
+  const snapshot = (execution: Execution): W.Snapshot => {
+    const state = execution.handle.snapshot(),
+      phase = (
+        {
+          pending: 'queued',
+          running: 'running',
+          waiting: 'waiting',
+          completed: 'succeeded',
+          failed: 'failed',
+          cancelled: 'cancelled',
+          abandoned: 'unknown',
+        } as const
+      )[state.phase];
+    const waiting = ['pending', 'running', 'waiting'].includes(state.phase)
+      ? [...execution.waits.values()].filter((v) => v.ticket.state === 'open')
+      : [];
+    return {
+      ref: execution.ref,
+      revision: `${state.revision}/${execution.nativeRevision}`,
+      definitionDigest: execution.prepared.definition.digest,
+      owner: options.descriptor.id,
+      phase,
+      nativeState: {
+        schema: { id: `${options.descriptor.id}/state`, version: 1 },
+        data: structuredClone(execution.native),
+      },
+      guarantees: memoryGuarantees,
+      activeOperations: [...execution.active],
+      waitingOn: waiting.map((w) => ({
+        owner: 'part/waits',
+        kind: w.ticket.type,
+        id: w.ticket.id,
+      })),
+      ...(state.phase === 'completed' && execution.output ? { output: execution.output } : {}),
+      diagnostics: state.error ? [state.error] : [],
+      actions: waiting.length
+        ? [
+            {
+              id: 'part.workflow/respond',
+              version: 1,
+              input: { id: 'part/workflow-response', version: 1 },
+              output: jsonSchema.ref,
+              execution: 'immediate',
+              availability: { state: 'available', checkedAt: state.revision },
+            },
+          ]
+        : [],
+      effect: state.effect,
+    };
+  };
+  return {
+    descriptor: options.descriptor,
+    async prepare(request, context) {
+      if (
+        request.engineId !== options.descriptor.id ||
+        !options.descriptor.formats.some(
+          (f) =>
+            f.id === request.definition.format &&
+            f.versions.includes(request.definition.formatVersion),
+        )
+      )
+        return fail('workflow.format', 'Unsupported engine or format', 'unsupported');
+      if (options.profileIds && !options.profileIds.includes(request.profileId))
+        return fail('workflow.profile', 'Workflow profile not installed', 'unsupported');
+      for (const required of request.requiredCapabilities)
+        if (
+          !options.descriptor.capabilities.entries.some(
+            (c) => c.id === required && c.status === 'supported',
+          )
+        )
+          return fail('workflow.capability', required, 'unsupported');
+      const runner = await options.compile(request, context);
+      if (!runner.ok) return runner;
+      const localHandle = {};
+      preparedTokens.set(localHandle, runner.value);
+      const prepared: W.Prepared = freeze({
+        definition: structuredClone(request.definition),
+        engine: structuredClone(options.descriptor),
+        compositionRevision: options.descriptor.capabilities.revision,
+        input: runner.value.input.ref,
+        output: runner.value.output.ref,
+        guarantees: memoryGuarantees,
+        compatibility: {
+          format: request.definition.format,
+          sourceVersion: request.definition.formatVersion,
+          adapter: options.descriptor.id,
+          adapterVersion: options.descriptor.version,
+          status: 'exact-tested-subset',
+          ignored: [],
+          semantics: memoryGuarantees.nativeSemantics,
+        },
+        report: [],
+        localHandle,
+      });
+      issued.add(prepared);
+      return ok(prepared);
+    },
+    async start(request, context) {
+      if (!isJson(request.input))
+        return {
+          kind: 'rejected',
+          error: fail('workflow.input', 'Input must be lossless JSON').error,
+        };
+      request = {
+        ...request,
+        input: structuredClone(request.input),
+        ...(request.limits ? { limits: structuredClone(request.limits) } : {}),
+      };
+      const token = request.prepared.localHandle,
+        runner = token && typeof token === 'object' ? preparedTokens.get(token) : undefined;
+      if (
+        !issued.has(request.prepared) ||
+        !runner ||
+        request.prepared.engine.id !== options.descriptor.id ||
+        request.prepared.compositionRevision !== options.descriptor.capabilities.revision
+      )
+        return {
+          kind: 'rejected',
+          error: fail(
+            'workflow.prepared',
+            'Unknown prepared handle or stale composition',
+            'conflict',
+          ).error,
+        };
+      const checked = runner.input.validate(request.input);
+      if (!checked.ok)
+        return {
+          kind: 'rejected',
+          error: fail('workflow.input', 'Workflow input validation failed').error,
+        };
+      const key = canonical({
+          principal: context.principal,
+          key: request.idempotencyKey ?? request.requestId,
+        }),
+        submissionDigest = await digest({
+          definition: request.prepared.definition.digest,
+          input: request.input,
+          limits: (request.limits as unknown as C.Json) ?? null,
+        });
+      const prior = submissions.get(key);
+      if (prior) {
+        if (prior.digest !== submissionDigest)
+          return {
+            kind: 'rejected',
+            error: fail('workflow.key-conflict', 'Submission key has different content', 'conflict')
+              .error,
+          };
+        return (
+          pendingSubmissions.get(key) ?? {
+            kind: 'accepted',
+            ref: prior.ref,
+            snapshot: snapshot(executions.get(prior.ref.id)!),
+          }
+        );
+      }
+      if (request.limits?.estimatedCostCeiling)
+        return {
+          kind: 'rejected',
+          error: fail('workflow.cost', 'Estimated cost budgets are not supported', 'unsupported')
+            .error,
+        };
+      const numeric: Record<string, number> = {};
+      for (const [dimension, value] of Object.entries(request.limits ?? {}))
+        if (dimension !== 'deadline') {
+          if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0)
+            return {
+              kind: 'rejected',
+              error: fail('workflow.limit', 'Invalid execution limit').error,
+            };
+          numeric[dimension] = value;
+        }
+      const budget = createBudget(numeric),
+        upstream = context.services.get(budgetKey);
+      const services: C.ServiceAccess = {
+        get(key) {
+          return key.id === budgetKey.id ? ok(budget as never) : context.services.get(key);
+        },
+      };
+      // A nested workflow may not silently create a second budget owner.
+      if (upstream.ok)
+        return {
+          kind: 'rejected',
+          error: fail(
+            'workflow.nested-budget',
+            'Nested workflow budget composition is not installed',
+            'unsupported',
+          ).error,
+        };
+      const deadlines = [context.deadline, request.limits?.deadline]
+        .filter((v): v is string => !!v)
+        .map(Date.parse);
+      if (deadlines.some(Number.isNaN))
+        return { kind: 'rejected', error: fail('workflow.deadline', 'Invalid deadline').error };
+      const c = {
+        ...context,
+        services,
+        ...(deadlines.length ? { deadline: new Date(Math.min(...deadlines)).toISOString() } : {}),
+      };
+      const ref: W.ExecutionRef = freeze({
+        engine: options.descriptor.id,
+        engineVersion: options.descriptor.version,
+        id: crypto.randomUUID(),
+      });
+      const waiting = new Map<string, { ticket: R.WaitTicket; schema: C.Schema<C.Json> }>(),
+        active = new Set<C.EntityRef>();
+      let execution: Execution | undefined;
+      let resolveSubmission!: (result: W.Submission) => void;
+      submissions.set(key, { digest: submissionDigest, ref });
+      pendingSubmissions.set(
+        key,
+        new Promise<W.Submission>((resolve) => {
+          resolveSubmission = resolve;
+        }),
+      );
+      const started = await operations.begin<C.Json>(
+        {
+          kind: 'part/workflow',
+          childPolicy: 'attached',
+          retryOwner: options.descriptor.id,
+          ...(request.parent ? { parent: request.parent } : {}),
+        },
+        async (operationContext) => {
+          let effect: C.EffectState = 'not-attempted';
+          const commit: C.CommitEvidence[] = [];
+          const memo = new Map<string, { digest: string; pending: Promise<unknown> }>();
+          const memoize = async <T>(
+            identity: W.CallIdentity,
+            input: C.Json,
+            body: () => Promise<T>,
+          ): Promise<T> => {
+            if (
+              identity.workflow.id !== ref.id ||
+              identity.workflow.engine !== ref.engine ||
+              identity.workflow.engineVersion !== ref.engineVersion ||
+              !identity.stepKey ||
+              !Number.isSafeInteger(identity.attempt) ||
+              identity.attempt < 1 ||
+              identity.inputDigest !== (await digest(input))
+            )
+              throw Error('Invalid workflow call identity');
+            const key = canonical({
+                step: identity.stepKey,
+                path: identity.iterationPath,
+                attempt: identity.attempt,
+              }),
+              fingerprint = await digest(input);
+            const old = memo.get(key);
+            if (old) {
+              if (old.digest !== fingerprint) throw Error('Workflow call identity conflict');
+              return old.pending as Promise<T>;
+            }
+            if (operationContext.signal.aborted) throw Error('Workflow cancelled');
+            operationContext.progress.publish('part.workflow/step', {
+              stepKey: identity.stepKey,
+              iterationPath: identity.iterationPath,
+              attempt: identity.attempt,
+            });
+            if (execution) {
+              execution.native = {
+                stepKey: identity.stepKey,
+                iterationPath: identity.iterationPath,
+                attempt: identity.attempt,
+              };
+              execution.nativeRevision++;
+            }
+            const pending = Promise.resolve().then(body);
+            memo.set(key, { digest: fingerprint, pending });
+            return pending;
+          };
+          const missing = (name: string): R.ManagedOutcome<never> => ({
+            phase: 'failed',
+            error: fail('workflow.service', `${name} is not installed`, 'unsupported').error,
+            effect: 'not-attempted',
+            commit: [],
+            unsettledChildren: [],
+          });
+          const runHandle = async <T>(
+            result: C.Result<R.ExecutionHandle<T>>,
+          ): Promise<R.ManagedOutcome<T>> => {
+            if (!result.ok)
+              return {
+                phase: 'failed',
+                error: result.error,
+                effect: 'not-attempted',
+                commit: [],
+                unsettledChildren: [],
+              };
+            active.add(result.value.ref);
+            const outcome = await result.value.done;
+            active.delete(result.value.ref);
+            effect = combineEffects(effect, outcome.effect);
+            commit.push(...outcome.commit);
+            return outcome;
+          };
+          const stepContext: W.StepContext = {
+            execution: ref,
+            signal: operationContext.signal,
+            limits: request.limits ?? {},
+            script: (identity, input) =>
+              memoize(identity, input as unknown as C.Json, async () => {
+                const outcome = options.services.scripts
+                  ? await runHandle(await options.services.scripts.execute(input, operationContext))
+                  : missing('scripts');
+                if (
+                  outcome.phase === 'completed' &&
+                  (outcome.result.exitCode !== 0 || outcome.result.completeness !== 'complete')
+                )
+                  return {
+                    phase: 'failed',
+                    effect: outcome.effect,
+                    commit: outcome.commit,
+                    unsettledChildren: outcome.unsettledChildren,
+                    error: fail(
+                      'workflow.script-exit',
+                      'Script exited unsuccessfully or capture is incomplete',
+                    ).error,
+                  };
+                return outcome;
+              }),
+            model: (identity, input) =>
+              memoize(identity, input as unknown as C.Json, async () =>
+                options.services.model
+                  ? runHandle(await options.services.model.invoke(input, operationContext))
+                  : missing('model'),
+              ),
+            agent: (identity, input) =>
+              memoize(
+                identity,
+                {
+                  driver: input.driver,
+                  input: input.input,
+                  compositionRevision: input.composition.inspection.revision,
+                },
+                async () =>
+                  options.services.runs
+                    ? runHandle(await options.services.runs.start(input, operationContext))
+                    : missing('runs'),
+              ),
+            submit: (identity, input) =>
+              memoize(identity, input as unknown as C.Json, async () =>
+                options.services.results
+                  ? options.services.results.submit(input, operationContext)
+                  : fail('workflow.results', 'Results service not installed', 'unsupported'),
+              ),
+            wait: (identity, input) =>
+              memoize(
+                identity,
+                {
+                  type: input.type,
+                  responseSchema: { ...input.responseSchema.ref },
+                  presentation: input.presentation,
+                  bindingDigest: input.bindingDigest,
+                },
+                async () => {
+                  if (!options.services.waits)
+                    return fail('workflow.waits', 'Wait service not installed', 'unsupported');
+                  const opened = await options.services.waits.open(
+                    {
+                      ...input,
+                      bindingDigest: await digest({
+                        definition: request.prepared.definition.digest,
+                        execution: ref.id,
+                        binding: input.bindingDigest,
+                      }),
+                    },
+                    operationContext,
+                  );
+                  if (opened.ok)
+                    waiting.set(opened.value.id, {
+                      ticket: opened.value,
+                      schema: input.responseSchema,
+                    });
+                  return opened;
+                },
+              ),
+            async response(ticket) {
+              const entry = waiting.get(ticket.id);
+              if (!entry || !options.services.waits)
+                return fail('workflow.ticket', 'Ticket not owned by this execution');
+              const response = await operationContext.wait(
+                options.services.waits.wait(entry.ticket, entry.schema, operationContext),
+              );
+              entry.ticket = {
+                ...entry.ticket,
+                state: response.ok
+                  ? 'resolved'
+                  : operationContext.signal.aborted
+                    ? 'cancelled'
+                    : 'expired',
+              };
+              return response;
+            },
+          };
+          let result: C.Result<C.Json>;
+          try {
+            result = await runner.execute(
+              structuredClone(checked.value),
+              stepContext,
+              operationContext,
+              (outcome) => {
+                effect = combineEffects(effect, outcome.effect);
+                commit.push(...outcome.commit);
+              },
+            );
+          } catch {
+            return {
+              phase: 'failed',
+              error: fail('workflow.exception', 'Workflow definition failed', 'internal', 'unknown')
+                .error,
+              effect: 'unknown',
+              commit,
+              unsettledChildren: [],
+            };
+          }
+          if (!result.ok)
+            return { phase: 'failed', error: result.error, effect, commit, unsettledChildren: [] };
+          const validated = runner.output.validate(result.value);
+          if (!validated.ok)
+            return {
+              phase: 'failed',
+              error: fail('workflow.output', 'Workflow output validation failed').error,
+              effect,
+              commit,
+              unsettledChildren: [],
+            };
+          const encoded = runner.output.codec?.encode(validated.value);
+          if (!encoded?.ok)
+            return {
+              phase: 'failed',
+              error: fail('workflow.codec', 'Workflow output codec failed').error,
+              effect,
+              commit,
+              unsettledChildren: [],
+            };
+          if (execution) {
+            execution.output = freeze({
+              kind: 'native',
+              data: structuredClone(encoded.value),
+              validation: 'engine-reported',
+              provenance,
+            });
+            execution.nativeRevision++;
+          }
+          return {
+            phase: 'completed',
+            result: encoded.value,
+            effect,
+            commit,
+            unsettledChildren: [],
+          };
+        },
+        c,
+      );
+      if (!started.ok) {
+        const result: W.Submission = { kind: 'rejected', error: started.error };
+        resolveSubmission(result);
+        pendingSubmissions.delete(key);
+        submissions.delete(key);
+        return result;
+      }
+      execution = {
+        ref,
+        prepared: request.prepared,
+        context: c,
+        handle: started.value,
+        native: { definition: request.prepared.definition.id },
+        nativeRevision: 0,
+        waits: waiting,
+        active,
+      };
+      executions.set(ref.id, execution);
+      submissions.set(key, { digest: submissionDigest, ref });
+      const accepted: W.Submission = { kind: 'accepted', ref, snapshot: snapshot(execution) };
+      resolveSubmission(accepted);
+      pendingSubmissions.delete(key);
+      return accepted;
+    },
+    async get(ref, context) {
+      const result = getExecution(ref, context);
+      return result.ok ? ok(snapshot(result.value)) : result;
+    },
+    async requestCancel(ref, reason, context) {
+      const result = getExecution(ref, context);
+      return result.ok ? result.value.handle.requestCancel(reason) : result;
+    },
+    observe(ref, context) {
+      const result = getExecution(ref, context);
+      return result.ok
+        ? result.value.handle.observe({ signal: context.signal })
+        : { async *[Symbol.asyncIterator]() {} };
+    },
+    async action(ref, command, context) {
+      const result = getExecution(ref, context),
+        rejected = (error: C.Failure): C.CommandReceipt => ({
+          kind: 'rejected',
+          commandId: command.commandId,
+          error,
+        });
+      if (!result.ok) return rejected(result.error);
+      if (
+        command.actionId !== 'part.workflow/respond' ||
+        command.actionVersion !== 1 ||
+        !options.services.waits
+      )
+        return rejected(fail('workflow.action', 'Action not installed', 'unsupported').error);
+      const input = command.input as unknown as {
+        ticketId: string;
+        revision: string;
+        response: C.Json;
+      };
+      const entry = input && result.value.waits.get(input.ticketId);
+      if (!entry || entry.ticket.revision !== input.revision)
+        return rejected(fail('workflow.ticket', 'Ticket is absent or stale', 'conflict').error);
+      const responded = await options.services.waits.respond(
+        entry.ticket,
+        input.response,
+        command.commandId,
+        context,
+      );
+      if (!responded.ok) return rejected(responded.error);
+      return {
+        kind: 'completed',
+        commandId: command.commandId,
+        result: responded.value as unknown as C.Json,
+        effect: 'not-applicable',
+        commit: [],
+      };
+    },
+    async reconcileSubmission(key, context) {
+      const found = submissions.get(canonical({ principal: context.principal, key }));
+      return ok(found?.ref ?? null);
+    },
+  };
+}

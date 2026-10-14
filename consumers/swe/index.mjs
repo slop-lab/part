@@ -6,17 +6,45 @@ import { createAgent } from 'part/agent';
 import { functionTool } from 'part/tools';
 import { schema, stringSchema } from 'part/contracts';
 import { fakeModel } from 'part/testing';
-const workspace=mkdtempSync(join(tmpdir(),'part-consumer-workspace-'));
-try{
-  writeFileSync(join(workspace,'input.txt'),'consumer-owned workspace');
-  const input=schema('swe/path',value=>value&&typeof value==='object'&&typeof value.path==='string');
-  let reads=0;
-  const read=functionTool({id:'workspace-read',input,output:stringSchema,execute:({path})=>{
-    const file=resolve(workspace,path),local=relative(workspace,file);
-    if(local.startsWith('..')||resolve(file)===resolve(workspace))throw Error('Outside workspace');
-    reads++;return readFileSync(file,'utf8');
-  }});
-  const agent=createAgent({model:fakeModel([{toolCalls:[{name:'workspace-read',arguments:{path:'input.txt'}}]},{text:'read complete'}]),tools:[read],toolSchemas:{'workspace-read':{type:'object',properties:{path:{type:'string'}},required:['path']}}}).value;
-  assert.equal((await agent.generate('read the file')).value.phase,'completed');assert.equal(reads,1);await agent.dispose();
+const workspace = mkdtempSync(join(tmpdir(), 'part-consumer-workspace-'));
+try {
+  writeFileSync(join(workspace, 'input.txt'), 'consumer-owned workspace');
+  const input = schema(
+    'swe/path',
+    (value) => value && typeof value === 'object' && typeof value.path === 'string',
+  );
+  let reads = 0;
+  const read = functionTool({
+    id: 'workspace-read',
+    input,
+    output: stringSchema,
+    execute: ({ path }) => {
+      const file = resolve(workspace, path),
+        local = relative(workspace, file);
+      if (local.startsWith('..') || resolve(file) === resolve(workspace))
+        throw Error('Outside workspace');
+      reads++;
+      return readFileSync(file, 'utf8');
+    },
+  });
+  const agent = createAgent({
+    model: fakeModel([
+      { toolCalls: [{ name: 'workspace-read', arguments: { path: 'input.txt' } }] },
+      { text: 'read complete' },
+    ]),
+    tools: [read],
+    toolSchemas: {
+      'workspace-read': {
+        type: 'object',
+        properties: { path: { type: 'string' } },
+        required: ['path'],
+      },
+    },
+  }).value;
+  assert.equal((await agent.generate('read the file')).value.phase, 'completed');
+  assert.equal(reads, 1);
+  await agent.dispose();
   console.log('swe consumer passed');
-}finally{rmSync(workspace,{recursive:true,force:true});}
+} finally {
+  rmSync(workspace, { recursive: true, force: true });
+}

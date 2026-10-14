@@ -8,27 +8,77 @@
  */
 
 export namespace Contracts {
-  export type Json = null | boolean | number | string | readonly Json[] | { readonly [key: string]: Json };
+  export type Json =
+    null | boolean | number | string | readonly Json[] | { readonly [key: string]: Json };
   export type QualifiedId = string;
   export type EntityId = string;
   export type Revision = string;
   export type Cursor = string;
   export type Timestamp = string;
   export type Digest = string;
-  export type ScopeKind = 'application' | 'runtime' | 'session' | 'run' | 'operation' | 'request' | 'client' | 'surface' | (string & {});
-  export interface SchemaRef { readonly id: QualifiedId; readonly version: number }
-  export interface EntityRef { readonly owner: QualifiedId; readonly kind: QualifiedId; readonly id: EntityId }
+  export type ScopeKind =
+    | 'application'
+    | 'runtime'
+    | 'session'
+    | 'run'
+    | 'operation'
+    | 'request'
+    | 'client'
+    | 'surface'
+    | (string & {});
+  export interface SchemaRef {
+    readonly id: QualifiedId;
+    readonly version: number;
+  }
+  export interface EntityRef {
+    readonly owner: QualifiedId;
+    readonly kind: QualifiedId;
+    readonly id: EntityId;
+  }
   /** Optional generic data handle. No document/backlog/proposal semantics. */
-  export interface DataRef extends EntityRef { readonly version?: Revision }
-  export interface ArtifactRef { readonly store: QualifiedId; readonly id: EntityId }
-  export interface ResourceRef { readonly owner: QualifiedId; readonly id: EntityId; readonly kind: QualifiedId }
-  export interface Versioned<T> { readonly value: T; readonly revision: Revision }
-  export interface Page<T> { readonly items: readonly T[]; readonly nextCursor?: Cursor }
-  export interface Issue { readonly path: readonly (string | number)[]; readonly code: string; readonly message: string }
-  export type EffectState = 'not-applicable' | 'not-attempted' | 'not-applied' | 'applied' | 'partially-applied' | 'unknown';
+  export interface DataRef extends EntityRef {
+    readonly version?: Revision;
+  }
+  export interface ArtifactRef {
+    readonly store: QualifiedId;
+    readonly id: EntityId;
+  }
+  export interface ResourceRef {
+    readonly owner: QualifiedId;
+    readonly id: EntityId;
+    readonly kind: QualifiedId;
+  }
+  export interface Versioned<T> {
+    readonly value: T;
+    readonly revision: Revision;
+  }
+  export interface Page<T> {
+    readonly items: readonly T[];
+    readonly nextCursor?: Cursor;
+  }
+  export interface Issue {
+    readonly path: readonly (string | number)[];
+    readonly code: string;
+    readonly message: string;
+  }
+  export type EffectState =
+    | 'not-applicable'
+    | 'not-attempted'
+    | 'not-applied'
+    | 'applied'
+    | 'partially-applied'
+    | 'unknown';
   export interface Failure {
     readonly code: QualifiedId;
-    readonly category: 'validation' | 'unsupported' | 'conflict' | 'permission' | 'unavailable' | 'timeout' | 'cancelled' | 'internal';
+    readonly category:
+      | 'validation'
+      | 'unsupported'
+      | 'conflict'
+      | 'permission'
+      | 'unavailable'
+      | 'timeout'
+      | 'cancelled'
+      | 'internal';
     readonly message: string;
     readonly retry: 'never' | 'safe-read' | 'after-reconciliation' | 'unspecified';
     readonly effect?: EffectState;
@@ -36,7 +86,8 @@ export namespace Contracts {
     readonly retryAfterMs?: number;
     readonly details?: Json;
   }
-  export type Result<T, E = Failure> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: E };
+  export type Result<T, E = Failure> =
+    { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: E };
   export interface Codec<T> {
     readonly schema: SchemaRef;
     encode(value: T): Result<Json>;
@@ -48,7 +99,10 @@ export namespace Contracts {
     readonly codec?: Codec<T>;
   }
   export interface JsonSchemaExporter {
-    exportSchema<T>(schema: Schema<T>, target: string): Result<{ readonly schema: Json; readonly losses: readonly string[] }>;
+    exportSchema<T>(
+      schema: Schema<T>,
+      target: string,
+    ): Result<{ readonly schema: Json; readonly losses: readonly string[] }>;
   }
   export interface Provenance {
     readonly component: QualifiedId;
@@ -58,7 +112,10 @@ export namespace Contracts {
     readonly correlationId?: EntityId;
     readonly source?: string;
   }
-  export interface ScopeRef { readonly kind: ScopeKind; readonly id: EntityId }
+  export interface ScopeRef {
+    readonly kind: ScopeKind;
+    readonly id: EntityId;
+  }
   export interface Capability {
     readonly id: QualifiedId;
     readonly contractVersion: number;
@@ -66,9 +123,19 @@ export namespace Contracts {
     readonly implementedBy: QualifiedId;
     readonly constraints: Json;
   }
-  export interface CapabilitySet { readonly revision: Revision; readonly entries: readonly Capability[] }
-  export interface ServiceKey<T> { readonly id: QualifiedId; readonly contractVersion: number; readonly scope: ScopeKind; readonly typeWitness?: (value: T) => T }
-  export interface ServiceAccess { get<T>(key: ServiceKey<T>): Result<T> }
+  export interface CapabilitySet {
+    readonly revision: Revision;
+    readonly entries: readonly Capability[];
+  }
+  export interface ServiceKey<T> {
+    readonly id: QualifiedId;
+    readonly contractVersion: number;
+    readonly scope: ScopeKind;
+    readonly typeWitness?: (value: T) => T;
+  }
+  export interface ServiceAccess {
+    get<T>(key: ServiceKey<T>): Result<T>;
+  }
   /** Process-local. Constructed by a trusted embedding/host adapter; NEVER accepted from wire payload. */
   export interface InvocationContext {
     readonly principal: { readonly subject: string; readonly authority: QualifiedId };
@@ -80,7 +147,9 @@ export namespace Contracts {
     readonly causationId?: EntityId;
     readonly idempotencyKey?: string;
   }
-  export interface Preconditions { readonly versions: readonly { readonly ref: EntityRef; readonly expected: Revision }[] }
+  export interface Preconditions {
+    readonly versions: readonly { readonly ref: EntityRef; readonly expected: Revision }[];
+  }
   export interface CommandRequest<I = Json> {
     readonly protocolVersion: number;
     readonly commandId: EntityId;
@@ -98,10 +167,28 @@ export namespace Contracts {
     readonly transactionId?: EntityId;
   }
   export type CommandReceipt<O = Json> =
-    | { readonly kind: 'completed'; readonly commandId: EntityId; readonly result: O; readonly commit: readonly CommitEvidence[]; readonly effect: EffectState }
-    | { readonly kind: 'accepted'; readonly commandId: EntityId; readonly operation: EntityRef; readonly commit: readonly CommitEvidence[] }
+    | {
+        readonly kind: 'completed';
+        readonly commandId: EntityId;
+        readonly result: O;
+        readonly commit: readonly CommitEvidence[];
+        readonly effect: EffectState;
+      }
+    | {
+        readonly kind: 'accepted';
+        readonly commandId: EntityId;
+        readonly operation: EntityRef;
+        readonly commit: readonly CommitEvidence[];
+      }
     | { readonly kind: 'rejected'; readonly commandId: EntityId; readonly error: Failure }
-    | { readonly kind: 'failed'; readonly commandId: EntityId; readonly error: Failure; readonly effect: EffectState; readonly commit: readonly CommitEvidence[]; readonly operation?: EntityRef };
+    | {
+        readonly kind: 'failed';
+        readonly commandId: EntityId;
+        readonly error: Failure;
+        readonly effect: EffectState;
+        readonly commit: readonly CommitEvidence[];
+        readonly operation?: EntityRef;
+      };
   export interface ActionDescriptor {
     readonly id: QualifiedId;
     readonly version: number;
@@ -109,16 +196,33 @@ export namespace Contracts {
     readonly output: SchemaRef;
     readonly targetKind?: QualifiedId;
     readonly execution: 'immediate' | 'operation';
-    readonly availability: { readonly state: 'available' | 'disabled'; readonly reason?: string; readonly checkedAt: Revision };
+    readonly availability: {
+      readonly state: 'available' | 'disabled';
+      readonly reason?: string;
+      readonly checkedAt: Revision;
+    };
     readonly presentation?: Json;
   }
-  export interface QueryRequest<I = Json> { readonly queryId: QualifiedId; readonly version: number; readonly input: I; readonly target?: EntityRef }
-  export interface CleanupReport { readonly released: readonly EntityRef[]; readonly unresolved: readonly EntityRef[]; readonly errors: readonly Failure[] }
+  export interface QueryRequest<I = Json> {
+    readonly queryId: QualifiedId;
+    readonly version: number;
+    readonly input: I;
+    readonly target?: EntityRef;
+  }
+  export interface CleanupReport {
+    readonly released: readonly EntityRef[];
+    readonly unresolved: readonly EntityRef[];
+    readonly errors: readonly Failure[];
+  }
 }
 
 export namespace Composition {
   export type Surface = 'local' | 'server' | 'client' | 'ui' | 'test';
-  export interface Requirement { readonly id: Contracts.QualifiedId; readonly contractVersion: number; readonly optional: boolean }
+  export interface Requirement {
+    readonly id: Contracts.QualifiedId;
+    readonly contractVersion: number;
+    readonly optional: boolean;
+  }
   export interface ComponentDescriptor {
     readonly id: Contracts.QualifiedId;
     readonly version: string;
@@ -144,19 +248,33 @@ export namespace Composition {
     readonly before?: readonly Contracts.QualifiedId[];
     readonly after?: readonly Contracts.QualifiedId[];
   }
-  export interface Replacement<T> { readonly point: ExtensionPoint<T>; readonly replaces: Contracts.QualifiedId; readonly with: Contribution<T> }
+  export interface Replacement<T> {
+    readonly point: ExtensionPoint<T>;
+    readonly replaces: Contracts.QualifiedId;
+    readonly with: Contribution<T>;
+  }
   export interface ComponentLifecycle {
     initialize(context: Contracts.InvocationContext): Promise<Contracts.Result<void>>;
     start(context: Contracts.InvocationContext): Promise<Contracts.Result<void>>;
     stop(reason: string): Promise<Contracts.CleanupReport>;
     dispose(): Promise<Contracts.CleanupReport>;
   }
-  export interface ScopedService<T> { readonly value: T; dispose(): Promise<Contracts.CleanupReport> }
+  export interface ScopedService<T> {
+    readonly value: T;
+    dispose(): Promise<Contracts.CleanupReport>;
+  }
   export interface ServiceFactory<T> {
     readonly id: string;
     readonly scope: Contracts.ScopeKind;
-    readonly dependencies: readonly { readonly id: string; readonly contractVersion: number; readonly scope: Contracts.ScopeKind }[];
-    create(config: Contracts.Json, context: Contracts.InvocationContext): Promise<Contracts.Result<ScopedService<T>>>;
+    readonly dependencies: readonly {
+      readonly id: string;
+      readonly contractVersion: number;
+      readonly scope: Contracts.ScopeKind;
+    }[];
+    create(
+      config: Contracts.Json,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<ScopedService<T>>>;
   }
   export interface RegistrationPort {
     provide<T>(point: ExtensionPoint<T>, factory: ServiceFactory<T>): Contracts.Result<void>;
@@ -167,16 +285,26 @@ export namespace Composition {
   export interface ComponentFactory {
     readonly descriptor: ComponentDescriptor;
     register(registry: RegistrationPort): Contracts.Result<void>;
-    create(config: Contracts.Json, services: Contracts.ServiceAccess): Contracts.Result<ComponentLifecycle>;
+    create(
+      config: Contracts.Json,
+      services: Contracts.ServiceAccess,
+    ): Contracts.Result<ComponentLifecycle>;
   }
   export interface ResolvedComposition {
     readonly id: Contracts.EntityId;
     readonly revision: Contracts.Revision;
     readonly digest: Contracts.Digest;
     readonly components: readonly ComponentDescriptor[];
-    readonly orderedBindings: readonly { readonly point: string; readonly contributions: readonly string[] }[];
+    readonly orderedBindings: readonly {
+      readonly point: string;
+      readonly contributions: readonly string[];
+    }[];
     readonly capabilities: Contracts.CapabilitySet;
-    readonly configProvenance: readonly { readonly key: string; readonly source: string; readonly effective: Contracts.Json }[];
+    readonly configProvenance: readonly {
+      readonly key: string;
+      readonly source: string;
+      readonly effective: Contracts.Json;
+    }[];
     readonly warnings: readonly string[];
   }
   export interface CompositionSpec {
@@ -184,7 +312,10 @@ export namespace Composition {
     readonly config: Contracts.Json;
     readonly edits?: readonly ((registry: RegistrationPort) => Contracts.Result<void>)[];
   }
-  export interface CompositionHandle { readonly inspection: ResolvedComposition; readonly localToken: unknown }
+  export interface CompositionHandle {
+    readonly inspection: ResolvedComposition;
+    readonly localToken: unknown;
+  }
   export interface CompositionPlanner {
     resolve(input: CompositionSpec): Contracts.Result<CompositionHandle>;
   }
@@ -194,7 +325,10 @@ export namespace Composition {
     close(): Promise<Contracts.CleanupReport>;
   }
   export interface ScopeManager {
-    open(scope: Contracts.ScopeRef, composition: CompositionHandle): Promise<Contracts.Result<ScopeLease>>;
+    open(
+      scope: Contracts.ScopeRef,
+      composition: CompositionHandle,
+    ): Promise<Contracts.Result<ScopeLease>>;
   }
   export interface Preset {
     readonly id: Contracts.QualifiedId;
@@ -205,7 +339,8 @@ export namespace Composition {
 }
 
 export namespace Runtime {
-  export type Phase = 'pending' | 'running' | 'waiting' | 'completed' | 'failed' | 'cancelled' | 'abandoned';
+  export type Phase =
+    'pending' | 'running' | 'waiting' | 'completed' | 'failed' | 'cancelled' | 'abandoned';
   export interface Cancellation {
     readonly requestId?: Contracts.EntityId;
     readonly state: 'not-requested' | 'requested' | 'confirmed' | 'partial' | 'unsupported';
@@ -226,23 +361,35 @@ export namespace Runtime {
     readonly unsettledChildren: readonly Contracts.EntityRef[];
     readonly commit: readonly Contracts.CommitEvidence[];
   }
-  export type ManagedOutcome<T> = OutcomeEvidence & (
-    | { readonly phase: 'completed'; readonly result: T }
-    | { readonly phase: 'failed'; readonly error: Contracts.Failure }
-    | { readonly phase: 'cancelled'; readonly error?: Contracts.Failure }
-    | { readonly phase: 'abandoned'; readonly error: Contracts.Failure }
-  );
+  export type ManagedOutcome<T> = OutcomeEvidence &
+    (
+      | { readonly phase: 'completed'; readonly result: T }
+      | { readonly phase: 'failed'; readonly error: Contracts.Failure }
+      | { readonly phase: 'cancelled'; readonly error?: Contracts.Failure }
+      | { readonly phase: 'abandoned'; readonly error: Contracts.Failure }
+    );
   export type Update<T = Contracts.Json> =
     | { readonly kind: 'data'; readonly index: number; readonly type: string; readonly payload: T }
-    | { readonly kind: 'gap'; readonly from: number; readonly to: number; readonly recovery: 'snapshot' | 'final-result' | 'unavailable' };
+    | {
+        readonly kind: 'gap';
+        readonly from: number;
+        readonly to: number;
+        readonly recovery: 'snapshot' | 'final-result' | 'unavailable';
+      };
   export interface ProgressSink {
-    publish(type: string, payload: Contracts.Json): Contracts.Result<{ readonly accepted: boolean; readonly dropped: number }>;
+    publish(
+      type: string,
+      payload: Contracts.Json,
+    ): Contracts.Result<{ readonly accepted: boolean; readonly dropped: number }>;
   }
   export interface ExecutionHandle<T, U = Contracts.Json> {
     readonly ref: Contracts.EntityRef;
     readonly done: Promise<ManagedOutcome<T>>;
     snapshot(): ExecutionSnapshot;
-    observe(options?: { readonly signal?: AbortSignal; readonly bufferSize?: number }): AsyncIterable<Update<U>>;
+    observe(options?: {
+      readonly signal?: AbortSignal;
+      readonly bufferSize?: number;
+    }): AsyncIterable<Update<U>>;
     requestCancel(reason: string): Promise<Contracts.Result<Cancellation>>;
   }
   export interface ExecutionLimits {
@@ -258,10 +405,18 @@ export namespace Runtime {
   export interface Usage {
     readonly inputTokens?: number;
     readonly outputTokens?: number;
-    readonly cost?: { readonly amount: string; readonly currency: string; readonly basis: 'estimate' | 'provider-reported' };
+    readonly cost?: {
+      readonly amount: string;
+      readonly currency: string;
+      readonly basis: 'estimate' | 'provider-reported';
+    };
     readonly providerNative?: Contracts.Json;
   }
-  export interface BudgetReservation { readonly id: Contracts.EntityId; readonly dimension: string; readonly quantity: number }
+  export interface BudgetReservation {
+    readonly id: Contracts.EntityId;
+    readonly dimension: string;
+    readonly quantity: number;
+  }
   export interface BudgetPort {
     reserve(dimension: string, quantity: number): Contracts.Result<BudgetReservation>;
     settle(reservation: BudgetReservation, actual: number | undefined): Contracts.Result<void>;
@@ -271,13 +426,27 @@ export namespace Runtime {
     readonly input: I;
     readonly composition: Composition.CompositionHandle;
     readonly limits?: ExecutionLimits;
-    readonly history?: { readonly sessionId: string; readonly branchId: string; readonly expectedHead?: string };
+    readonly history?: {
+      readonly sessionId: string;
+      readonly branchId: string;
+      readonly expectedHead?: string;
+    };
     readonly parent?: Contracts.EntityRef;
   }
   export interface RunService {
-    start<I>(request: RunRequest<I>, context: Contracts.InvocationContext): Promise<Contracts.Result<ExecutionHandle<unknown>>>;
-    get(ref: Contracts.EntityRef, context: Contracts.InvocationContext): Promise<Contracts.Result<ExecutionSnapshot>>;
-    cancel(ref: Contracts.EntityRef, reason: string, context: Contracts.InvocationContext): Promise<Contracts.Result<Cancellation>>;
+    start<I>(
+      request: RunRequest<I>,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<ExecutionHandle<unknown>>>;
+    get(
+      ref: Contracts.EntityRef,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<ExecutionSnapshot>>;
+    cancel(
+      ref: Contracts.EntityRef,
+      reason: string,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Cancellation>>;
   }
   export interface OperationSpec {
     readonly kind: Contracts.QualifiedId;
@@ -286,7 +455,11 @@ export namespace Runtime {
     readonly childPolicy: 'attached' | 'explicit-transfer';
   }
   export interface OperationService {
-    begin<T>(spec: OperationSpec, body: (context: Contracts.InvocationContext) => Promise<ManagedOutcome<T>>, context: Contracts.InvocationContext): Promise<Contracts.Result<ExecutionHandle<T>>>;
+    begin<T>(
+      spec: OperationSpec,
+      body: (context: Contracts.InvocationContext) => Promise<ManagedOutcome<T>>,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<ExecutionHandle<T>>>;
   }
   export interface EffectPlan {
     readonly operationId: Contracts.EntityId;
@@ -299,14 +472,33 @@ export namespace Runtime {
     readonly classification: 'read' | 'write' | 'external' | 'unknown';
   }
   /** A local, single-use token issued at an awaited execution boundary; not a serialized credential. */
-  export interface AttemptPermit { readonly attemptId: Contracts.EntityId; readonly planDigest: Contracts.Digest; readonly boundary: Contracts.QualifiedId }
+  export interface AttemptPermit {
+    readonly attemptId: Contracts.EntityId;
+    readonly planDigest: Contracts.Digest;
+    readonly boundary: Contracts.QualifiedId;
+  }
   export type AttemptOutcome<T> =
     | { readonly kind: 'returned'; readonly value: T; readonly effect: Contracts.EffectState }
-    | { readonly kind: 'failed'; readonly error: Contracts.Failure; readonly effect: Contracts.EffectState }
-    | { readonly kind: 'cancelled'; readonly effect: Contracts.EffectState; readonly error?: Contracts.Failure };
+    | {
+        readonly kind: 'failed';
+        readonly error: Contracts.Failure;
+        readonly effect: Contracts.EffectState;
+      }
+    | {
+        readonly kind: 'cancelled';
+        readonly effect: Contracts.EffectState;
+        readonly error?: Contracts.Failure;
+      };
   export interface InvocationBoundary {
-    prepare(plan: EffectPlan, context: Contracts.InvocationContext): Promise<Contracts.Result<AttemptPermit>>;
-    settle<T>(permit: AttemptPermit, outcome: AttemptOutcome<T>, context: Contracts.InvocationContext): Promise<Contracts.Result<readonly Contracts.CommitEvidence[]>>;
+    prepare(
+      plan: EffectPlan,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<AttemptPermit>>;
+    settle<T>(
+      permit: AttemptPermit,
+      outcome: AttemptOutcome<T>,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<readonly Contracts.CommitEvidence[]>>;
   }
   export interface WaitSpec<T> {
     readonly type: Contracts.QualifiedId;
@@ -314,20 +506,43 @@ export namespace Runtime {
     readonly presentation: Contracts.Json;
     readonly bindingDigest: Contracts.Digest;
     readonly expiresAt?: Contracts.Timestamp;
-    readonly resume?: { readonly handler: Contracts.QualifiedId; readonly version: number; readonly state: Contracts.Json };
+    readonly resume?: {
+      readonly handler: Contracts.QualifiedId;
+      readonly version: number;
+      readonly state: Contracts.Json;
+    };
   }
-  export interface WaitTicket { readonly id: Contracts.EntityId; readonly revision: Contracts.Revision; readonly type: Contracts.QualifiedId; readonly state: 'open' | 'resolved' | 'expired' | 'cancelled'; readonly durability: 'memory' | 'durable' }
+  export interface WaitTicket {
+    readonly id: Contracts.EntityId;
+    readonly revision: Contracts.Revision;
+    readonly type: Contracts.QualifiedId;
+    readonly state: 'open' | 'resolved' | 'expired' | 'cancelled';
+    readonly durability: 'memory' | 'durable';
+  }
   export interface SuspensionPort {
-    open<T>(spec: WaitSpec<T>, context: Contracts.InvocationContext): Promise<Contracts.Result<WaitTicket>>;
-    respond(ticket: WaitTicket, response: unknown, commandId: string, context: Contracts.InvocationContext): Promise<Contracts.Result<WaitTicket>>;
-    wait<T>(ticket: WaitTicket, schema: Contracts.Schema<T>, context: Contracts.InvocationContext): Promise<Contracts.Result<T>>;
+    open<T>(
+      spec: WaitSpec<T>,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<WaitTicket>>;
+    respond(
+      ticket: WaitTicket,
+      response: unknown,
+      commandId: string,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<WaitTicket>>;
+    wait<T>(
+      ticket: WaitTicket,
+      schema: Contracts.Schema<T>,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<T>>;
   }
 }
 
 export namespace Driver {
   export interface InputReceipt {
     readonly accepted: boolean;
-    readonly disposition: 'next-safe-point' | 'next-model-call' | 'follow-up-run' | 'queued' | 'rejected';
+    readonly disposition:
+      'next-safe-point' | 'next-model-call' | 'follow-up-run' | 'queued' | 'rejected';
     readonly inputId: string;
     readonly reason?: string;
   }
@@ -342,7 +557,11 @@ export namespace Driver {
   export interface Instance<I, O> {
     execute(input: I, context: Contracts.InvocationContext): Promise<Runtime.ManagedOutcome<O>>;
     describeActions(context: Contracts.InvocationContext): readonly Contracts.ActionDescriptor[];
-    receive(actionId: string, input: unknown, context: Contracts.InvocationContext): Promise<Contracts.Result<InputReceipt>>;
+    receive(
+      actionId: string,
+      input: unknown,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<InputReceipt>>;
     dispose(): Promise<Contracts.CleanupReport>;
   }
   export interface Factory<I, O> {
@@ -365,9 +584,18 @@ export namespace Model {
   export type ContentPart =
     | { readonly kind: 'text'; readonly text: string }
     | { readonly kind: 'json'; readonly value: Contracts.Json }
-    | { readonly kind: 'media'; readonly mediaType: string; readonly artifact: Contracts.ArtifactRef }
+    | {
+        readonly kind: 'media';
+        readonly mediaType: string;
+        readonly artifact: Contracts.ArtifactRef;
+      }
     | { readonly kind: 'native'; readonly native: NativePart };
-  export interface ToolCall { readonly id: string; readonly toolId: string; readonly arguments: Contracts.Json; readonly native?: NativePart }
+  export interface ToolCall {
+    readonly id: string;
+    readonly toolId: string;
+    readonly arguments: Contracts.Json;
+    readonly native?: NativePart;
+  }
   export interface Response {
     readonly content: readonly ContentPart[];
     readonly toolCalls: readonly ToolCall[];
@@ -375,7 +603,13 @@ export namespace Model {
     readonly usage: Runtime.Usage;
     readonly continuation?: NativePart;
   }
-  export interface ToolAdvertisement { readonly id: string; readonly description: string; readonly inputSchema: Contracts.Json; readonly execution: 'runtime' | 'provider'; readonly version: string }
+  export interface ToolAdvertisement {
+    readonly id: string;
+    readonly description: string;
+    readonly inputSchema: Contracts.Json;
+    readonly execution: 'runtime' | 'provider';
+    readonly version: string;
+  }
   export interface Invocation {
     readonly profileId: string;
     readonly context: Context.CompiledContext;
@@ -384,7 +618,10 @@ export namespace Model {
     readonly continuation?: NativePart;
   }
   export interface Gateway {
-    invoke(request: Invocation, context: Contracts.InvocationContext): Promise<Contracts.Result<Runtime.ExecutionHandle<Response>>>;
+    invoke(
+      request: Invocation,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Runtime.ExecutionHandle<Response>>>;
   }
   export interface Profile {
     readonly id: string;
@@ -405,8 +642,15 @@ export namespace Model {
     readonly metadata: Contracts.Json;
     readonly inspectionBoundary: 'outgoing-body' | 'broker-input';
   }
-  export interface WireResponse { readonly status?: number; readonly headers: Readonly<Record<string, string>>; readonly body: AsyncIterable<Uint8Array> }
-  export interface ProviderEvent { readonly type: string; readonly payload: Contracts.Json }
+  export interface WireResponse {
+    readonly status?: number;
+    readonly headers: Readonly<Record<string, string>>;
+    readonly body: AsyncIterable<Uint8Array>;
+  }
+  export interface ProviderEvent {
+    readonly type: string;
+    readonly payload: Contracts.Json;
+  }
   export interface ResponseDecoder {
     push(chunk: Uint8Array): Contracts.Result<readonly ProviderEvent[]>;
     finish(): Contracts.Result<Response>;
@@ -414,15 +658,37 @@ export namespace Model {
   export interface Adapter {
     readonly id: string;
     encode(invocation: Invocation, profile: Profile): Promise<Contracts.Result<EncodedRequest>>;
-    createDecoder(response: { readonly status?: number; readonly headers: Readonly<Record<string, string>> }): Contracts.Result<ResponseDecoder>;
+    createDecoder(response: {
+      readonly status?: number;
+      readonly headers: Readonly<Record<string, string>>;
+    }): Contracts.Result<ResponseDecoder>;
   }
-  export interface CredentialBinding { readonly strategy: string; readonly material: unknown }
-  export interface AuthStrategy { bind(profile: Profile, context: Contracts.InvocationContext): Promise<Contracts.Result<CredentialBinding>> }
+  export interface CredentialBinding {
+    readonly strategy: string;
+    readonly material: unknown;
+  }
+  export interface AuthStrategy {
+    bind(
+      profile: Profile,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<CredentialBinding>>;
+  }
   export interface Transport {
     readonly id: string;
-    send(request: EncodedRequest, profile: Profile, auth: CredentialBinding, context: Contracts.InvocationContext): Promise<Contracts.Result<WireResponse>>;
+    send(
+      request: EncodedRequest,
+      profile: Profile,
+      auth: CredentialBinding,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<WireResponse>>;
   }
-  export interface RequestTransform { readonly id: string; apply(request: EncodedRequest, context: Contracts.InvocationContext): Promise<Contracts.Result<EncodedRequest>> }
+  export interface RequestTransform {
+    readonly id: string;
+    apply(
+      request: EncodedRequest,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<EncodedRequest>>;
+  }
   export interface RequestInspection {
     readonly requestId: string;
     readonly contextId: string;
@@ -476,13 +742,27 @@ export namespace Tools {
     | { readonly kind: 'replace-arguments'; readonly arguments: unknown; readonly reason: string }
     | { readonly kind: 'deny'; readonly error: Contracts.Failure }
     | { readonly kind: 'substitute'; readonly result: ResultContent; readonly reason: string }
-    | { readonly kind: 'redirect'; readonly toolId?: string; readonly executorId?: string; readonly arguments: unknown; readonly reason: string }
+    | {
+        readonly kind: 'redirect';
+        readonly toolId?: string;
+        readonly executorId?: string;
+        readonly arguments: unknown;
+        readonly reason: string;
+      }
     | { readonly kind: 'suspend'; readonly ticket: Runtime.WaitSpec<Contracts.Json> };
   export interface Middleware {
     readonly id: string;
     readonly version: string;
-    decide(plan: CallPlan, context: Contracts.InvocationContext): Promise<Contracts.Result<Decision>>;
-    resume?(plan: CallPlan, ticket: Runtime.WaitTicket, response: Contracts.Json, context: Contracts.InvocationContext): Promise<Contracts.Result<Decision>>;
+    decide(
+      plan: CallPlan,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Decision>>;
+    resume?(
+      plan: CallPlan,
+      ticket: Runtime.WaitTicket,
+      response: Contracts.Json,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Decision>>;
   }
   export interface ExecutionContext extends Contracts.InvocationContext {
     readonly operationId: string;
@@ -496,24 +776,44 @@ export namespace Tools {
     readonly definition: Definition<I, O>;
     execute(input: I, context: ExecutionContext): Promise<Contracts.Result<ResultContent<O>>>;
   }
-  export interface InstalledTool { readonly id: string; readonly version: string; readonly localBinding: unknown }
-  export interface BindingFactory { install<I, O>(binding: FunctionBinding<I, O>): InstalledTool }
+  export interface InstalledTool {
+    readonly id: string;
+    readonly version: string;
+    readonly localBinding: unknown;
+  }
+  export interface BindingFactory {
+    install<I, O>(binding: FunctionBinding<I, O>): InstalledTool;
+  }
   export interface Executor {
     readonly id: string;
     readonly capabilities: Contracts.CapabilitySet;
-    execute(plan: CallPlan, permit: Runtime.AttemptPermit, context: ExecutionContext): Promise<Runtime.AttemptOutcome<ResultContent>>;
-    reconcile?(attempt: Runtime.EffectPlan, context: Contracts.InvocationContext): Promise<Contracts.Result<Contracts.EffectState>>;
+    execute(
+      plan: CallPlan,
+      permit: Runtime.AttemptPermit,
+      context: ExecutionContext,
+    ): Promise<Runtime.AttemptOutcome<ResultContent>>;
+    reconcile?(
+      attempt: Runtime.EffectPlan,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Contracts.EffectState>>;
   }
   export interface Registry {
     resolve(id: string, expectedVersion?: string): Contracts.Result<Definition<unknown, unknown>>;
     list(context: Contracts.InvocationContext): readonly Definition<unknown, unknown>[];
   }
   export interface Dispatcher {
-    dispatch(call: Call, context: Contracts.InvocationContext): Promise<Contracts.Result<Runtime.ExecutionHandle<ResultContent>>>;
+    dispatch(
+      call: Call,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Runtime.ExecutionHandle<ResultContent>>>;
   }
   export interface OutputProjector {
     readonly id: string;
-    forModel(result: ResultContent, budget: number, context: Contracts.InvocationContext): Promise<Contracts.Result<readonly Model.ContentPart[]>>;
+    forModel(
+      result: ResultContent,
+      budget: number,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<readonly Model.ContentPart[]>>;
   }
 }
 
@@ -524,16 +824,45 @@ export namespace History {
     readonly schemaVersion: number;
     readonly payload: T;
     readonly provenance: Contracts.Provenance;
-    readonly visibility: { readonly model: boolean; readonly conversation: boolean; readonly inspector: boolean; readonly export: boolean };
+    readonly visibility: {
+      readonly model: boolean;
+      readonly conversation: boolean;
+      readonly inspector: boolean;
+      readonly export: boolean;
+    };
     readonly createdAt: Contracts.Timestamp;
   }
-  export interface Branch { readonly id: string; readonly sessionId: string; readonly head?: string; readonly revision: Contracts.Revision }
-  export interface Entry { readonly entryId: string; readonly previous?: string; readonly record: Record }
+  export interface Branch {
+    readonly id: string;
+    readonly sessionId: string;
+    readonly head?: string;
+    readonly revision: Contracts.Revision;
+  }
+  export interface Entry {
+    readonly entryId: string;
+    readonly previous?: string;
+    readonly record: Record;
+  }
   export interface Service {
-    createSession(metadata: Contracts.Json, context: Contracts.InvocationContext): Promise<Contracts.Result<Contracts.EntityRef>>;
-    fork(branch: Branch, atEntry: string | undefined, context: Contracts.InvocationContext): Promise<Contracts.Result<Branch>>;
-    append(branch: Branch, records: readonly Record[], context: Contracts.InvocationContext): Promise<Contracts.Result<Branch>>;
-    path(branch: Branch, cursor: string | undefined, context: Contracts.InvocationContext): Promise<Contracts.Result<Contracts.Page<Entry>>>;
+    createSession(
+      metadata: Contracts.Json,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Contracts.EntityRef>>;
+    fork(
+      branch: Branch,
+      atEntry: string | undefined,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Branch>>;
+    append(
+      branch: Branch,
+      records: readonly Record[],
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Branch>>;
+    path(
+      branch: Branch,
+      cursor: string | undefined,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Contracts.Page<Entry>>>;
   }
 }
 
@@ -551,14 +880,43 @@ export namespace Context {
     readonly source: SourceRef;
     readonly provenance: Contracts.Provenance;
   }
-  export interface SourceVersion { readonly source: SourceRef; readonly observed: Contracts.Revision; readonly fidelity: 'version-pinned' | 'observed-only' | 'content-addressed' }
-  export interface Selection { readonly source: SourceRef; readonly required: boolean; readonly reason: string; readonly selectorData?: Contracts.Json }
-  export interface Plan { readonly id: string; readonly selections: readonly Selection[]; readonly policyRevision: string }
-  export interface Request { readonly sources: readonly SourceRef[]; readonly input: readonly SemanticItem[]; readonly modelCapabilities: Contracts.CapabilitySet; readonly toolsDigest: string; readonly budget?: number }
-  export interface Planner { plan(request: Request, context: Contracts.InvocationContext): Promise<Contracts.Result<Plan>> }
+  export interface SourceVersion {
+    readonly source: SourceRef;
+    readonly observed: Contracts.Revision;
+    readonly fidelity: 'version-pinned' | 'observed-only' | 'content-addressed';
+  }
+  export interface Selection {
+    readonly source: SourceRef;
+    readonly required: boolean;
+    readonly reason: string;
+    readonly selectorData?: Contracts.Json;
+  }
+  export interface Plan {
+    readonly id: string;
+    readonly selections: readonly Selection[];
+    readonly policyRevision: string;
+  }
+  export interface Request {
+    readonly sources: readonly SourceRef[];
+    readonly input: readonly SemanticItem[];
+    readonly modelCapabilities: Contracts.CapabilitySet;
+    readonly toolsDigest: string;
+    readonly budget?: number;
+  }
+  export interface Planner {
+    plan(request: Request, context: Contracts.InvocationContext): Promise<Contracts.Result<Plan>>;
+  }
   export interface Resolver {
     readonly id: string;
-    resolve(selection: Selection, context: Contracts.InvocationContext): Promise<Contracts.Result<{ readonly items: readonly SemanticItem[]; readonly versions: readonly SourceVersion[] }>>;
+    resolve(
+      selection: Selection,
+      context: Contracts.InvocationContext,
+    ): Promise<
+      Contracts.Result<{
+        readonly items: readonly SemanticItem[];
+        readonly versions: readonly SourceVersion[];
+      }>
+    >;
   }
   export interface Fragment {
     readonly id: string;
@@ -569,11 +927,31 @@ export namespace Context {
     readonly sources: readonly SourceRef[];
     readonly provenance: Contracts.Provenance;
   }
-  export type Lowering = { readonly kind: 'include'; readonly fragments: readonly Fragment[] } | { readonly kind: 'omit'; readonly reason: string };
-  export interface Lowerer<T> { readonly id: string; readonly accepts: Contracts.SchemaRef; lower(item: SemanticItem<T>): Contracts.Result<Lowering> }
-  export interface SetTransform { readonly id: string; transform(fragments: readonly Fragment[], context: Contracts.InvocationContext): Promise<Contracts.Result<readonly Fragment[]>> }
-  export interface Assembly { readonly fragments: readonly Fragment[]; readonly sourceMap: readonly { readonly fragmentId: string; readonly sources: readonly SourceRef[] }[] }
-  export interface Assembler { assemble(fragments: readonly Fragment[]): Contracts.Result<Assembly> }
+  export type Lowering =
+    | { readonly kind: 'include'; readonly fragments: readonly Fragment[] }
+    | { readonly kind: 'omit'; readonly reason: string };
+  export interface Lowerer<T> {
+    readonly id: string;
+    readonly accepts: Contracts.SchemaRef;
+    lower(item: SemanticItem<T>): Contracts.Result<Lowering>;
+  }
+  export interface SetTransform {
+    readonly id: string;
+    transform(
+      fragments: readonly Fragment[],
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<readonly Fragment[]>>;
+  }
+  export interface Assembly {
+    readonly fragments: readonly Fragment[];
+    readonly sourceMap: readonly {
+      readonly fragmentId: string;
+      readonly sources: readonly SourceRef[];
+    }[];
+  }
+  export interface Assembler {
+    assemble(fragments: readonly Fragment[]): Contracts.Result<Assembly>;
+  }
   export interface CompiledContext extends Assembly {
     readonly id: string;
     readonly digest: string;
@@ -581,11 +959,21 @@ export namespace Context {
     readonly toolsDigest: string;
     readonly modelCapabilitiesRevision: string;
     readonly sourceVersions: readonly SourceVersion[];
-    readonly decisions: readonly { readonly source: SourceRef; readonly disposition: 'include' | 'omit'; readonly reason: string; readonly component: string }[];
+    readonly decisions: readonly {
+      readonly source: SourceRef;
+      readonly disposition: 'include' | 'omit';
+      readonly reason: string;
+      readonly component: string;
+    }[];
     readonly consistency: 'per-source' | 'atomic-owner-snapshot';
     readonly losses: readonly string[];
   }
-  export interface Compiler { compile(request: Request, context: Contracts.InvocationContext): Promise<Contracts.Result<CompiledContext>> }
+  export interface Compiler {
+    compile(
+      request: Request,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<CompiledContext>>;
+  }
 }
 
 export namespace Control {
@@ -594,18 +982,37 @@ export namespace Control {
     readonly version: number;
     readonly input: Contracts.Schema<I>;
     readonly output: Contracts.Schema<O>;
-    describe(target: Contracts.EntityRef | undefined, context: Contracts.InvocationContext): Promise<Contracts.Result<Contracts.ActionDescriptor>>;
-    execute(request: Contracts.CommandRequest<I>, context: Contracts.InvocationContext): Promise<Contracts.CommandReceipt<O>>;
+    describe(
+      target: Contracts.EntityRef | undefined,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Contracts.ActionDescriptor>>;
+    execute(
+      request: Contracts.CommandRequest<I>,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.CommandReceipt<O>>;
   }
   export interface ActionGateway {
-    invoke(request: Contracts.CommandRequest, context: Contracts.InvocationContext): Promise<Contracts.CommandReceipt>;
-    describe(target: Contracts.EntityRef | undefined, context: Contracts.InvocationContext): Promise<Contracts.Result<readonly Contracts.ActionDescriptor[]>>;
+    invoke(
+      request: Contracts.CommandRequest,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.CommandReceipt>;
+    describe(
+      target: Contracts.EntityRef | undefined,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<readonly Contracts.ActionDescriptor[]>>;
   }
 }
 
 export namespace Projection {
-  export interface Audience { readonly target: 'chat' | 'inspector' | 'document' | 'overlay' | 'export' | string; readonly authorizationRevision: string }
-  export interface SafeFallback { readonly label: string; readonly text?: string; readonly detail?: Contracts.Json }
+  export interface Audience {
+    readonly target: 'chat' | 'inspector' | 'document' | 'overlay' | 'export' | string;
+    readonly authorizationRevision: string;
+  }
+  export interface SafeFallback {
+    readonly label: string;
+    readonly text?: string;
+    readonly detail?: Contracts.Json;
+  }
   export interface Item<T = Contracts.Json> {
     readonly id: string;
     readonly type: string;
@@ -619,9 +1026,19 @@ export namespace Projection {
   }
   export interface Projector<T> {
     readonly id: string;
-    project(value: T, audience: Audience, context: Contracts.InvocationContext): Promise<Contracts.Result<readonly Item[]>>;
+    project(
+      value: T,
+      audience: Audience,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<readonly Item[]>>;
   }
-  export interface Service { read(target: Contracts.EntityRef, audience: Audience, context: Contracts.InvocationContext): Promise<Contracts.Result<readonly Item[]>> }
+  export interface Service {
+    read(
+      target: Contracts.EntityRef,
+      audience: Audience,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<readonly Item[]>>;
+  }
 }
 
 export namespace Storage {
@@ -634,45 +1051,112 @@ export namespace Storage {
     readonly resumableHandlers: readonly string[];
     readonly artifactFinalization: boolean;
   }
-  export interface StateAddress { readonly namespace: string; readonly scope: Contracts.ScopeRef; readonly key: string }
-  export interface StateValue { readonly schemaVersion: number; readonly value: Contracts.Json }
-  export interface Mutation { readonly address: StateAddress; readonly expected: string | 'absent'; readonly next: StateValue | null }
-  export interface JournalEntry { readonly id: string; readonly type: string; readonly version: number; readonly payload: Contracts.Json; readonly provenance: Contracts.Provenance }
+  export interface StateAddress {
+    readonly namespace: string;
+    readonly scope: Contracts.ScopeRef;
+    readonly key: string;
+  }
+  export interface StateValue {
+    readonly schemaVersion: number;
+    readonly value: Contracts.Json;
+  }
+  export interface Mutation {
+    readonly address: StateAddress;
+    readonly expected: string | 'absent';
+    readonly next: StateValue | null;
+  }
+  export interface JournalEntry {
+    readonly id: string;
+    readonly type: string;
+    readonly version: number;
+    readonly payload: Contracts.Json;
+    readonly provenance: Contracts.Provenance;
+  }
   export interface ChangeSet {
     readonly id: string;
     readonly mutations: readonly Mutation[];
     readonly append: readonly JournalEntry[];
-    readonly commandReceipt?: { readonly key: string; readonly requestDigest: string; readonly receipt: Contracts.Json };
+    readonly commandReceipt?: {
+      readonly key: string;
+      readonly requestDigest: string;
+      readonly receipt: Contracts.Json;
+    };
   }
-  export interface CommitReceipt extends Contracts.CommitEvidence { readonly appended: readonly string[]; readonly publicationWatermark?: string }
+  export interface CommitReceipt extends Contracts.CommitEvidence {
+    readonly appended: readonly string[];
+    readonly publicationWatermark?: string;
+  }
   export interface StateJournalStore {
     readonly id: string;
     readonly capabilities: Capabilities;
-    read(address: StateAddress, context: Contracts.InvocationContext): Promise<Contracts.Result<Contracts.Versioned<StateValue> | null>>;
-    commit(changes: ChangeSet, context: Contracts.InvocationContext): Promise<Contracts.Result<CommitReceipt>>;
-    journal(cursor: string | undefined, limit: number, context: Contracts.InvocationContext): Promise<Contracts.Result<Contracts.Page<JournalEntry>>>;
+    read(
+      address: StateAddress,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Contracts.Versioned<StateValue> | null>>;
+    commit(
+      changes: ChangeSet,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<CommitReceipt>>;
+    journal(
+      cursor: string | undefined,
+      limit: number,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Contracts.Page<JournalEntry>>>;
   }
-  export interface Migration { readonly namespace: string; readonly from: number; readonly to: number; transform(value: Contracts.Json): Contracts.Result<Contracts.Json> }
-  export interface ArtifactMetadata { readonly mediaType: string; readonly name?: string; readonly provenance: Contracts.Provenance }
-  export interface FinalizedArtifact { readonly ref: Contracts.ArtifactRef; readonly bytes: number; readonly digest: string; readonly durability: 'memory' | 'durable' }
+  export interface Migration {
+    readonly namespace: string;
+    readonly from: number;
+    readonly to: number;
+    transform(value: Contracts.Json): Contracts.Result<Contracts.Json>;
+  }
+  export interface ArtifactMetadata {
+    readonly mediaType: string;
+    readonly name?: string;
+    readonly provenance: Contracts.Provenance;
+  }
+  export interface FinalizedArtifact {
+    readonly ref: Contracts.ArtifactRef;
+    readonly bytes: number;
+    readonly digest: string;
+    readonly durability: 'memory' | 'durable';
+  }
   export interface ArtifactWriter {
     write(chunk: Uint8Array): Promise<Contracts.Result<void>>;
     finalize(): Promise<Contracts.Result<FinalizedArtifact>>;
     abort(): Promise<Contracts.Result<void>>;
   }
   export interface ArtifactStore {
-    create(metadata: ArtifactMetadata, context: Contracts.InvocationContext): Promise<Contracts.Result<ArtifactWriter>>;
-    read(ref: Contracts.ArtifactRef, range: { readonly start: number; readonly length: number } | undefined, context: Contracts.InvocationContext): Promise<Contracts.Result<AsyncIterable<Uint8Array>>>;
+    create(
+      metadata: ArtifactMetadata,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<ArtifactWriter>>;
+    read(
+      ref: Contracts.ArtifactRef,
+      range: { readonly start: number; readonly length: number } | undefined,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<AsyncIterable<Uint8Array>>>;
   }
-  export interface RecoveryReport { readonly recovered: readonly Contracts.EntityRef[]; readonly abandoned: readonly Contracts.EntityRef[]; readonly reconciliationRequired: readonly Contracts.EntityRef[]; readonly errors: readonly Contracts.Failure[] }
-  export interface RecoveryAdapter { recover(context: Contracts.InvocationContext): Promise<Contracts.Result<RecoveryReport>> }
+  export interface RecoveryReport {
+    readonly recovered: readonly Contracts.EntityRef[];
+    readonly abandoned: readonly Contracts.EntityRef[];
+    readonly reconciliationRequired: readonly Contracts.EntityRef[];
+    readonly errors: readonly Contracts.Failure[];
+  }
+  export interface RecoveryAdapter {
+    recover(context: Contracts.InvocationContext): Promise<Contracts.Result<RecoveryReport>>;
+  }
 }
 
 export namespace Client {
   export type CommandDelivery<O = Contracts.Json> =
     | { readonly kind: 'not-sent'; readonly commandId: string; readonly error: Contracts.Failure }
     | { readonly kind: 'receipt'; readonly receipt: Contracts.CommandReceipt<O> }
-    | { readonly kind: 'unknown'; readonly commandId: string; readonly error: Contracts.Failure; readonly recovery: 'query-status' | 'same-key-retry' | 'manual' };
+    | {
+        readonly kind: 'unknown';
+        readonly commandId: string;
+        readonly error: Contracts.Failure;
+        readonly recovery: 'query-status' | 'same-key-retry' | 'manual';
+      };
   export interface StreamPartSnapshot {
     readonly itemId: string;
     readonly partId: string;
@@ -696,9 +1180,18 @@ export namespace Client {
     read(input: I, context: Contracts.InvocationContext): Promise<Contracts.Result<O>>;
   }
   export interface Endpoint {
-    command(request: Contracts.CommandRequest, context: Contracts.InvocationContext): Promise<Contracts.CommandReceipt>;
-    query(request: Contracts.QueryRequest, context: Contracts.InvocationContext): Promise<Contracts.Result<Contracts.Json>>;
-    watch(request: WatchRequest, context: Contracts.InvocationContext): Promise<Contracts.Result<WatchSession>>;
+    command(
+      request: Contracts.CommandRequest,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.CommandReceipt>;
+    query(
+      request: Contracts.QueryRequest,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Contracts.Json>>;
+    watch(
+      request: WatchRequest,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<WatchSession>>;
   }
   export interface EventEnvelope<T = Contracts.Json> {
     readonly protocolVersion: number;
@@ -728,17 +1221,47 @@ export namespace Client {
   export type StreamFrame =
     | { readonly kind: 'event'; readonly event: EventEnvelope }
     | { readonly kind: 'reset'; readonly snapshot: Snapshot }
-    | { readonly kind: 'gap'; readonly recovery: 'replay' | 'snapshot' | 'unavailable'; readonly lastCursor?: string; readonly reason: string };
-  export interface WatchRequest { readonly target?: Contracts.EntityRef; readonly surface: string; readonly resumeCursor?: string }
-  export interface WatchSession { readonly bootstrap: Snapshot; readonly frames: AsyncIterable<StreamFrame>; close(): Promise<void> }
-  export interface Port {
-    command(request: Contracts.CommandRequest, options?: { readonly signal?: AbortSignal }): Promise<CommandDelivery>;
-    query(request: Contracts.QueryRequest, options?: { readonly signal?: AbortSignal }): Promise<Contracts.Result<Contracts.Json>>;
-    discover(target?: Contracts.EntityRef): Promise<Contracts.Result<Contracts.CapabilitySet>>;
-    watch(request: WatchRequest, options?: { readonly signal?: AbortSignal }): Promise<Contracts.Result<WatchSession>>;
+    | {
+        readonly kind: 'gap';
+        readonly recovery: 'replay' | 'snapshot' | 'unavailable';
+        readonly lastCursor?: string;
+        readonly reason: string;
+      };
+  export interface WatchRequest {
+    readonly target?: Contracts.EntityRef;
+    readonly surface: string;
+    readonly resumeCursor?: string;
   }
-  export interface State { readonly epoch?: string; readonly connection: 'offline' | 'connecting' | 'connected' | 'resyncing'; readonly itemIds: readonly string[]; readonly pendingCommands: readonly string[] }
-  export interface Selector<T> { select(state: State, getItem: (id: string) => Projection.Item | undefined): T; equal(left: T, right: T): boolean }
+  export interface WatchSession {
+    readonly bootstrap: Snapshot;
+    readonly frames: AsyncIterable<StreamFrame>;
+    close(): Promise<void>;
+  }
+  export interface Port {
+    command(
+      request: Contracts.CommandRequest,
+      options?: { readonly signal?: AbortSignal },
+    ): Promise<CommandDelivery>;
+    query(
+      request: Contracts.QueryRequest,
+      options?: { readonly signal?: AbortSignal },
+    ): Promise<Contracts.Result<Contracts.Json>>;
+    discover(target?: Contracts.EntityRef): Promise<Contracts.Result<Contracts.CapabilitySet>>;
+    watch(
+      request: WatchRequest,
+      options?: { readonly signal?: AbortSignal },
+    ): Promise<Contracts.Result<WatchSession>>;
+  }
+  export interface State {
+    readonly epoch?: string;
+    readonly connection: 'offline' | 'connecting' | 'connected' | 'resyncing';
+    readonly itemIds: readonly string[];
+    readonly pendingCommands: readonly string[];
+  }
+  export interface Selector<T> {
+    select(state: State, getItem: (id: string) => Projection.Item | undefined): T;
+    equal(left: T, right: T): boolean;
+  }
   export interface Controller {
     readonly port: Port;
     getState(): State;
@@ -749,12 +1272,19 @@ export namespace Client {
     invoke(request: Contracts.CommandRequest): Promise<CommandDelivery>;
     dispose(): Promise<void>;
   }
-  export interface Codec { encode(value: Contracts.Json): Contracts.Result<Uint8Array>; decode(bytes: Uint8Array): Contracts.Result<Contracts.Json> }
+  export interface Codec {
+    encode(value: Contracts.Json): Contracts.Result<Uint8Array>;
+    decode(bytes: Uint8Array): Contracts.Result<Contracts.Json>;
+  }
 }
 
 export namespace UI {
   export type RenderTarget = 'chat' | 'inspector' | 'document' | 'overlay' | string;
-  export interface RenderContext { readonly controller: Client.Controller; readonly target: RenderTarget; readonly itemId: string }
+  export interface RenderContext {
+    readonly controller: Client.Controller;
+    readonly target: RenderTarget;
+    readonly itemId: string;
+  }
   export interface Renderer<T, View> {
     readonly id: string;
     readonly type: string;
@@ -763,10 +1293,23 @@ export namespace UI {
     render(item: Projection.Item<T>, context: RenderContext): View;
   }
   export interface RendererRegistry<View> {
-    resolve(item: Projection.Item, target: RenderTarget): Contracts.Result<Renderer<Contracts.Json, View>>;
+    resolve(
+      item: Projection.Item,
+      target: RenderTarget,
+    ): Contracts.Result<Renderer<Contracts.Json, View>>;
   }
-  export interface SlotContribution<View> { readonly id: string; readonly slot: string; readonly before?: readonly string[]; readonly after?: readonly string[]; render(context: RenderContext): View }
-  export interface Draft { readonly text: string; readonly references: readonly Contracts.DataRef[]; readonly revision: number }
+  export interface SlotContribution<View> {
+    readonly id: string;
+    readonly slot: string;
+    readonly before?: readonly string[];
+    readonly after?: readonly string[];
+    render(context: RenderContext): View;
+  }
+  export interface Draft {
+    readonly text: string;
+    readonly references: readonly Contracts.DataRef[];
+    readonly revision: number;
+  }
   export interface ComposerController {
     getDraft(): Draft;
     setDraft(draft: Draft): void;
@@ -774,14 +1317,23 @@ export namespace UI {
     submit(origin: 'enter' | 'button' | 'api'): Promise<Client.CommandDelivery>;
     canSubmit(): { readonly allowed: boolean; readonly reason?: string };
   }
-  export interface ScrollState { readonly anchoredItemId?: string; readonly following: boolean; readonly hasNewContent: boolean }
+  export interface ScrollState {
+    readonly anchoredItemId?: string;
+    readonly following: boolean;
+    readonly hasNewContent: boolean;
+  }
   export interface ScrollController {
     getState(): ScrollState;
     onUserScroll(distanceFromLatest: number): void;
     followLatest(): void;
     preserveAnchor(itemId: string): void;
   }
-  export interface Parts { readonly Message: unknown; readonly Composer: unknown; readonly ToolDetails: unknown; readonly Fallback: unknown }
+  export interface Parts {
+    readonly Message: unknown;
+    readonly Composer: unknown;
+    readonly ToolDetails: unknown;
+    readonly Fallback: unknown;
+  }
   export interface ChatOptions<View> {
     readonly client: Client.Controller;
     readonly ownsClient?: boolean;
@@ -792,11 +1344,20 @@ export namespace UI {
     readonly theme?: Readonly<Record<string, string>>;
   }
   /** Framework binding supplies actual React/Vue/etc. component/ref/event types; not fixed here. */
-  export interface HeadlessBinding<View> { readonly contractVersion: number; createChat(options: ChatOptions<View>): View }
+  export interface HeadlessBinding<View> {
+    readonly contractVersion: number;
+    createChat(options: ChatOptions<View>): View;
+  }
 }
 
 export namespace Host {
-  export interface AdmissionRequest<I = Contracts.Json> { readonly requestId: string; readonly run: Runtime.RunRequest<I>; readonly concurrencyKey?: string; readonly priority?: number; readonly expiresAt?: string }
+  export interface AdmissionRequest<I = Contracts.Json> {
+    readonly requestId: string;
+    readonly run: Runtime.RunRequest<I>;
+    readonly concurrencyKey?: string;
+    readonly priority?: number;
+    readonly expiresAt?: string;
+  }
   export type Admission =
     | { readonly kind: 'started'; readonly run: Contracts.EntityRef }
     | { readonly kind: 'queued'; readonly job: Contracts.EntityRef }
@@ -804,10 +1365,24 @@ export namespace Host {
     | { readonly kind: 'rejected'; readonly error: Contracts.Failure };
   export interface Service {
     start(context: Contracts.InvocationContext): Promise<Contracts.Result<void>>;
-    submit(request: AdmissionRequest, context: Contracts.InvocationContext): Promise<Contracts.Result<Admission>>;
-    stop(options: { readonly mode: 'drain' | 'cancel'; readonly deadline?: string }): Promise<Contracts.CleanupReport>;
+    submit(
+      request: AdmissionRequest,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Admission>>;
+    stop(options: {
+      readonly mode: 'drain' | 'cancel';
+      readonly deadline?: string;
+    }): Promise<Contracts.CleanupReport>;
   }
-  export interface InputPolicy { decide(request: AdmissionRequest, pending: readonly AdmissionRequest[]): Contracts.Result<{ readonly action: 'start' | 'queue' | 'replace-pending' | 'reject'; readonly affected: readonly string[] }> }
+  export interface InputPolicy {
+    decide(
+      request: AdmissionRequest,
+      pending: readonly AdmissionRequest[],
+    ): Contracts.Result<{
+      readonly action: 'start' | 'queue' | 'replace-pending' | 'reject';
+      readonly affected: readonly string[];
+    }>;
+  }
   export interface RuntimeResource {
     readonly ref: Contracts.ResourceRef;
     readonly owner: Contracts.ScopeRef;
@@ -822,7 +1397,12 @@ export namespace Host {
 }
 
 export namespace Testing {
-  export interface Candidate { readonly id: string; readonly revision: string; readonly components: readonly string[]; readonly config: Contracts.Json }
+  export interface Candidate {
+    readonly id: string;
+    readonly revision: string;
+    readonly components: readonly string[];
+    readonly config: Contracts.Json;
+  }
   export interface Evidence {
     readonly testId: string;
     readonly candidate: Candidate;
@@ -831,9 +1411,11 @@ export namespace Testing {
     readonly logs: readonly string[];
     readonly measurements?: Contracts.Json;
   }
-  export interface ContractSuite { readonly id: string; run(candidate: Candidate): Promise<readonly Evidence[]> }
+  export interface ContractSuite {
+    readonly id: string;
+    run(candidate: Candidate): Promise<readonly Evidence[]>;
+  }
 }
-
 
 export namespace Convenience {
   export interface ConfiguredModel {
@@ -849,8 +1431,12 @@ export namespace Convenience {
     readonly components?: readonly Composition.ComponentFactory[];
     readonly customize?: (base: Composition.CompositionSpec) => Composition.CompositionSpec;
   }
-  export interface DefaultOptions extends BaseOptions { readonly driver?: never }
-  export interface CustomOptions<I, O> extends BaseOptions { readonly driver: Driver.Factory<I, O> }
+  export interface DefaultOptions extends BaseOptions {
+    readonly driver?: never;
+  }
+  export interface CustomOptions<I, O> extends BaseOptions {
+    readonly driver: Driver.Factory<I, O>;
+  }
   export interface Agent<I, O> {
     start(input: I): Promise<Contracts.Result<Runtime.ExecutionHandle<O>>>;
     generate(input: I): Promise<Contracts.Result<Runtime.ManagedOutcome<O>>>;
@@ -858,11 +1444,12 @@ export namespace Convenience {
     dispose(): Promise<Contracts.CleanupReport>;
   }
   export interface Factory {
-    create(options: DefaultOptions): Contracts.Result<Agent<string | readonly Context.SemanticItem[], Model.Response>>;
+    create(
+      options: DefaultOptions,
+    ): Contracts.Result<Agent<string | readonly Context.SemanticItem[], Model.Response>>;
     create<I, O>(options: CustomOptions<I, O>): Contracts.Result<Agent<I, O>>;
   }
 }
-
 
 export namespace ControlCatalog {
   /** Proposed built-in wire inputs. A host resolves composition/profile references locally. */
@@ -871,12 +1458,30 @@ export namespace ControlCatalog {
     readonly input: Contracts.Json;
     readonly composition: { readonly id: string; readonly revision: string };
     readonly limits?: Runtime.ExecutionLimits;
-    readonly history?: { readonly sessionId: string; readonly branchId: string; readonly expectedHead?: string };
+    readonly history?: {
+      readonly sessionId: string;
+      readonly branchId: string;
+      readonly expectedHead?: string;
+    };
   }
-  export interface RunCancelInput { readonly run: Contracts.EntityRef; readonly reason: string }
-  export interface WaitResponseInput { readonly ticketId: string; readonly expectedRevision: string; readonly response: Contracts.Json }
-  export interface HistoryForkInput { readonly branchId: string; readonly expectedRevision: string; readonly atEntry?: string }
-  export interface InspectInput { readonly target: Contracts.EntityRef; readonly view: string }
+  export interface RunCancelInput {
+    readonly run: Contracts.EntityRef;
+    readonly reason: string;
+  }
+  export interface WaitResponseInput {
+    readonly ticketId: string;
+    readonly expectedRevision: string;
+    readonly response: Contracts.Json;
+  }
+  export interface HistoryForkInput {
+    readonly branchId: string;
+    readonly expectedRevision: string;
+    readonly atEntry?: string;
+  }
+  export interface InspectInput {
+    readonly target: Contracts.EntityRef;
+    readonly view: string;
+  }
   /** Wire selects already registered/authorized definitions; no executable module bytes or local handle. */
   export interface WorkflowStartInput {
     readonly engineId: string;
@@ -907,7 +1512,11 @@ export namespace Results {
   }
   export type Input =
     | { readonly kind: 'inline'; readonly value: Contracts.Json }
-    | { readonly kind: 'artifact'; readonly ref: Contracts.ArtifactRef; readonly expectedDigest: string }
+    | {
+        readonly kind: 'artifact';
+        readonly ref: Contracts.ArtifactRef;
+        readonly expectedDigest: string;
+      }
     | { readonly kind: 'captured'; readonly captureId: string; readonly expectedDigest: string };
   export interface Validation {
     readonly validator: string;
@@ -940,10 +1549,16 @@ export namespace Results {
     readonly version: string;
     readonly inputType: Contracts.SchemaRef;
     readonly outputType: Contracts.SchemaRef;
-    process(input: Input, context: Contracts.InvocationContext): Promise<Contracts.Result<{ readonly output: Input; readonly evidence: Validation }>>;
+    process(
+      input: Input,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<{ readonly output: Input; readonly evidence: Validation }>>;
   }
   export interface Service {
-    submit(input: Submission, context: Contracts.InvocationContext): Promise<Contracts.Result<Accepted>>;
+    submit(
+      input: Submission,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Accepted>>;
     read(id: string, context: Contracts.InvocationContext): Promise<Contracts.Result<Accepted>>;
   }
 }
@@ -957,8 +1572,18 @@ export namespace Scripts {
   }
   export type OutputCapture =
     | { readonly kind: 'stdout-json'; readonly maxBytes: number }
-    | { readonly kind: 'file'; readonly relativePath: string; readonly mediaType: string; readonly maxBytes: number }
-    | { readonly kind: 'channel'; readonly channelId: string; readonly protocolVersion: number; readonly maxBytes: number }
+    | {
+        readonly kind: 'file';
+        readonly relativePath: string;
+        readonly mediaType: string;
+        readonly maxBytes: number;
+      }
+    | {
+        readonly kind: 'channel';
+        readonly channelId: string;
+        readonly protocolVersion: number;
+        readonly maxBytes: number;
+      }
     | { readonly kind: 'none' };
   export interface Request {
     readonly requestId: string;
@@ -985,7 +1610,10 @@ export namespace Scripts {
     readonly executionDigest: string;
   }
   export interface Service {
-    execute(input: Request, context: Contracts.InvocationContext): Promise<Contracts.Result<Runtime.ExecutionHandle<Output>>>;
+    execute(
+      input: Request,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Runtime.ExecutionHandle<Output>>>;
   }
   /** Hooked to an actual IPC/security mechanism by the selected script host. */
   export interface BridgeGrant {
@@ -1006,8 +1634,14 @@ export namespace Scripts {
     readonly params: Contracts.Json;
   }
   export interface BridgeHost {
-    issue(policy: Omit<BridgeGrant, 'id'>, context: Contracts.InvocationContext): Promise<Contracts.Result<BridgeGrant>>;
-    invoke(request: BridgeRequest, context: Contracts.InvocationContext): Promise<Contracts.CommandReceipt>;
+    issue(
+      policy: Omit<BridgeGrant, 'id'>,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<BridgeGrant>>;
+    invoke(
+      request: BridgeRequest,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.CommandReceipt>;
     revoke(grantId: string, context: Contracts.InvocationContext): Promise<Contracts.Result<void>>;
   }
 }
@@ -1029,10 +1663,21 @@ export namespace Packages {
     readonly trustProfile: string;
   }
   export interface Source {
-    discover(roots: readonly string[], context: Contracts.InvocationContext): Promise<Contracts.Result<readonly Snapshot[]>>;
-    read(snapshot: Snapshot, path: string, context: Contracts.InvocationContext): Promise<Contracts.Result<Uint8Array>>;
+    discover(
+      roots: readonly string[],
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<readonly Snapshot[]>>;
+    read(
+      snapshot: Snapshot,
+      path: string,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Uint8Array>>;
   }
-  export interface UnsupportedField { readonly path: string; readonly significance: 'presentation' | 'optional' | 'required-behavior'; readonly reason: string }
+  export interface UnsupportedField {
+    readonly path: string;
+    readonly significance: 'presentation' | 'optional' | 'required-behavior';
+    readonly reason: string;
+  }
   export interface CompatibilityReport {
     readonly format: string;
     readonly sourceVersion: string;
@@ -1045,7 +1690,11 @@ export namespace Packages {
   export interface Decoder<T> {
     readonly id: string;
     readonly format: string;
-    decode(snapshot: Snapshot, source: Source, context: Contracts.InvocationContext): Promise<Contracts.Result<{ readonly value: T; readonly report: CompatibilityReport }>>;
+    decode(
+      snapshot: Snapshot,
+      source: Source,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<{ readonly value: T; readonly report: CompatibilityReport }>>;
   }
 }
 
@@ -1077,7 +1726,10 @@ export namespace Skills {
   }
   export interface Service {
     list(context: Contracts.InvocationContext): Promise<Contracts.Result<readonly Descriptor[]>>;
-    activate(request: ActivationRequest, context: Contracts.InvocationContext): Promise<Contracts.Result<Activation>>;
+    activate(
+      request: ActivationRequest,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Activation>>;
     deactivate(id: string, context: Contracts.InvocationContext): Promise<Contracts.Result<void>>;
   }
   /** Arbitrary extension payload; owning decoder decides semantics. The core never parses it. */
@@ -1114,8 +1766,14 @@ export namespace Hooks {
     readonly reentrancy: 'deny' | 'explicit-bounded';
   }
   export interface Service {
-    bind(binding: Binding, context: Contracts.InvocationContext): Promise<Contracts.Result<Contracts.EntityRef>>;
-    unbind(ref: Contracts.EntityRef, context: Contracts.InvocationContext): Promise<Contracts.Result<void>>;
+    bind(
+      binding: Binding,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Contracts.EntityRef>>;
+    unbind(
+      ref: Contracts.EntityRef,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<void>>;
   }
 }
 
@@ -1127,7 +1785,9 @@ export namespace Workflows {
     readonly format: string;
     readonly formatVersion: string;
     readonly digest: string;
-    readonly source: { readonly package: Packages.Snapshot; readonly entry: string } | { readonly owner: string; readonly native: Contracts.Json };
+    readonly source:
+      | { readonly package: Packages.Snapshot; readonly entry: string }
+      | { readonly owner: string; readonly native: Contracts.Json };
   }
   export interface Guarantees {
     readonly control: 'instruction-only' | 'runner-enforced';
@@ -1163,10 +1823,20 @@ export namespace Workflows {
     /** Process-local compiled value or adapter token. Not a serialized continuation. */
     readonly localHandle: unknown;
   }
-  export interface ExecutionRef { readonly engine: string; readonly engineVersion: string; readonly id: string; readonly native?: Contracts.Json }
+  export interface ExecutionRef {
+    readonly engine: string;
+    readonly engineVersion: string;
+    readonly id: string;
+    readonly native?: Contracts.Json;
+  }
   export type Output =
     | { readonly kind: 'validated'; readonly value: Results.Accepted }
-    | { readonly kind: 'native'; readonly data: Contracts.Json; readonly validation: 'engine-reported' | 'unverified'; readonly provenance: Contracts.Provenance };
+    | {
+        readonly kind: 'native';
+        readonly data: Contracts.Json;
+        readonly validation: 'engine-reported' | 'unverified';
+        readonly provenance: Contracts.Provenance;
+      };
   export interface NativeState {
     readonly schema: Contracts.SchemaRef;
     readonly data: Contracts.Json;
@@ -1176,7 +1846,8 @@ export namespace Workflows {
     readonly revision: string;
     readonly definitionDigest: string;
     readonly owner: string;
-    readonly phase: 'queued' | 'running' | 'waiting' | 'succeeded' | 'failed' | 'cancelled' | 'unknown';
+    readonly phase:
+      'queued' | 'running' | 'waiting' | 'succeeded' | 'failed' | 'cancelled' | 'unknown';
     readonly nativeState: NativeState;
     readonly guarantees: Guarantees;
     readonly activeOperations: readonly Contracts.EntityRef[];
@@ -1197,24 +1868,57 @@ export namespace Workflows {
   export type Submission =
     | { readonly kind: 'accepted'; readonly ref: ExecutionRef; readonly snapshot: Snapshot }
     | { readonly kind: 'rejected'; readonly error: Contracts.Failure }
-    | { readonly kind: 'unknown'; readonly requestId: string; readonly reconciliationKey: string; readonly error: Contracts.Failure };
-  export interface InspectView { readonly kind: string; readonly schema: Contracts.SchemaRef; readonly data: Contracts.Json }
+    | {
+        readonly kind: 'unknown';
+        readonly requestId: string;
+        readonly reconciliationKey: string;
+        readonly error: Contracts.Failure;
+      };
+  export interface InspectView {
+    readonly kind: string;
+    readonly schema: Contracts.SchemaRef;
+    readonly data: Contracts.Json;
+  }
   export interface Engine {
     readonly descriptor: EngineDescriptor;
-    prepare(request: PrepareRequest, context: Contracts.InvocationContext): Promise<Contracts.Result<Prepared>>;
+    prepare(
+      request: PrepareRequest,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Prepared>>;
     start(request: StartRequest, context: Contracts.InvocationContext): Promise<Submission>;
-    get(ref: ExecutionRef, context: Contracts.InvocationContext): Promise<Contracts.Result<Snapshot>>;
-    requestCancel(ref: ExecutionRef, reason: string, context: Contracts.InvocationContext): Promise<Contracts.Result<Runtime.Cancellation>>;
+    get(
+      ref: ExecutionRef,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Snapshot>>;
+    requestCancel(
+      ref: ExecutionRef,
+      reason: string,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Runtime.Cancellation>>;
     observe(ref: ExecutionRef, context: Contracts.InvocationContext): AsyncIterable<Runtime.Update>;
-    action(ref: ExecutionRef, command: Contracts.CommandRequest, context: Contracts.InvocationContext): Promise<Contracts.CommandReceipt>;
-    inspect?(ref: ExecutionRef, view: string, context: Contracts.InvocationContext): Promise<Contracts.Result<InspectView>>;
-    reconcileSubmission?(key: string, context: Contracts.InvocationContext): Promise<Contracts.Result<ExecutionRef | null>>;
+    action(
+      ref: ExecutionRef,
+      command: Contracts.CommandRequest,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.CommandReceipt>;
+    inspect?(
+      ref: ExecutionRef,
+      view: string,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<InspectView>>;
+    reconcileSubmission?(
+      key: string,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<ExecutionRef | null>>;
   }
   /** This point is declared by workflow-host, not by the kernel. */
   export interface Host {
     readonly engines: Composition.ExtensionPoint<Engine>;
     resolve(engineId: string): Contracts.Result<Engine>;
-    prepare(request: PrepareRequest, context: Contracts.InvocationContext): Promise<Contracts.Result<Prepared>>;
+    prepare(
+      request: PrepareRequest,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Prepared>>;
     start(request: StartRequest, context: Contracts.InvocationContext): Promise<Submission>;
   }
   export interface CallIdentity {
@@ -1229,11 +1933,26 @@ export namespace Workflows {
     readonly execution: ExecutionRef;
     readonly signal: AbortSignal;
     readonly limits: Runtime.ExecutionLimits;
-    script(identity: CallIdentity, request: Scripts.Request): Promise<Runtime.ManagedOutcome<Scripts.Output>>;
-    agent(identity: CallIdentity, request: Runtime.RunRequest<Contracts.Json>): Promise<Runtime.ManagedOutcome<unknown>>;
-    model(identity: CallIdentity, request: Model.Invocation): Promise<Runtime.ManagedOutcome<Model.Response>>;
-    submit(identity: CallIdentity, request: Results.Submission): Promise<Contracts.Result<Results.Accepted>>;
-    wait(identity: CallIdentity, request: Runtime.WaitSpec<Contracts.Json>): Promise<Contracts.Result<Runtime.WaitTicket>>;
+    script(
+      identity: CallIdentity,
+      request: Scripts.Request,
+    ): Promise<Runtime.ManagedOutcome<Scripts.Output>>;
+    agent(
+      identity: CallIdentity,
+      request: Runtime.RunRequest<Contracts.Json>,
+    ): Promise<Runtime.ManagedOutcome<unknown>>;
+    model(
+      identity: CallIdentity,
+      request: Model.Invocation,
+    ): Promise<Runtime.ManagedOutcome<Model.Response>>;
+    submit(
+      identity: CallIdentity,
+      request: Results.Submission,
+    ): Promise<Contracts.Result<Results.Accepted>>;
+    wait(
+      identity: CallIdentity,
+      request: Runtime.WaitSpec<Contracts.Json>,
+    ): Promise<Contracts.Result<Runtime.WaitTicket>>;
     response(ticket: Runtime.WaitTicket): Promise<Contracts.Result<Contracts.Json>>;
   }
   export interface CodeDefinition<I extends Contracts.Json, O extends Contracts.Json> {
@@ -1252,12 +1971,23 @@ export namespace Workflows {
     readonly revision: string;
     readonly stateSchema: Contracts.SchemaRef;
     readonly state: Contracts.Json;
-    readonly completedCalls: readonly { readonly identity: CallIdentity; readonly resultRef: string; readonly digest: string }[];
+    readonly completedCalls: readonly {
+      readonly identity: CallIdentity;
+      readonly resultRef: string;
+      readonly digest: string;
+    }[];
     readonly pendingEffects: readonly Runtime.EffectPlan[];
   }
   export interface CheckpointStore {
-    read(ref: ExecutionRef, context: Contracts.InvocationContext): Promise<Contracts.Result<Checkpoint | null>>;
-    commit(expectedRevision: string | 'absent', checkpoint: Checkpoint, context: Contracts.InvocationContext): Promise<Contracts.Result<Contracts.CommitEvidence>>;
+    read(
+      ref: ExecutionRef,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Checkpoint | null>>;
+    commit(
+      expectedRevision: string | 'absent',
+      checkpoint: Checkpoint,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Contracts.CommitEvidence>>;
   }
   export interface ExternalBoundary {
     readonly owner: string;
@@ -1269,8 +1999,15 @@ export namespace Workflows {
   export interface AgentStepBinding {
     readonly id: string;
     readonly boundary: ExternalBoundary;
-    startOrAttach(key: string, request: Runtime.RunRequest<Contracts.Json>, context: Contracts.InvocationContext): Promise<Contracts.Result<Contracts.EntityRef>>;
-    result(ref: Contracts.EntityRef, context: Contracts.InvocationContext): Promise<Contracts.Result<Runtime.ManagedOutcome<unknown>>>;
+    startOrAttach(
+      key: string,
+      request: Runtime.RunRequest<Contracts.Json>,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Contracts.EntityRef>>;
+    result(
+      ref: Contracts.EntityRef,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Runtime.ManagedOutcome<unknown>>>;
   }
   export interface VisualNodeType {
     readonly id: string;
@@ -1281,7 +2018,14 @@ export namespace Workflows {
     readonly engineBinding: string;
   }
   export interface VisualCompiler {
-    compile(graph: Contracts.Json, supported: readonly VisualNodeType[]): Contracts.Result<{ readonly definition: Contracts.Json; readonly format: string; readonly sourceMap: Contracts.Json }>;
+    compile(
+      graph: Contracts.Json,
+      supported: readonly VisualNodeType[],
+    ): Contracts.Result<{
+      readonly definition: Contracts.Json;
+      readonly format: string;
+      readonly sourceMap: Contracts.Json;
+    }>;
   }
 }
 
@@ -1291,17 +2035,67 @@ export namespace PipelineV1 {
     | { readonly literal: Contracts.Json }
     | { readonly input: string }
     | { readonly step: string; readonly pointer: string };
-  export interface BaseStep { readonly id: string; readonly after: readonly string[]; readonly timeoutMs?: number }
+  export interface BaseStep {
+    readonly id: string;
+    readonly after: readonly string[];
+    readonly timeoutMs?: number;
+  }
   export type Step =
-    | (BaseStep & { readonly kind: 'extension'; readonly handler: string; readonly handlerVersion: number; readonly input: Value; readonly config: Contracts.Json })
-    | (BaseStep & { readonly kind: 'script'; readonly request: Scripts.Request; readonly stdin: Value })
-    | (BaseStep & { readonly kind: 'agent'; readonly profile: string; readonly input: Value; readonly skills?: readonly { readonly id: string; readonly digest: string }[] })
-    | (BaseStep & { readonly kind: 'validate'; readonly value: Value; readonly schema: Contracts.SchemaRef })
-    | (BaseStep & { readonly kind: 'wait'; readonly response: Contracts.SchemaRef; readonly binding: Value; readonly prompt: string })
-    | (BaseStep & { readonly kind: 'assert'; readonly value: Value; readonly equals: Contracts.Json })
-    | (BaseStep & { readonly kind: 'branch'; readonly value: Value; readonly cases: readonly { readonly equals: Contracts.Json; readonly run: readonly Step[] }[]; readonly otherwise?: readonly Step[] })
-    | (BaseStep & { readonly kind: 'repeat'; readonly maxIterations: number; readonly body: readonly Step[]; readonly until: { readonly value: Value; readonly equals: Contracts.Json } })
-    | (BaseStep & { readonly kind: 'parallel'; readonly maxConcurrency: number; readonly onError: 'cancel-and-join' | 'collect'; readonly branches: readonly (readonly Step[])[] });
+    | (BaseStep & {
+        readonly kind: 'extension';
+        readonly handler: string;
+        readonly handlerVersion: number;
+        readonly input: Value;
+        readonly config: Contracts.Json;
+      })
+    | (BaseStep & {
+        readonly kind: 'script';
+        readonly request: Scripts.Request;
+        readonly stdin: Value;
+      })
+    | (BaseStep & {
+        readonly kind: 'agent';
+        readonly profile: string;
+        readonly input: Value;
+        readonly skills?: readonly { readonly id: string; readonly digest: string }[];
+      })
+    | (BaseStep & {
+        readonly kind: 'validate';
+        readonly value: Value;
+        readonly schema: Contracts.SchemaRef;
+      })
+    | (BaseStep & {
+        readonly kind: 'wait';
+        readonly response: Contracts.SchemaRef;
+        readonly binding: Value;
+        readonly prompt: string;
+      })
+    | (BaseStep & {
+        readonly kind: 'assert';
+        readonly value: Value;
+        readonly equals: Contracts.Json;
+      })
+    | (BaseStep & {
+        readonly kind: 'branch';
+        readonly value: Value;
+        readonly cases: readonly {
+          readonly equals: Contracts.Json;
+          readonly run: readonly Step[];
+        }[];
+        readonly otherwise?: readonly Step[];
+      })
+    | (BaseStep & {
+        readonly kind: 'repeat';
+        readonly maxIterations: number;
+        readonly body: readonly Step[];
+        readonly until: { readonly value: Value; readonly equals: Contracts.Json };
+      })
+    | (BaseStep & {
+        readonly kind: 'parallel';
+        readonly maxConcurrency: number;
+        readonly onError: 'cancel-and-join' | 'collect';
+        readonly branches: readonly (readonly Step[])[];
+      });
   export interface StepHandler<I extends Contracts.Json, O extends Contracts.Json> {
     readonly id: string;
     readonly version: number;
@@ -1311,14 +2105,27 @@ export namespace PipelineV1 {
     readonly requires: readonly string[];
     readonly effects: 'read' | 'write' | 'external' | 'unknown';
     readonly replay: 'never' | 'idempotent-with-key' | 'engine-managed';
-    execute(input: I, config: Contracts.Json, identity: Workflows.CallIdentity, context: Workflows.StepContext): Promise<Contracts.Result<O>>;
+    execute(
+      input: I,
+      config: Contracts.Json,
+      identity: Workflows.CallIdentity,
+      context: Workflows.StepContext,
+    ): Promise<Contracts.Result<O>>;
   }
-  export interface InstalledStepHandler { readonly id: string; readonly version: number; readonly localBinding: unknown }
+  export interface InstalledStepHandler {
+    readonly id: string;
+    readonly version: number;
+    readonly localBinding: unknown;
+  }
   export interface HandlerFactory {
-    install<I extends Contracts.Json, O extends Contracts.Json>(handler: StepHandler<I, O>): InstalledStepHandler;
+    install<I extends Contracts.Json, O extends Contracts.Json>(
+      handler: StepHandler<I, O>,
+    ): InstalledStepHandler;
   }
   /** Declared by pipeline-v1; no other engine has to understand these steps. */
-  export interface Extensions { readonly handlers: Composition.ExtensionPoint<InstalledStepHandler> }
+  export interface Extensions {
+    readonly handlers: Composition.ExtensionPoint<InstalledStepHandler>;
+  }
   export interface Definition {
     readonly format: 'part.pipeline';
     readonly version: 1;
@@ -1354,7 +2161,14 @@ export namespace Observability {
     readonly guarantees: Contracts.CapabilitySet;
   }
   export interface Service {
-    manifest(ref: Contracts.EntityRef, context: Contracts.InvocationContext): Promise<Contracts.Result<InvocationManifest>>;
-    readTrace(ref: Contracts.EntityRef, cursor: string | undefined, context: Contracts.InvocationContext): Promise<Contracts.Result<Contracts.Page<Contracts.Json>>>;
+    manifest(
+      ref: Contracts.EntityRef,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<InvocationManifest>>;
+    readTrace(
+      ref: Contracts.EntityRef,
+      cursor: string | undefined,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Contracts.Page<Contracts.Json>>>;
   }
 }

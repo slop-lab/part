@@ -48,3 +48,15 @@ The optional DOM binding concretizes the framework-neutral UI contracts using
 HTMLElement. It supports the composer.actions slot, per-type renderers, safe plain
 text fallbacks, pagination, keyboard/IME handling and CSS tokens. Markdown, artifact
 viewers, custom component substitution, and additional slots remain later UI work.
+
+The skill reader follows an explicitly limited subset of the Agent Skills
+specification: https://agentskills.io/specification . It rejects unsupported
+frontmatter rather than ignoring required behavior. This loader's package policy
+rejects all symlinks. No package discovery imports executable modules.
+
+Reference workflows are optional trusted async code and a separate dependency-
+ordered pipeline interpreter. They share execution services and observation,
+not a mandatory kernel DAG. Both advertise runner-path-only effects, memory
+submission dedupe, and no durable checkpoints. Their state is owned by the engine.
+There is no automatic workflow retry, continuation serialization or native adapter
+compatibility claim.
