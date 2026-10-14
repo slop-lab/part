@@ -1,6 +1,10 @@
 import type { Contracts as C, Runtime as R, Driver as D } from './reference.js';
+import type { RunHistoryAttachment, RunHistoryLease } from './history-runs.js';
 import type { Operations } from './runtime.js';
-import { ok, fail, emptyCleanup } from './contracts.js';
+import { ok, fail, emptyCleanup, canonical } from './contracts.js';
+import { isCompositionHandle } from './composition.js';
+import { numericLimits } from './budgets.js';
+import { costServices } from './costs.js';
 import { createBudget } from './runtime.js';
 import { budgetKey } from './model.js';
 
@@ -66,13 +70,40 @@ export function installDriver<I, O>(factory: D.Factory<I, O>): InstalledDriver {
   });
   return Object.freeze({ id: factory.id, binding });
 }
+export interface RunControlService extends R.RunService {
+  describeActions(
+    ref: C.EntityRef,
+    context: C.InvocationContext,
+  ): Promise<C.Result<readonly C.ActionDescriptor[]>>;
+  receive(
+    ref: C.EntityRef,
+    actionId: string,
+    version: number,
+    input: unknown,
+    context: C.InvocationContext,
+  ): Promise<C.Result<D.InputReceipt>>;
+}
 export function createRunService(options: {
   drivers: readonly InstalledDriver[];
   services: D.Services;
   operations: Operations;
-}): C.Result<R.RunService> {
+  history?: RunHistoryAttachment;
+}): C.Result<RunControlService> {
   const registry = new Map<string, DriverBinding>(),
-    runs = new Map<string, R.ExecutionHandle<unknown>>();
+    runs = new Map<string, { handle: R.ExecutionHandle<unknown>; principal: string }>();
+  const instances = new Map<
+    string,
+    { instance: D.Instance<unknown, unknown>; context: C.InvocationContext }
+  >();
+  const owned = (ref: C.EntityRef, context: C.InvocationContext) => {
+    const record = runs.get(ref.id);
+    return record &&
+      record.principal === canonical(context.principal) &&
+      ref.owner === record.handle.ref.owner &&
+      ref.kind === record.handle.ref.kind
+      ? record.handle
+      : undefined;
+  };
   for (const installed of options.drivers) {
     const binding =
       installed.binding && typeof installed.binding === 'object'
@@ -85,16 +116,23 @@ export function createRunService(options: {
   }
   return ok({
     async start(request, context) {
+      request = {
+        ...request,
+        ...(request.parent ? { parent: { ...request.parent } } : {}),
+        ...(request.history ? { history: { ...request.history } } : {}),
+        ...(request.limits ? { limits: structuredClone(request.limits) } : {}),
+      };
+      if (!isCompositionHandle(request.composition))
+        return fail('run.composition', 'A resolved local composition handle is required');
       const driver = registry.get(request.driver);
       if (!driver) return fail('driver.missing', request.driver, 'unsupported');
-      if (request.history)
+      if (request.history && !options.history)
         return fail(
           'run.history',
           'History attachment is not installed; use the history service explicitly',
           'unsupported',
         );
-      if (request.limits?.estimatedCostCeiling)
-        return fail('run.cost-budget', 'Estimated cost budgets are not supported', 'unsupported');
+
       for (const requirement of driver.requires)
         if (
           !request.composition.inspection.capabilities.entries.some(
@@ -114,13 +152,9 @@ export function createRunService(options: {
       } catch {
         return fail('run.input', 'Run input is not cloneable');
       }
-      const limits: Record<string, number> = {};
-      for (const [key, value] of Object.entries(request.limits ?? {}))
-        if (key !== 'deadline') {
-          if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0)
-            return fail('run.limit', `Invalid limit ${key}`);
-          limits[key] = value;
-        }
+      const parsedLimits = numericLimits(request.limits);
+      if (!parsedLimits.ok) return parsedLimits;
+      const limits = parsedLimits.value;
       const budget = createBudget(limits),
         upstream = context.services.get(budgetKey);
       const services: C.ServiceAccess = {
@@ -161,12 +195,35 @@ export function createRunService(options: {
         .filter((v): v is string => !!v)
         .map(Date.parse);
       if (deadlines.some(Number.isNaN)) return fail('run.deadline', 'Invalid deadline');
+      const guardedServices = costServices(context, services, request.limits);
+      if (!guardedServices.ok) return guardedServices;
       const fixedContext = {
         ...context,
-        services,
+        services: guardedServices.value,
         compositionRevision: request.composition.inspection.revision,
         ...(deadlines.length ? { deadline: new Date(Math.min(...deadlines)).toISOString() } : {}),
       };
+      let historyLease: RunHistoryLease | undefined;
+      if (request.history) {
+        const attached = await options.history!.prepare(
+          { ...request.history },
+          fixed,
+          fixedContext,
+        );
+        if (!attached.ok) return attached;
+        historyLease = attached.value;
+        const checked = driver.validate(historyLease.input);
+        if (!checked.ok) {
+          historyLease.release();
+          return checked;
+        }
+        try {
+          fixed = structuredClone(checked.value);
+        } catch {
+          historyLease.release();
+          return fail('history.input', 'Attached input is not cloneable');
+        }
+      }
       const created = await options.operations.begin(
         {
           kind: 'part/run',
@@ -176,33 +233,112 @@ export function createRunService(options: {
         },
         async (c) => {
           const ref: C.EntityRef = { owner: 'part/operations', kind: 'part/run', id: c.scope.id };
-          const instance = driver.create({ ...options.services, services }, ref);
-          let outcome: R.ManagedOutcome<unknown>;
+          let instance: D.Instance<unknown, unknown> | undefined;
+          let outcome: R.ManagedOutcome<unknown> = {
+            phase: 'failed',
+            error: fail('run.exception', 'Driver execution failed', 'internal', 'unknown').error,
+            effect: 'unknown',
+            commit: [],
+            unsettledChildren: [],
+          };
           try {
+            instance = driver.create({ ...options.services, services: guardedServices.value }, ref);
+            instances.set(ref.id, { instance, context: c });
             outcome = await instance.execute(fixed, c);
+            if (historyLease) {
+              const saved = await historyLease.finish(outcome, c);
+              if (!saved.ok)
+                outcome = {
+                  phase: 'failed',
+                  error: saved.error,
+                  effect: outcome.effect,
+                  commit: outcome.commit,
+                  unsettledChildren: outcome.unsettledChildren,
+                };
+              else outcome = { ...outcome, commit: [...outcome.commit, ...saved.value] };
+            }
+          } catch {
+            outcome = {
+              phase: 'failed',
+              error: fail('run.exception', 'Driver execution failed', 'internal', 'unknown').error,
+              effect: 'unknown',
+              commit: [],
+              unsettledChildren: [],
+            };
           } finally {
-            const cleaned = await instance.dispose();
-            if (cleaned.errors.length || cleaned.unresolved.length)
+            historyLease?.release();
+            instances.delete(ref.id);
+            const cleaned = await Promise.resolve()
+              .then(() => instance?.dispose() ?? emptyCleanup())
+              .catch(() => ({
+                released: [],
+                unresolved: [{ owner: driver.id, kind: 'part/driver-instance', id: ref.id }],
+                errors: [
+                  fail('run.dispose', 'Driver disposal failed', 'internal', 'unknown').error,
+                ],
+              }));
+            if (cleaned.errors.length || cleaned.unresolved.length) {
+              outcome = {
+                phase: cleaned.unresolved.length ? 'abandoned' : 'failed',
+                error: fail(
+                  'run.cleanup',
+                  'Driver cleanup did not complete',
+                  'unavailable',
+                  cleaned.unresolved.length ? 'unknown' : outcome.effect,
+                ).error,
+                effect: cleaned.unresolved.length ? 'unknown' : outcome.effect,
+                commit: outcome.commit,
+                unsettledChildren: [...outcome.unsettledChildren, ...cleaned.unresolved],
+              };
               c.progress.publish('part.run/cleanup', cleaned as unknown as C.Json);
+            }
           }
           return outcome;
         },
         fixedContext,
       );
-      if (created.ok) runs.set(created.value.ref.id, created.value);
+      if (!created.ok) historyLease?.release();
+      if (created.ok)
+        runs.set(created.value.ref.id, {
+          handle: created.value,
+          principal: canonical(context.principal),
+        });
       return created;
     },
-    async get(ref) {
-      const handle = runs.get(ref.id);
+    async get(ref, context) {
+      const handle = owned(ref, context);
       return handle && ref.owner === handle.ref.owner
         ? ok(handle.snapshot())
         : fail('run.missing', ref.id);
     },
-    async cancel(ref, reason) {
-      const handle = runs.get(ref.id);
+    async cancel(ref, reason, context) {
+      const handle = owned(ref, context);
       return handle && ref.owner === handle.ref.owner
         ? handle.requestCancel(reason)
         : fail('run.missing', ref.id);
+    },
+    async describeActions(ref, context) {
+      const handle = owned(ref, context),
+        entry = instances.get(ref.id);
+      return handle && entry
+        ? ok(entry.instance.describeActions(entry.context))
+        : fail('run.actions', 'Run actions unavailable', 'permission');
+    },
+    async receive(ref, actionId, version, input, context) {
+      const handle = owned(ref, context),
+        entry = instances.get(ref.id);
+      if (!handle || !entry || entry.context.signal.aborted)
+        return fail('run.receive', 'Run input is unavailable', 'permission');
+      const action = entry.instance
+        .describeActions(entry.context)
+        .find(
+          (action) =>
+            action.id === actionId &&
+            action.version === version &&
+            action.availability.state === 'available',
+        );
+      if (!action) return fail('run.action', 'Driver action/version unavailable', 'unsupported');
+      return entry.instance.receive(actionId, input, entry.context);
     },
   });
 }

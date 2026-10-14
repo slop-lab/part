@@ -19,6 +19,7 @@ import {
   transformsPoint,
   transformsKey,
 } from './context.js';
+import type { CostEstimator } from './costs.js';
 import { createModelGateway } from './model.js';
 import { createToolDispatcher } from './tools.js';
 import { createBasicDriver } from './driver-basic.js';
@@ -48,9 +49,11 @@ export const toolsPoint: P.ExtensionPoint<T.Dispatcher> = {
 };
 export interface AgentOptions extends V.BaseOptions {
   readonly toolSchemas?: Readonly<Record<string, C.Json>>;
+  readonly executors?: readonly T.Executor[];
   readonly middleware?: readonly T.Middleware[];
   readonly boundary?: R.InvocationBoundary;
   readonly principal?: C.InvocationContext['principal'];
+  readonly costEstimator?: CostEstimator;
   readonly inspectRequest?: (view: M.RequestInspection) => void;
 }
 export function expandAgent(options: AgentOptions & { driver?: D.Factory<unknown, unknown> }) {
@@ -79,11 +82,13 @@ export function expandAgent(options: AgentOptions & { driver?: D.Factory<unknown
     operations,
     boundary: options.boundary,
     inspect: options.inspectRequest,
+    costEstimator: options.costEstimator,
   });
   if (!gateway.ok) return gateway;
   const dispatcher = createToolDispatcher({
     tools: options.tools ?? [],
     middleware: options.middleware,
+    executors: options.executors,
     operations,
     boundary: options.boundary,
     waits,

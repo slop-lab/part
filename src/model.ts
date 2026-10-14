@@ -1,6 +1,8 @@
 import type { Contracts as C, Model as M, Runtime as R } from './reference.js';
 import { ok, fail, digest, freeze, isJson } from './contracts.js';
 import { createOperations, createBoundary, managedAttempt, budgetKey } from './runtime.js';
+import { costPolicyKey, costUnits } from './costs.js';
+import type { CostEstimator } from './costs.js';
 import type { Operations } from './runtime.js';
 export { budgetKey } from './runtime.js';
 export function reserve(
@@ -27,6 +29,7 @@ export function createModelGateway(options: {
   inspect?: (inspection: M.RequestInspection) => void;
   maxResponseBytes?: number;
   compositionRevision?: string;
+  costEstimator?: CostEstimator;
 }): C.Result<M.Gateway> {
   const profiles = new Map(options.profiles.map((p) => [p.id, freeze(structuredClone(p))])),
     adapters = new Map(options.adapters.map((a) => [a.id, a])),
@@ -133,6 +136,47 @@ export function createModelGateway(options: {
               const attempts = reserve(c, 'maxExecutorAttempts');
               if (!attempts.ok)
                 return { kind: 'failed', error: attempts.error, effect: 'not-attempted' };
+              const costPolicy = c.services.get(costPolicyKey);
+              if (costPolicy.ok) {
+                if (!options.costEstimator)
+                  return {
+                    kind: 'failed',
+                    error: fail(
+                      'model.cost-estimator',
+                      'A configured cost estimator is required by this budget',
+                      'unsupported',
+                    ).error,
+                    effect: 'not-attempted',
+                  };
+                const estimate = await options.costEstimator.estimate(fixed, profile, c);
+                if (!estimate.ok)
+                  return { kind: 'failed', error: estimate.error, effect: 'not-attempted' };
+                const units = costUnits(estimate.value.amount);
+                if (!units.ok || estimate.value.currency !== costPolicy.value.currency)
+                  return {
+                    kind: 'failed',
+                    error: fail(
+                      'model.cost-currency',
+                      'Cost estimate does not match the budget currency',
+                    ).error,
+                    effect: 'not-attempted',
+                  };
+                const reserved = reserve(
+                  c,
+                  'estimatedCost/' + estimate.value.currency,
+                  units.value,
+                );
+                if (!reserved.ok)
+                  return { kind: 'failed', error: reserved.error, effect: 'not-attempted' };
+                c.progress.publish('part.model/cost-estimate', {
+                  estimator: options.costEstimator.id,
+                  version: options.costEstimator.version,
+                  amount: estimate.value.amount,
+                  currency: estimate.value.currency,
+                  basis: 'estimate',
+                });
+              }
+              if (c.signal.aborted) return { kind: 'cancelled', effect: 'not-attempted' };
               const sent = await transport.send(finalRequest, profile, auth.value, c);
               if (!sent.ok)
                 return {

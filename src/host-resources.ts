@@ -11,7 +11,15 @@ export function createResourceManager(options: { closeGraceMs?: number } = {}): 
       const id = key(resource.ref);
       if (entries.has(id))
         return fail('resource.duplicate', 'Resource is already registered', 'conflict');
-      entries.set(id, { resource, owner: { ...resource.owner } });
+      entries.set(id, {
+        resource: {
+          ref: { ...resource.ref },
+          owner: { ...resource.owner },
+          transferable: resource.transferable,
+          close: (reason) => resource.close(reason),
+        },
+        owner: { ...resource.owner },
+      });
       return ok(Object.freeze({ ...resource.ref }));
     },
     transfer(ref, target) {

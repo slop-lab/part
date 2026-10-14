@@ -141,6 +141,11 @@ export interface Operations extends R.OperationService {
   ): Promise<C.Result<R.ExecutionHandle<T>>>;
   get(ref: C.EntityRef): C.Result<R.ExecutionSnapshot>;
 }
+export const operationOwnerKey: C.ServiceKey<Operations> = {
+  id: 'part/operation-owner',
+  contractVersion: 1,
+  scope: 'operation',
+};
 export function createOperations(
   options: { cancellationGraceMs?: number; maxRetained?: number } = {},
 ): Operations {
@@ -155,7 +160,7 @@ export function createOperations(
     }
   >();
   const grace = options.cancellationGraceMs ?? 100;
-  return {
+  const supervisor: Operations = {
     get(ref) {
       const record = records.get(ref.id);
       return record && record.handle.ref.owner === ref.owner && record.handle.ref.kind === ref.kind
@@ -167,6 +172,12 @@ export function createOperations(
       body: (context: OperationContext) => Promise<R.ManagedOutcome<T>>,
       parentContext: C.InvocationContext,
     ) {
+      const owner =
+        parentContext.scope.kind === 'operation'
+          ? parentContext.services.get(operationOwnerKey)
+          : undefined;
+      if (owner?.ok && owner.value !== supervisor)
+        return owner.value.begin(spec, body, parentContext);
       if (spec.childPolicy !== 'attached')
         return fail(
           'operation.transfer',
@@ -340,6 +351,13 @@ export function createOperations(
         update({ phase: 'running', effect: 'unknown' });
         const context: OperationContext = {
           ...parentContext,
+          services: {
+            get(key) {
+              return key.id === operationOwnerKey.id
+                ? ok(supervisor as never)
+                : parentContext.services.get(key);
+            },
+          },
           scope: { kind: 'operation', id: ref.id },
           signal: controller.signal,
           ...(effectiveDeadline ? { deadline: effectiveDeadline } : {}),
@@ -406,6 +424,7 @@ export function createOperations(
       return ok(handle);
     },
   };
+  return supervisor;
 }
 
 export function createBoundary(

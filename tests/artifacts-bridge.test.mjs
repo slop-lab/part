@@ -164,7 +164,7 @@ test('Authenticated bridge rejects public IDs, profile widening and changed IDs;
       await bridge.issue(
         {
           version: 1,
-          audience: 'test-script',
+          audience: 'bridge.mjs',
           owner: { owner: 'test', kind: 'run', id: owner.scope.id },
           allowedMethods: ['model.invoke'],
           allowedProfiles: ['local'],
@@ -187,12 +187,16 @@ test('Authenticated bridge rejects public IDs, profile widening and changed IDs;
       403,
     );
     assert.equal((await bridge.invoke(payload, owner)).kind, 'rejected');
-    const authenticated = bridge.authenticate(grant.id, env.PART_BRIDGE_CREDENTIAL).value;
+    const authenticated = bridge.authenticate(
+      grant.id,
+      env.PART_BRIDGE_CREDENTIAL,
+      env.PART_BRIDGE_AUDIENCE,
+    ).value;
     assert.equal(
       (await bridge.invoke({ ...payload, params: { profileId: 'foreign' } }, authenticated)).kind,
       'rejected',
     );
-    const source = `const env=process.env; const request=${JSON.stringify(payload)}; const result=await fetch(env.PART_BRIDGE_URL,{method:'POST',headers:{authorization:'Bearer '+env.PART_BRIDGE_CREDENTIAL},body:JSON.stringify(request)}); console.log(JSON.stringify(await result.json()));`;
+    const source = `const env=process.env; const request=${JSON.stringify(payload)}; const result=await fetch(env.PART_BRIDGE_URL,{method:'POST',headers:{authorization:'Bearer '+env.PART_BRIDGE_CREDENTIAL,'x-part-bridge-audience':env.PART_BRIDGE_AUDIENCE},body:JSON.stringify(request)}); console.log(JSON.stringify(await result.json()));`;
     await writeFile(join(root, 'bridge.mjs'), source);
     const scripts = createNodeScripts({
       root,
@@ -235,9 +239,149 @@ test('Authenticated bridge rejects public IDs, profile widening and changed IDs;
     assert.equal((await bridge.invoke({ ...payload, id: 'next' }, authenticated)).kind, 'rejected');
     assert.equal(calls, 2);
     await bridge.revoke(grant.id, owner);
-    assert.equal(bridge.authenticate(grant.id, env.PART_BRIDGE_CREDENTIAL).ok, false);
+    assert.equal(
+      bridge.authenticate(grant.id, env.PART_BRIDGE_CREDENTIAL, env.PART_BRIDGE_AUDIENCE).ok,
+      false,
+    );
   } finally {
     await transport.close();
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test('Script tools share one prepared executor attempt; direct workflow scripts retain their own boundary', async () => {
+  const { createToolDispatcher, installTool } = await import('../dist/tools.js');
+  const { schema } = await import('../dist/contracts.js');
+  const { isScriptRequest } = await import('../dist/scripts.js');
+  const { createBoundary, createOperations } = await import('../dist/runtime.js');
+  const root = await mkdtemp(join(tmpdir(), 'part-script-attempt-'));
+  try {
+    const source = 'console.log(JSON.stringify({done:true}));';
+    await writeFile(join(root, 'source.cjs'), source);
+    let prepares = 0,
+      settles = 0;
+    const boundary = createBoundary({
+      prepare: async () => {
+        prepares++;
+        return ok(undefined);
+      },
+      settle: async () => {
+        settles++;
+        return ok([]);
+      },
+    });
+    const scripts = createNodeScripts({ root, interpreters: { node: process.execPath }, boundary });
+    const request = {
+      requestId: 'one',
+      executorId: 'part/node-process',
+      source: {
+        relativePath: 'source.cjs',
+        digest: await digest(new TextEncoder().encode(source)),
+      },
+      interpreter: 'node',
+      args: [],
+      capture: { kind: 'stdout-json', maxBytes: 1024 },
+      effects: 'read',
+      retry: 'never',
+    };
+    const executor = scripts.executor();
+    const tool = installTool({
+      definition: {
+        id: 'test/script',
+        version: '1',
+        description: 'Explicit script',
+        input: schema('test/script-request', isScriptRequest),
+        output: jsonSchema,
+        executor: executor.id,
+        effects: 'read',
+        cancellation: 'cooperative',
+        retrySafety: 'never',
+        requiredCapabilities: [],
+      },
+      execute: async () => {
+        throw Error('External executor must own the process');
+      },
+    });
+    const dispatcher = createToolDispatcher({
+      tools: [tool],
+      executors: [executor],
+      boundary,
+    }).value;
+    const budget = createBudget({ maxExecutorAttempts: 1 });
+    const caller = localContext({
+      services: {
+        get: (key) => (key.id === budgetKey.id ? ok(budget) : fail('missing', 'Missing service')),
+      },
+    });
+    const handle = (
+      await dispatcher.dispatch(
+        { logicalCallId: 'one', toolId: tool.id, arguments: request },
+        caller,
+      )
+    ).value;
+    assert.equal((await handle.done).phase, 'completed');
+    assert.equal(prepares, 1);
+    assert.equal(settles, 1);
+    const second = (
+      await dispatcher.dispatch(
+        { logicalCallId: 'two', toolId: tool.id, arguments: request },
+        caller,
+      )
+    ).value;
+    assert.equal((await second.done).phase, 'failed');
+    const direct = (await scripts.execute({ ...request, requestId: 'direct' }, context)).value;
+    assert.equal((await direct.done).phase, 'completed');
+    assert.equal(prepares, 3);
+    assert.equal(settles, 3);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('Processor timeout rejects acceptance and late normalization cannot revive the submission', async () => {
+  const { createOperations } = await import('../dist/runtime.js');
+  let finish;
+  const processor = {
+    id: 'test/timeout',
+    version: '1',
+    inputType: jsonSchema.ref,
+    outputType: jsonSchema.ref,
+    process: async (input) => {
+      await new Promise((resolve) => {
+        finish = resolve;
+      });
+      return ok({
+        output: input,
+        evidence: {
+          validator: 'test/timeout',
+          version: '1',
+          status: 'pass',
+          inputDigest: await digest(input.value),
+          outputDigest: await digest(input.value),
+          diagnostics: [],
+        },
+      });
+    },
+  };
+  const results = createResults(
+    [{ id: jsonSchema.ref.id, version: 1, schema: jsonSchema, mediaType: 'application/json' }],
+    {
+      processors: [processor],
+      profiles: { normalize: [processor.id] },
+      processorTimeoutMs: 5,
+      operations: createOperations({ cancellationGraceMs: 5 }),
+    },
+  ).value;
+  const request = {
+    submissionId: 'one',
+    expectedType: jsonSchema.ref,
+    data: { kind: 'inline', value: {} },
+    producedBy: { owner: 'test', kind: 'run', id: 'one' },
+    validationProfile: 'normalize',
+  };
+  const failed = await results.submit(request, context);
+  assert.equal(failed.ok, false);
+  finish();
+  await new Promise((resolve) => setTimeout(resolve, 2));
+  assert.equal((await results.submit(request, context)).ok, false);
 });

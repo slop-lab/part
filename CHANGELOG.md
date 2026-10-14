@@ -1,6 +1,25 @@
 # Changelog
 
-## 0.1.0-alpha.1 (unreleased)
+## 0.1.0-alpha.2 (unreleased)
+
+- Complete local workflow integration: nested pipelines, authenticated script bridge,
+  generic endpoint/UI, native submission reconciliation and stable agent-step attachment.
+- Add artifact stores, result processors/timeouts, recipe validation retry and pinned skills.
+- Add admission/resource ownership, run history, driver actions, checkpoint storage,
+  namespace migration, decimal estimated-cost ceilings and optional trace policy.
+- Add safe Markdown, concrete DOM components, ordered slots and Inspector/Workbench.
+- Keep separately configured nested services under the actual parent supervisor and
+  share one prepared executor attempt between script tools and the script host.
+- Enforce principal ownership and resolved run composition handles.
+- Verify local fixtures; actual-provider smoke remains explicitly deferred.
+
+Migration: existing basic/embedded start inputs remain strings. Script bridge grants
+must use the script relative path as audience and send the new audience header.
+Direct `createRunService` callers must pass a planner-resolved composition handle.
+DOM component overrides now have concrete exported signatures. Durable checkpoint
+storage does not enable code/pipeline replay. Pin this version and rerun consumers.
+
+## 0.1.0-alpha.1 (local baseline)
 
 - Establish part naming, TypeScript package boundaries, and design reference.
 - All APIs remain experimental; neither integration gate is certified.
@@ -31,12 +50,3 @@
 No migration from a previous runtime release is required: this is the first local
 integration alpha. The `car` prefix in the local design is renamed to `part`.
 Actual provider smoke is deferred. G-BASE and G-WORKFLOW are not formally certified.
-
-- Add immutable memory/durable file artifacts with authorized ranges and atomic publication.
-- Add explicit processor profiles, pinned result sources and concurrent submission dedupe.
-- Add authenticated script RPC grants with inherited budgets, expiry, revocation and host-owned methods.
-
-- Add bounded nested pipeline branches, repeat, parallel, step timeouts and capability validation.
-- Add generic workflow endpoint, default action/approval UI and authorized wait inspection.
-- Add native workflow submission/attach/reconciliation adapters without a second scheduler.
-- Add priority admission, pending replacement, drain/cancel and resource ownership/transfer.

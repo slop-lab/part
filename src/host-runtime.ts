@@ -5,6 +5,7 @@ export function createRuntimeHost(options: {
   runs: R.RunService;
   maxConcurrent?: number;
   maxQueued?: number;
+  maxRetained?: number;
   policy?: H.InputPolicy;
   resources?: H.ResourceManager;
 }): H.Service & {
@@ -47,6 +48,10 @@ export function createRuntimeHost(options: {
     error: fail('host.admission', message, 'conflict').error,
   });
   async function admit(job: Job) {
+    if (job.request.expiresAt && Date.parse(job.request.expiresAt) <= Date.now()) {
+      job.admission = reject('Admission request expired');
+      return;
+    }
     active.add(job);
     try {
       const created = await options.runs.start(job.request.run, job.context);
@@ -139,6 +144,8 @@ export function createRuntimeHost(options: {
           existing.fingerprint === fingerprint
           ? ok(existing.admission)
           : fail('host.dedupe', 'Request ID has different content', 'conflict');
+      if (jobs.size >= (options.maxRetained ?? 1000))
+        return fail('host.retention', 'Admission receipt capacity reached');
       if (state !== 'running' || cancellation.signal.aborted)
         return fail('host.stopped', 'Host is not accepting requests', 'conflict');
       const fixed = {

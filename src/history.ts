@@ -11,6 +11,8 @@ interface BranchData {
   head?: string;
 }
 export interface HistoryService extends H.Service {
+  readonly owner: string;
+  readonly durability: 'memory' | 'durable';
   getBranch(id: string, context: C.InvocationContext): Promise<C.Result<H.Branch>>;
 }
 export function createHistory(
@@ -78,6 +80,8 @@ export function createHistory(
     return ok({ items: structuredClone(entries.slice(offset)) });
   };
   return {
+    owner: namespace,
+    durability: store.capabilities.history,
     getBranch,
     path,
     async createSession(metadata, context) {

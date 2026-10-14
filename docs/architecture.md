@@ -45,9 +45,10 @@ Store access is trusted in-process; history and embedded endpoint enforce their
 own principal ownership. No database grants or cross-service atomicity are claimed.
 
 The optional DOM binding concretizes the framework-neutral UI contracts using
-HTMLElement. It supports the composer.actions slot, per-type renderers, safe plain
-text fallbacks, pagination, keyboard/IME handling and CSS tokens. Markdown, artifact
-viewers, custom component substitution, and additional slots remain later UI work.
+HTMLElement. It supports explicit component signatures, per-type renderers, ordered slots,
+safe Markdown/code, artifact previews, Inspector/Workbench, pagination,
+keyboard/IME handling and CSS tokens. UI extensions use public client contracts;
+raw HTML and executable artifact documents are not interpreted.
 
 The skill reader follows an explicitly limited subset of the Agent Skills
 specification: https://agentskills.io/specification . It rejects unsupported
@@ -60,3 +61,20 @@ not a mandatory kernel DAG. Both advertise runner-path-only effects, memory
 submission dedupe, and no durable checkpoints. Their state is owned by the engine.
 There is no automatic workflow retry, continuation serialization or native adapter
 compatibility claim.
+
+The authenticated script bridge uses an explicitly started loopback RPC listener.
+A grant ID is public metadata; a separate bearer credential plus audience is required.
+The host fixes actor context, permitted methods/profiles, expiry, limits and cancellation.
+Node execution binds the audience to the script source path. This is an IPC authority
+boundary, not an OS sandbox for trusted script code.
+
+Artifacts finalize immutable bytes through bounded memory or an explicitly opened
+file backend. The durable file backend commits one fsynced atomic metadata/byte
+record and fsyncs its directory. State migration uses CAS and atomically publishes
+new schema data with the ready ledger. Checkpoint persistence does not imply resume.
+
+Reference pipelines now support bounded lexical branch/repeat/parallel and per-step
+timeouts. Recipe retry is a separate read-only validation policy; native adapters
+retain their scheduler, state, actions and reconciliation semantics. No universal DAG
+or application workflow editor is part of the kernel. All managed nested operations
+inherit their actual parent supervisor, even when a module has a different default.

@@ -22,7 +22,12 @@ export function createArtifactStore(
     throw new TypeError('Invalid artifact limit');
   return {
     async create(metadata, context) {
-      if (!isJson(metadata) || !metadata.mediaType || context.signal.aborted)
+      if (
+        !isJson(metadata) ||
+        !metadata.mediaType ||
+        new TextEncoder().encode(JSON.stringify(metadata)).length > 16384 ||
+        context.signal.aborted
+      )
         return fail('artifact.create', 'Invalid metadata or cancelled writer');
       const fixed = structuredClone(metadata),
         principal = { ...context.principal };
@@ -119,7 +124,8 @@ export function createArtifactStore(
         const bytes = record.bytes.slice(start, start + length);
         return ok(
           (async function* () {
-            if (!context.signal.aborted) yield bytes;
+            if (context.signal.aborted) throw new Error('Artifact read cancelled');
+            yield bytes;
           })(),
         );
       } catch {

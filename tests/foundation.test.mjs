@@ -476,3 +476,69 @@ test('E05: a child cannot widen its parent deadline', async () => {
   ).value;
   assert.equal((await parent.done).phase, 'completed');
 });
+
+test('Attached work from a separately configured service joins the parent supervisor', async () => {
+  const owner = createOperations({ cancellationGraceMs: 5 }),
+    separate = createOperations({ cancellationGraceMs: 100 });
+  let child;
+  const parent = await owner.begin(
+    { kind: 'test/parent', childPolicy: 'attached', retryOwner: 'test' },
+    async (context) => {
+      child = (
+        await separate.begin(
+          { kind: 'test/child', childPolicy: 'attached', retryOwner: 'test' },
+          async () => new Promise(() => {}),
+          context,
+        )
+      ).value;
+      return {
+        phase: 'completed',
+        result: 'must not succeed',
+        effect: 'not-applied',
+        commit: [],
+        unsettledChildren: [],
+      };
+    },
+    localContext(),
+  );
+  const outcome = await parent.value.done;
+  assert.equal(outcome.phase, 'abandoned');
+  assert.equal(outcome.unsettledChildren[0].id, child.ref.id);
+  assert.equal(owner.get(child.ref).ok, true);
+});
+
+test('Unresolved driver cleanup is abandoned and retains the actual resource reference', async () => {
+  const { createRunService, installDriver } = await import('../dist/runs.js');
+  const operations = createOperations();
+  let disposals = 0;
+  const ref = { owner: 'test/driver', kind: 'test/resource', id: 'unclosed' };
+  const driver = installDriver({
+    id: 'test/cleanup',
+    version: '1',
+    input: jsonSchema,
+    output: jsonSchema,
+    requires: [],
+    create: () => ({
+      execute: async () => completed(null),
+      describeActions: () => [],
+      receive: async () => fail('test.action', 'No action'),
+      dispose: async () => {
+        disposals++;
+        return { released: [], unresolved: [ref], errors: [] };
+      },
+    }),
+  });
+  const service = createRunService({
+    drivers: [driver],
+    operations,
+    services: { operations, services: context.services },
+  }).value;
+  const composition = createPlanner().resolve({ components: [], config: {} }).value;
+  const handle = (await service.start({ driver: driver.id, composition, input: null }, context))
+    .value;
+  const result = await handle.done;
+  assert.equal(result.phase, 'abandoned');
+  assert.equal(result.effect, 'unknown');
+  assert.deepEqual(result.unsettledChildren, [ref]);
+  assert.equal(disposals, 1);
+});

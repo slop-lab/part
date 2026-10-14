@@ -34,7 +34,7 @@ const sourceKey = (source: X.SourceRef) => JSON.stringify(source);
 export async function semanticItem(
   type: string,
   payload: C.Json,
-  id = crypto.randomUUID(),
+  id: string = crypto.randomUUID(),
   schemaVersion = 1,
 ): Promise<X.SemanticItem<C.Json>> {
   const copy = structuredClone(payload),

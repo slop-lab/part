@@ -36,6 +36,10 @@ function order(ids: string[], edges: [string, string][]): C.Result<string[]> {
   }
   return ok(result);
 }
+export function isCompositionHandle(value: P.CompositionHandle): boolean {
+  if (!value || typeof value.localToken !== 'object' || value.localToken === null) return false;
+  return plans.get(value.localToken)?.inspection === value.inspection;
+}
 export function createPlanner(
   options: { schemas?: readonly C.Schema<unknown>[]; surface?: P.Surface } = {},
 ): P.CompositionPlanner {

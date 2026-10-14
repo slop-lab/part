@@ -7,6 +7,7 @@ export interface ScriptBridgeEnvironment {
   environment(
     grantId: string,
     context: C.InvocationContext,
+    audience?: string,
   ): C.Result<Readonly<Record<string, string>>>;
 }
 /** Explicit loopback listener; the public grant ID cannot authenticate a request. */
@@ -41,7 +42,11 @@ export async function startScriptBridge(
         return;
       }
       const credential = request.headers.authorization?.replace(/^Bearer /, '') ?? '';
-      const authenticated = bridge.authenticate(input.grantId, credential);
+      const authenticated = bridge.authenticate(
+        input.grantId,
+        credential,
+        String(request.headers['x-part-bridge-audience'] ?? ''),
+      );
       if (!authenticated.ok) {
         send(403, authenticated);
         return;
@@ -64,12 +69,17 @@ export async function startScriptBridge(
   }
   const url = `http://127.0.0.1:${address.port}/invoke`;
   return ok({
-    environment(id, context) {
+    environment(id, context, audience) {
+      const grant = bridge.grant(id, context);
+      if (!grant.ok) return grant;
+      if (audience !== undefined && audience !== grant.value.audience)
+        return fail('bridge.audience', 'Script source is outside the grant audience', 'permission');
       const credential = bridge.credential(id, context);
       return credential.ok
         ? ok({
             PART_BRIDGE_URL: url,
             PART_BRIDGE_GRANT: id,
+            PART_BRIDGE_AUDIENCE: grant.value.audience,
             PART_BRIDGE_CREDENTIAL: credential.value,
           })
         : credential;
@@ -98,6 +108,7 @@ export async function invokeScriptBridge(
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${environment.PART_BRIDGE_CREDENTIAL ?? ''}`,
+        'x-part-bridge-audience': environment.PART_BRIDGE_AUDIENCE ?? '',
       },
       body: JSON.stringify({ ...request, grantId: environment.PART_BRIDGE_GRANT }),
     });

@@ -4,10 +4,12 @@ import type {
   Workflows as W,
   Composition as L,
   Runtime as R,
+  Skills as K,
 } from './reference.js';
 import { ok, fail, digest, canonical, isJson, isJsonObject } from './contracts.js';
 import { createMemoryWorkflowEngine, callIdentity, scopeStepContext } from './workflow-memory.js';
 import { createBoundary, managedAttempt, createOperations } from './runtime.js';
+import { isScriptRequest } from './scripts.js';
 import { reserve } from './model.js';
 import type { OperationContext } from './runtime.js';
 import type { WorkflowServices } from './workflow-memory.js';
@@ -107,7 +109,22 @@ export function createPipelineEngine(options: {
   agents?: Readonly<Record<string, { driver: string; composition: L.CompositionHandle }>>;
   boundary?: R.InvocationBoundary;
   capabilities?: C.CapabilitySet;
+  skills?: {
+    service: K.Service;
+    bind(input: C.Json, activations: readonly K.Activation[]): C.Result<C.Json>;
+  };
 }): C.Result<W.Engine> {
+  options = {
+    ...options,
+    services: { ...options.services },
+    agents: options.agents
+      ? Object.fromEntries(
+          Object.entries(options.agents).map(([id, profile]) => [id, { ...profile }]),
+        )
+      : undefined,
+    capabilities: options.capabilities ? structuredClone(options.capabilities) : undefined,
+    skills: options.skills ? { ...options.skills } : undefined,
+  };
   const definitions = new Map(options.definitions.map((d) => [d.id, structuredClone(d)])),
     schemas = new Map(options.schemas.map((s) => [`${s.ref.id}@${s.ref.version}`, s])),
     handlers = new Map<string, Handler>();
@@ -167,7 +184,12 @@ export function createPipelineEngine(options: {
       },
       services: { ...options.services, operations },
       profileIds: ['default'],
-      async compile(request) {
+      async compile(request, caller) {
+        const listedSkills = options.skills
+          ? await options.skills.service.list(caller)
+          : ok([] as readonly K.Descriptor[]);
+        if (!listedSkills.ok) return listedSkills;
+        const installedSkills = listedSkills.value;
         const definition = definitions.get(request.definition.id);
         if (!definition)
           return fail('pipeline.definition', 'Pipeline definition not installed', 'unsupported');
@@ -225,7 +247,7 @@ export function createPipelineEngine(options: {
               assert: ['value', 'equals'],
               wait: ['response', 'binding', 'prompt'],
               script: ['request', 'stdin'],
-              agent: ['profile', 'input'],
+              agent: ['profile', 'input', 'skills'],
               extension: ['handler', 'handlerVersion', 'input', 'config'],
               branch: ['value', 'cases', 'otherwise'],
               repeat: ['maxIterations', 'body', 'until'],
@@ -255,7 +277,7 @@ export function createPipelineEngine(options: {
                   !options.services.waits)) ||
               (step.kind === 'script' &&
                 (!valueValid(step.stdin) ||
-                  !isJsonObject(step.request) ||
+                  !isScriptRequest(step.request) ||
                   !options.services.scripts)) ||
               (step.kind === 'agent' &&
                 (!valueValid(step.input) ||
@@ -269,6 +291,26 @@ export function createPipelineEngine(options: {
                 `Missing schema, value, or service in ${step.id}`,
                 'unsupported',
               );
+            if (step.kind === 'agent' && step.skills) {
+              if (
+                !options.skills ||
+                !Array.isArray(step.skills) ||
+                step.skills.some(
+                  (skill: { id: string; digest: string }) =>
+                    !isJsonObject(skill) ||
+                    Object.keys(skill).some((key) => !['id', 'digest'].includes(key)) ||
+                    !installedSkills.some(
+                      (installed) =>
+                        installed.id === skill.id && installed.package.digest === skill.digest,
+                    ),
+                )
+              )
+                return fail(
+                  'pipeline.skill',
+                  'Pinned skill or binding adapter unavailable',
+                  'unsupported',
+                );
+            }
             if (step.kind === 'extension') {
               const handler = handlers.get(step.handler);
               if (
@@ -477,21 +519,54 @@ export function createPipelineEngine(options: {
                 } else if (step.kind === 'agent') {
                   const value = read(step.input);
                   if (!value.ok) return value;
-                  const profile = options.agents![step.profile]!;
-                  const identity = await identify(context.execution, step.id, {
-                    driver: profile.driver,
-                    input: value.value,
-                    compositionRevision: profile.composition.inspection.revision,
-                  });
-                  const outcome = await context.agent(identity, {
-                    driver: profile.driver,
-                    input: value.value,
-                    composition: profile.composition,
-                  });
-                  result =
-                    outcome.phase === 'completed' && isJson(outcome.result)
-                      ? ok(outcome.result)
-                      : fail('pipeline.agent', 'Agent step failed', 'internal', outcome.effect);
+                  const activations: K.Activation[] = [];
+                  let boundInput = value.value;
+                  try {
+                    for (const skill of step.skills ?? []) {
+                      const activated = await options.skills!.service.activate(
+                        {
+                          skillId: skill.id,
+                          packageDigest: skill.digest,
+                          owner: {
+                            owner: 'part/workflow-pipeline-v1',
+                            kind: 'step',
+                            id: invocation.scope.id,
+                          },
+                          purpose: 'Managed pipeline agent input',
+                          scope: 'invocation',
+                        },
+                        invocation,
+                      );
+                      if (!activated.ok) return activated;
+                      activations.push(activated.value);
+                    }
+                    if (activations.length) {
+                      const bound = options.skills!.bind(boundInput, activations);
+                      if (!bound.ok) return bound;
+                      boundInput = bound.value;
+                    }
+                    const profile = options.agents![step.profile]!;
+                    const identity = await identify(context.execution, step.id, {
+                      driver: profile.driver,
+                      input: boundInput,
+                      compositionRevision: profile.composition.inspection.revision,
+                    });
+                    const outcome = await context.agent(identity, {
+                      driver: profile.driver,
+                      input: boundInput,
+                      composition: profile.composition,
+                    });
+                    result =
+                      outcome.phase === 'completed' && isJson(outcome.result)
+                        ? ok(outcome.result)
+                        : fail('pipeline.agent', 'Agent step failed', 'internal', outcome.effect);
+                  } finally {
+                    for (const activation of activations.reverse())
+                      await options.skills!.service.deactivate(activation.id, {
+                        ...invocation,
+                        signal: new AbortController().signal,
+                      });
+                  }
                 } else if (step.kind === 'extension') {
                   const value = read(step.input);
                   if (!value.ok) return value;

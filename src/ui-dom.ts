@@ -1,11 +1,27 @@
 import type { Contracts as C, Client as L, Projection as P, UI as U } from './reference.js';
+import { createMarkdownView } from './ui-markdown.js';
+import { orderSlots } from './ui-registry.js';
 import { createComposer, createScroll } from './ui-headless.js';
-export interface ChatOptions extends U.ChatOptions<HTMLElement> {
+export interface ChatComponents {
+  Message(item: P.Item, context: U.RenderContext, body: HTMLElement): HTMLElement;
+  Fallback(item: P.Item, context: U.RenderContext): HTMLElement;
+  ToolDetails(item: P.Item, context: U.RenderContext): HTMLElement;
+  Composer(context: {
+    document: Document;
+    form: HTMLFormElement;
+    input: HTMLTextAreaElement;
+    send: HTMLButtonElement;
+    composer: U.ComposerController;
+    submit(): Promise<void>;
+  }): HTMLElement;
+}
+export interface ChatOptions extends Omit<U.ChatOptions<HTMLElement>, 'components'> {
+  readonly components?: Partial<ChatComponents>;
   readonly document?: Document;
   readonly client: L.Controller & {
     getPart?(itemId: string, partId: string): L.StreamPartSnapshot | undefined;
   };
-  readonly command: (draft: U.Draft) => C.CommandRequest;
+  readonly command?: (draft: U.Draft) => C.CommandRequest;
   readonly maxVisibleItems?: number;
 }
 export interface ChatView {
@@ -14,21 +30,14 @@ export interface ChatView {
   dispose(): Promise<void>;
 }
 export function createChat(options: ChatOptions): ChatView {
-  if (options.components)
-    throw new TypeError(
-      'Component substitution is not supported by this DOM binding; use renderers or headless components',
-    );
-  const supportedSlots = new Set<string>();
-  for (const slot of options.slots ?? []) {
-    if (
-      slot.slot !== 'composer.actions' ||
-      supportedSlots.has(slot.id) ||
-      slot.before?.length ||
-      slot.after?.length
+  const ordered = orderSlots(options.slots ?? []);
+  if (!ordered.ok) throw new TypeError(ordered.error.message);
+  if (
+    ordered.value.some(
+      (slot) => !['composer.actions', 'message.actions', 'artifact.preview'].includes(slot.slot),
     )
-      throw new TypeError('Unsupported or duplicate DOM slot contribution');
-    supportedSlots.add(slot.id);
-  }
+  )
+    throw new TypeError('Unsupported Chat slot position');
   const document = options.document ?? globalThis.document,
     controller = options.client;
   const root = document.createElement('section');
@@ -65,7 +74,19 @@ export function createChat(options: ChatOptions): ChatView {
   form.append(textarea, send);
   const composer = createComposer({
       invoke: (request) => controller.invoke(request),
-      command: options.command,
+      command:
+        options.command ??
+        ((draft) => {
+          const commandId = crypto.randomUUID();
+          return {
+            protocolVersion: 1,
+            commandId,
+            idempotencyKey: commandId,
+            actionId: 'part.run/start',
+            actionVersion: 1,
+            input: draft.text,
+          };
+        }),
     }),
     scroll = createScroll();
   const renderers = new Map<string, U.Renderer<C.Json, HTMLElement>>();
@@ -78,14 +99,32 @@ export function createChat(options: ChatOptions): ChatView {
   const rendered = new Map<string, { item: P.Item; element: HTMLElement }>();
   let visible = options.maxVisibleItems ?? 100,
     disposed = false;
+  const markdownViews = new WeakMap<HTMLElement, ReturnType<typeof createMarkdownView>>();
+  const updateMessageText = (element: HTMLElement, text: string) => {
+    const body = element.matches('[data-part-part="message-body"]')
+      ? element
+      : element.querySelector<HTMLElement>('[data-part-part="message-body"]');
+    const view = body && markdownViews.get(body);
+    if (view) view.update(text);
+    else {
+      const pre = element.querySelector('pre');
+      if (pre) pre.textContent = text;
+    }
+  };
   const fallback = (item: P.Item): HTMLElement => {
+    if (options.components?.Fallback) {
+      try {
+        return options.components.Fallback(item, { controller, target: 'chat', itemId: item.id });
+      } catch {}
+    }
     const node = document.createElement('div');
     node.dataset.partPart = 'message-body';
     const label = document.createElement('strong');
     label.textContent = item.fallback.label;
-    const text = document.createElement('pre');
-    text.textContent = item.fallback.text ?? '';
-    node.append(label, text);
+    const text = createMarkdownView(document);
+    text.update(item.fallback.text ?? '');
+    markdownViews.set(node, text);
+    node.append(label, text.element);
     for (const action of item.actions) {
       if (action.availability.state !== 'available' || action.input.id !== 'part/null') continue;
       const button = document.createElement('button');
@@ -121,13 +160,11 @@ export function createChat(options: ChatOptions): ChatView {
       const existing = rendered.get(id);
       const streamed = options.client.getPart?.(id, 'text');
       if (existing?.item === item) {
-        const text = existing.element.querySelector('pre');
         if (
-          text &&
           streamed &&
           !(item.payload && typeof item.payload === 'object' && 'phase' in item.payload)
         )
-          text.textContent = streamed.text;
+          updateMessageText(existing.element, streamed.text);
         continue;
       }
       let body: HTMLElement;
@@ -135,7 +172,9 @@ export function createChat(options: ChatOptions): ChatView {
         const renderer = renderers.get(`chat/${item.type}@${item.schemaVersion}`);
         body = renderer
           ? renderer.render(item, { controller, target: 'chat', itemId: id })
-          : fallback(item);
+          : item.type === 'part/tool' && options.components?.ToolDetails
+            ? options.components.ToolDetails(item, { controller, target: 'chat', itemId: id })
+            : fallback(item);
       } catch {
         body = fallback(item);
       }
@@ -144,10 +183,16 @@ export function createChat(options: ChatOptions): ChatView {
         item.type === 'part/message' &&
         !(item.payload && typeof item.payload === 'object' && 'phase' in item.payload)
       ) {
-        const text = body.querySelector('pre');
-        if (text) text.textContent = streamed.text;
+        updateMessageText(body, streamed.text);
       }
-      const message = document.createElement('article');
+      let message: HTMLElement;
+      try {
+        message = options.components?.Message
+          ? options.components.Message(item, { controller, target: 'chat', itemId: id }, body)
+          : document.createElement('article');
+      } catch {
+        message = document.createElement('article');
+      }
       message.dataset.partPart = 'message';
       message.dataset.partType = item.type;
       message.dataset.state =
@@ -157,7 +202,18 @@ export function createChat(options: ChatOptions): ChatView {
         'phase' in item.payload
           ? String(item.payload.phase)
           : 'ready';
-      message.append(body);
+      if (!message.contains(body)) message.append(body);
+      for (const slot of ordered.value.filter(
+        (slot) =>
+          slot.slot === 'message.actions' ||
+          (slot.slot === 'artifact.preview' && item.artifacts.length),
+      )) {
+        try {
+          message.append(slot.render({ controller, target: 'chat', itemId: id }));
+        } catch {
+          /* Isolate an optional presentation failure. */
+        }
+      }
       if (existing) existing.element.replaceWith(message);
       else thread.append(message);
       rendered.set(id, { item, element: message });
@@ -230,10 +286,21 @@ export function createChat(options: ChatOptions): ChatView {
     visible += options.maxVisibleItems ?? 100;
     render();
   });
-  for (const contribution of options.slots ?? []) {
-    if (contribution.slot !== 'composer.actions')
-      throw new Error(`Unsupported DOM slot ${contribution.slot}`);
+  for (const contribution of ordered.value.filter((slot) => slot.slot === 'composer.actions'))
     form.append(contribution.render({ controller, target: 'chat', itemId: '' }));
+  if (options.components?.Composer) {
+    const element = options.components.Composer({
+      document,
+      form,
+      input: textarea,
+      send,
+      composer,
+      submit,
+    });
+    if (element !== form) {
+      form.replaceWith(element);
+      if (!element.contains(form)) element.append(form);
+    }
   }
   render();
   return {

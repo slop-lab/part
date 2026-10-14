@@ -1,13 +1,20 @@
 import type { Contracts as C, Scripts as S, Runtime as R } from './reference.js';
 import { ok, fail, canonical, freeze, isJson, isJsonObject } from './contracts.js';
 import { createBudget, budgetKey } from './runtime.js';
+import { numericLimits } from './budgets.js';
+import { costServices } from './costs.js';
 import { scheduleDeadline } from './deadline.js';
 export interface BridgeMethod {
   readonly profileRequired?: boolean;
   invoke(params: C.Json, context: C.InvocationContext): Promise<C.CommandReceipt>;
 }
 export interface ManagedBridge extends S.BridgeHost {
-  authenticate(grantId: string, credential: string): C.Result<C.InvocationContext>;
+  authenticate(
+    grantId: string,
+    credential: string,
+    audience: string,
+  ): C.Result<C.InvocationContext>;
+  grant(grantId: string, context: C.InvocationContext): C.Result<S.BridgeGrant>;
   credential(grantId: string, context: C.InvocationContext): C.Result<string>;
   close(): void;
 }
@@ -63,25 +70,9 @@ export function createScriptBridge(
         return fail('bridge.policy', 'Invalid owner, method, or grant policy');
       if (!['trusted-code-only', 'authenticated-channel'].includes(policy.enforcement))
         return fail('bridge.enforcement', 'Unknown bridge enforcement');
-      const limits: Record<string, number> = {};
-      for (const [key, value] of Object.entries(policy.limits)) {
-        if (key === 'deadline') continue;
-        if (
-          ![
-            'maxModelInvocations',
-            'maxToolDispatches',
-            'maxExecutorAttempts',
-            'maxChildRuns',
-            'maxConcurrentOperations',
-            'maxKnownTokens',
-          ].includes(key) ||
-          typeof value !== 'number' ||
-          !Number.isSafeInteger(value) ||
-          value < 0
-        )
-          return fail('bridge.limit', 'Unsupported or invalid limit');
-        limits[key] = value;
-      }
+      const parsed = numericLimits(policy.limits);
+      if (!parsed.ok) return parsed;
+      const limits = parsed.value;
       const times = [policy.expiresAt, policy.limits.deadline, context.deadline]
         .filter((x): x is string => x !== undefined)
         .map(Date.parse);
@@ -124,9 +115,11 @@ export function createScriptBridge(
           return key.id === budgetKey.id ? ok(port as never) : context.services.get(key);
         },
       };
+      const guarded = costServices(context, services, fixed.limits);
+      if (!guarded.ok) return guarded;
       const caller = {
         ...context,
-        services,
+        services: guarded.value,
         deadline: expiry,
         signal: AbortSignal.any([context.signal, controller.signal]),
       };
@@ -150,13 +143,20 @@ export function createScriptBridge(
       }
       return ok(grant);
     },
-    authenticate(id, credential) {
+    authenticate(id, credential, audience) {
       const entry = live(id);
       return entry &&
         entry.grant.enforcement === 'authenticated-channel' &&
-        entry.credential === credential
+        entry.credential === credential &&
+        entry.grant.audience === audience
         ? ok(entry.context)
         : fail('bridge.authentication', 'Bridge authentication failed', 'permission');
+    },
+    grant(id, context) {
+      const entry = live(id);
+      return entry && same(entry.context, context)
+        ? ok(entry.grant)
+        : fail('bridge.permission', 'Grant access denied', 'permission');
     },
     credential(id, context) {
       const entry = live(id);

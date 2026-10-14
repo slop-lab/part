@@ -8,7 +8,9 @@ import type {
 } from './reference.js';
 import type { Operations, OperationContext } from './runtime.js';
 import { ok, fail, digest, canonical, jsonSchema, freeze, isJson } from './contracts.js';
-import { createOperations, createBudget, budgetKey } from './runtime.js';
+import { createOperations, budgetKey } from './runtime.js';
+import { costServices } from './costs.js';
+import { createChildBudget, numericLimits } from './budgets.js';
 import { combineEffects } from './driver-basic.js';
 import { provenance } from './context.js';
 export interface WorkflowServices {
@@ -254,47 +256,25 @@ export function createMemoryWorkflowEngine(options: {
           }
         );
       }
-      if (request.limits?.estimatedCostCeiling)
-        return {
-          kind: 'rejected',
-          error: fail('workflow.cost', 'Estimated cost budgets are not supported', 'unsupported')
-            .error,
-        };
-      const numeric: Record<string, number> = {};
-      for (const [dimension, value] of Object.entries(request.limits ?? {}))
-        if (dimension !== 'deadline') {
-          if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0)
-            return {
-              kind: 'rejected',
-              error: fail('workflow.limit', 'Invalid execution limit').error,
-            };
-          numeric[dimension] = value;
-        }
-      const budget = createBudget(numeric),
-        upstream = context.services.get(budgetKey);
+      const parsedLimits = numericLimits(request.limits);
+      if (!parsedLimits.ok) return { kind: 'rejected', error: parsedLimits.error };
+      const numeric = parsedLimits.value;
+      const budget = createChildBudget(context, numeric);
       const services: C.ServiceAccess = {
         get(key) {
           return key.id === budgetKey.id ? ok(budget as never) : context.services.get(key);
         },
       };
-      // A nested workflow may not silently create a second budget owner.
-      if (upstream.ok)
-        return {
-          kind: 'rejected',
-          error: fail(
-            'workflow.nested-budget',
-            'Nested workflow budget composition is not installed',
-            'unsupported',
-          ).error,
-        };
       const deadlines = [context.deadline, request.limits?.deadline]
         .filter((v): v is string => !!v)
         .map(Date.parse);
       if (deadlines.some(Number.isNaN))
         return { kind: 'rejected', error: fail('workflow.deadline', 'Invalid deadline').error };
+      const guarded = costServices(context, services, request.limits);
+      if (!guarded.ok) return { kind: 'rejected', error: guarded.error };
       const c = {
         ...context,
-        services,
+        services: guarded.value,
         ...(deadlines.length ? { deadline: new Date(Math.min(...deadlines)).toISOString() } : {}),
       };
       const ref: W.ExecutionRef = freeze({
@@ -443,9 +423,17 @@ export function createMemoryWorkflowEngine(options: {
                 ),
               submit: (identity, input) =>
                 memoize(identity, input as unknown as C.Json, async () =>
-                  options.services.results
-                    ? options.services.results.submit(input, invocation)
-                    : fail('workflow.results', 'Results service not installed', 'unsupported'),
+                  input.producedBy.id !== ref.id || input.producedBy.owner !== ref.engine
+                    ? Promise.resolve(
+                        fail(
+                          'workflow.result-owner',
+                          'Result producer is not this execution',
+                          'permission',
+                        ),
+                      )
+                    : options.services.results
+                      ? options.services.results.submit(input, invocation)
+                      : fail('workflow.results', 'Results service not installed', 'unsupported'),
                 ),
               wait: (identity, input) =>
                 memoize(
@@ -529,7 +517,13 @@ export function createMemoryWorkflowEngine(options: {
             };
           }
           if (!result.ok)
-            return { phase: 'failed', error: result.error, effect, commit, unsettledChildren: [] };
+            return {
+              phase: 'failed',
+              error: result.error,
+              effect: combineEffects(effect, result.error.effect ?? 'not-attempted'),
+              commit,
+              unsettledChildren: [],
+            };
           const validated = runner.output.validate(result.value);
           if (!validated.ok)
             return {

@@ -1,5 +1,7 @@
 import type { Contracts as C, Results as R, Storage as D } from './reference.js';
 import { ok, fail, digest, canonical, freeze, isJson } from './contracts.js';
+import { createOperations } from './runtime.js';
+import type { Operations } from './runtime.js';
 import { provenance } from './context.js';
 export interface ResultsOptions {
   artifacts?: D.ArtifactStore;
@@ -11,6 +13,8 @@ export interface ResultsOptions {
   processors?: readonly R.Processor[];
   profiles?: Readonly<Record<string, readonly string[]>>;
   maxBytes?: number;
+  operations?: Operations;
+  processorTimeoutMs?: number;
 }
 export function createResults(
   types: readonly R.TypeDefinition<unknown>[],
@@ -35,6 +39,10 @@ export function createResults(
     { accepted: R.Accepted; principal: C.InvocationContext['principal'] }
   >();
   const submissions = new Map<string, { digest: string; result: Promise<C.Result<R.Accepted>> }>();
+  const operations = options.operations ?? createOperations();
+  const timeout = options.processorTimeoutMs ?? 30000;
+  if (!Number.isSafeInteger(timeout) || timeout < 1)
+    return fail('results.timeout', 'Invalid processor timeout');
   const maximum = options.maxBytes ?? 16 * 1024 * 1024;
   const schemaFor = (ref: C.SchemaRef) => schemas.get(`${ref.id}@${ref.version}`);
   async function decode(
@@ -125,10 +133,49 @@ export function createResults(
       if (context.signal.aborted)
         return fail('results.cancelled', 'Processing cancelled', 'cancelled');
       // Pass a fixed explicit capture; processors never re-read mutable source files.
-      const processed = await processor.process(
-        freeze({ kind: 'inline', value: checked.value }),
-        context,
+      const invocation = await operations.begin<{ output: R.Input; evidence: R.Validation }>(
+        { kind: 'part/result-processor', childPolicy: 'attached', retryOwner: 'part/results' },
+        async (c) => {
+          const processed = await processor.process(
+            freeze({ kind: 'inline', value: checked.value }),
+            c,
+          );
+          return processed.ok
+            ? {
+                phase: 'completed',
+                result: processed.value,
+                effect: 'not-applicable',
+                commit: [],
+                unsettledChildren: [],
+              }
+            : {
+                phase: 'failed',
+                error: processed.error,
+                effect: processed.error.effect ?? 'not-applicable',
+                commit: [],
+                unsettledChildren: [],
+              };
+        },
+        {
+          ...context,
+          deadline: new Date(
+            Math.min(
+              context.deadline ? Date.parse(context.deadline) : Infinity,
+              Date.now() + timeout,
+            ),
+          ).toISOString(),
+        },
       );
+      if (!invocation.ok) return invocation;
+      const completed = await invocation.value.done;
+      if (completed.phase !== 'completed')
+        return fail(
+          'results.processor',
+          'Processor failed, timed out, or did not confirm cancellation',
+          completed.phase === 'cancelled' ? 'cancelled' : 'internal',
+          completed.effect,
+        );
+      const processed = ok(completed.result);
       if (!processed.ok) return processed;
       const output = await check(processed.value.output, processor.outputType);
       if (!output.ok) return output;

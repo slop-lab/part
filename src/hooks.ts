@@ -1,8 +1,12 @@
-import type { Contracts as C, Hooks as H, Scripts as S } from './reference.js';
+import type { Contracts as C, Hooks as H, Scripts as S, Runtime as R } from './reference.js';
 import { ok, fail, canonical, isJsonObject } from './contracts.js';
 export function createScriptHooks(
   points: readonly H.Point<unknown, unknown>[],
   scripts: S.Service,
+  options: {
+    match?: (matcher: C.Json, input: unknown, context: C.InvocationContext) => C.Result<boolean>;
+    report?: (binding: H.Binding, error: C.Failure, context: C.InvocationContext) => void;
+  } = {},
 ): C.Result<
   H.Service & {
     fire(
@@ -34,7 +38,7 @@ export function createScriptHooks(
         return fail('hook.failure-policy', 'Before-effect checks must await and fail closed');
       if (binding.script.capture.kind !== 'stdout-json')
         return fail('hook.capture', 'Hook decisions require explicit stdout-json capture');
-      if (binding.match)
+      if (binding.match && !options.match)
         return fail('hook.matcher', 'Matchers are not installed in this subset', 'unsupported');
       bindings.set(binding.id, {
         binding: structuredClone(binding),
@@ -74,6 +78,11 @@ export function createScriptHooks(
         )
           continue;
         if (binding.scope !== 'host' && binding.activationOwner.id !== context.scope.id) continue;
+        if (binding.match) {
+          const matched = options.match!(binding.match, checked.value, context);
+          if (!matched.ok) return matched;
+          if (!matched.value) continue;
+        }
         const key = `${binding.id}/${context.correlationId}`,
           current = depth.get(key) ?? 0;
         if (current >= (binding.reentrancy === 'deny' ? 1 : 8))
@@ -81,43 +90,55 @@ export function createScriptHooks(
         if (binding.once) entry.consumed = true;
         depth.set(key, current + 1);
         try {
-          const script = await scripts.execute(
-            {
-              ...binding.script,
-              stdin: {
-                point: { id: point.id, version: point.version },
-                input: checked.value as C.Json,
+          const executed = await (async (): Promise<C.Result<unknown>> => {
+            const script = await scripts.execute(
+              {
+                ...binding.script,
+                stdin: {
+                  point: { id: point.id, version: point.version },
+                  input: checked.value as C.Json,
+                },
               },
-            },
-            context,
-          );
-          if (!script.ok) {
-            if (binding.failure === 'report-and-continue') continue;
-            return script;
-          }
-          const outcome = await script.value.done;
-          if (
-            outcome.phase !== 'completed' ||
-            outcome.result.exitCode !== 0 ||
-            outcome.result.captured?.kind !== 'inline'
-          ) {
-            if (binding.failure === 'report-and-continue') continue;
-            return fail(
-              'hook.script',
-              'Required hook did not return a successful explicit result',
-              'internal',
-              outcome.effect,
+              context,
             );
+            if (!script.ok) {
+              return script;
+            }
+            const outcome = await script.value.done;
+            if (
+              outcome.phase !== 'completed' ||
+              outcome.result.exitCode !== 0 ||
+              outcome.result.captured?.kind !== 'inline'
+            ) {
+              return fail(
+                'hook.script',
+                'Required hook did not return a successful explicit result',
+                'internal',
+                outcome.effect,
+              );
+            }
+            const result = point.output.validate(outcome.result.captured.value);
+            if (!result.ok) return fail('hook.output', 'Hook output validation failed');
+            if (
+              !isJsonObject(result.value) ||
+              typeof result.value.kind !== 'string' ||
+              !point.allowedDecisions.includes(result.value.kind)
+            )
+              return fail('hook.decision', 'Hook decision is not allowed');
+            return ok(result.value);
+          })().catch(() => fail('hook.exception', 'Hook execution failed', 'internal', 'unknown'));
+          if (!executed.ok) {
+            try {
+              options.report?.(binding, executed.error, context);
+            } catch {}
+            (context as C.InvocationContext & { progress?: R.ProgressSink }).progress?.publish(
+              'part.hook/failure',
+              { bindingId: binding.id, code: executed.error.code, policy: binding.failure },
+            );
+            if (binding.failure === 'report-and-continue') continue;
+            return executed;
           }
-          const result = point.output.validate(outcome.result.captured.value);
-          if (!result.ok) return fail('hook.output', 'Hook output validation failed');
-          if (
-            !isJsonObject(result.value) ||
-            typeof result.value.kind !== 'string' ||
-            !point.allowedDecisions.includes(result.value.kind)
-          )
-            return fail('hook.decision', 'Hook decision is not allowed');
-          output.push(result.value);
+          output.push(executed.value);
         } finally {
           if (current) depth.set(key, current);
           else depth.delete(key);
