@@ -56,248 +56,240 @@ const terminal = async (engine, ref) => {
   }
   throw Error('Workflow did not terminate');
 };
-test(
-  'SR03-SR05/SR08: standalone scripts pin bytes, capture explicit JSON and reject extra/truncated output',
-  { skip: process.platform === 'win32' && 'Requires POSIX process groups' },
-  async () => {
-    const root = await mkdtemp(join(tmpdir(), 'part-script-test-')),
-      source = 'process.stdout.write(JSON.stringify({text:"collected"}));';
-    try {
-      await writeFile(join(root, 'collect.cjs'), source);
-      const scripts = createNodeScripts({ root, interpreters: { node: process.execPath } }),
-        /** @type {import('@slop-lab/part/reference').Scripts.Request} */
-        request = {
-          requestId: 'collect',
-          executorId: 'part/node-process',
-          source: {
-            relativePath: 'collect.cjs',
-            digest: await digest(new TextEncoder().encode(source)),
-          },
-          interpreter: 'node',
-          args: [],
-          capture: { kind: 'stdout-json', maxBytes: 1024 },
-          effects: 'read',
-          retry: 'never',
-        };
-      const captured = await scripts.execute(request, context);
-      assert.equal(
-        expectProperty(
-          expectProperty(
-            expectProperty(await expectProperty(captured, 'value').done, 'result').captured,
-            'value',
-          ),
-          'text',
-        ),
-        'collected',
-      );
-      const uncaptured = await scripts.execute({ ...request, capture: { kind: 'none' } }, context);
-      assert.equal(
-        expectProperty(await expectProperty(uncaptured, 'value').done, 'result').captured,
-        undefined,
-      );
-      await writeFile(join(root, 'collect.cjs'), source + 'process.stdout.write("extra");');
-      assert.equal((await scripts.execute(request, context)).ok, false);
-      const newSource = source + 'process.stdout.write("extra");',
-        /** @type {import('@slop-lab/part/reference').Scripts.Request} */
-        changed = {
-          ...request,
-          source: { ...request.source, digest: await digest(new TextEncoder().encode(newSource)) },
-        };
-      assert.equal(
-        (await expectProperty(await scripts.execute(changed, context), 'value').done).phase,
-        'failed',
-      );
-      const large = await scripts.execute(
-        { ...changed, capture: { kind: 'stdout-json', maxBytes: 2 } },
-        context,
-      );
-      assert.equal((await expectProperty(large, 'value').done).phase, 'failed');
-    } finally {
-      await rm(root, { recursive: true, force: true });
-    }
-  },
-);
-test(
-  'GW03/W01: code workflow executes script -> managed model -> validated result -> memory wait',
-  { skip: process.platform === 'win32' && 'Requires POSIX process groups' },
-  async () => {
-    const root = await mkdtemp(join(tmpdir(), 'part-code-test-')),
-      source = 'process.stdout.write(JSON.stringify({text:"collected"}));';
-    const operations = createOperations(),
-      scripts = createNodeScripts({ root, interpreters: { node: process.execPath }, operations }),
-      waits = createSuspensions(),
-      results = expectProperty(
-        createResults([
-          { id: jsonSchema.ref.id, version: 1, schema: jsonSchema, mediaType: 'application/json' },
-        ]),
-        'value',
-      );
-    const fake = fakeModel([{ text: 'model-result' }]),
-      model = expectProperty(
-        createModelGateway({
-          profiles: [fake.profile],
-          adapters: [fake.adapter],
-          transports: [fake.transport],
-          auth: { none: fake.auth },
-          operations,
-        }),
-        'value',
-      );
+test('SR03-SR05/SR08: standalone scripts pin bytes, capture explicit JSON and reject extra/truncated output', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'part-script-test-')),
+    source = 'process.stdout.write(JSON.stringify({text:"collected"}));';
+  try {
     await writeFile(join(root, 'collect.cjs'), source);
-    /** @type {import('@slop-lab/part/reference').Scripts.Request} */
-    const request = {
-      requestId: 'collect',
-      executorId: 'part/node-process',
-      source: {
-        relativePath: 'collect.cjs',
-        digest: await digest(new TextEncoder().encode(source)),
-      },
-      interpreter: 'node',
-      args: [],
-      capture: { kind: 'stdout-json', maxBytes: 1024 },
-      effects: 'read',
-      retry: 'never',
-    };
-    let acceptedResult;
-    const definition = await defineCodeWorkflow({
-      id: 'code-review',
-      version: '1',
-      input: jsonSchema,
-      output: jsonSchema,
-      replay: 'none',
-      async execute(input, c) {
-        const collected = await c.script(
-          await callIdentity(c.execution, 'collect', json(request)),
-          request,
-        );
-        if (collected.phase !== 'completed') return fail('fixture.script', 'Script failed');
-        const item = await messageItem('user', [
-          { kind: 'json', value: expectProperty(collected.result.captured, 'value') },
-        ]);
-        const compiled = expectProperty(
-          await expectProperty(createContextCompiler(), 'value').compile(
-            {
-              input: [item],
-              sources: [item.source],
-              modelCapabilities: { revision: '1', entries: [] },
-              toolsDigest: 'none',
-            },
-            context,
-          ),
+    const scripts = createNodeScripts({ root, interpreters: { node: process.execPath } }),
+      /** @type {import('@slop-lab/part/reference').Scripts.Request} */
+      request = {
+        requestId: 'collect',
+        executorId: 'part/node-process',
+        source: {
+          relativePath: 'collect.cjs',
+          digest: await digest(new TextEncoder().encode(source)),
+        },
+        interpreter: 'node',
+        args: [],
+        capture: { kind: 'stdout-json', maxBytes: 1024 },
+        effects: 'read',
+        retry: 'never',
+      };
+    const captured = await scripts.execute(request, context);
+    assert.equal(
+      expectProperty(
+        expectProperty(
+          expectProperty(await expectProperty(captured, 'value').done, 'result').captured,
           'value',
-        );
-        const invocation = { profileId: 'fake', context: compiled, tools: [], options: {} };
-        const invoked = await c.model(
-          await callIdentity(c.execution, 'model', json(invocation)),
-          invocation,
-        );
-        if (invoked.phase !== 'completed') return fail('fixture.model', 'Model failed');
-        /** @type {import('@slop-lab/part/reference').Results.Submission} */
-        const submission = {
-          submissionId: 'result',
-          expectedType: jsonSchema.ref,
-          data: {
-            kind: 'inline',
-            value: { text: expectProperty(invoked.result.content[0], 'text') },
-          },
-          producedBy: { owner: c.execution.engine, kind: 'workflow', id: c.execution.id },
-          validationProfile: 'schema',
-        };
-        const accepted = await c.submit(
-          await callIdentity(c.execution, 'result', json(submission)),
-          submission,
-        );
-        if (accepted.ok === false) return accepted;
-        acceptedResult = accepted.value;
-        const spec = {
-          type: 'approve',
-          responseSchema: jsonSchema,
-          presentation: { prompt: 'Approve?' },
-          bindingDigest: accepted.value.digest,
-        };
-        const identity = await callIdentity(
-          c.execution,
-          'approval',
-          json({
-            type: spec.type,
-            responseSchema: jsonSchema.ref,
-            presentation: spec.presentation,
-            bindingDigest: spec.bindingDigest,
-          }),
-        );
-        const ticket = await c.wait(identity, spec);
-        if (ticket.ok === false) return ticket;
-        const response = await c.response(ticket.value);
-        if (response.ok === false) return response;
-        return response.value === true
-          ? ok({ text: expectProperty(invoked.result.content[0], 'text') })
-          : fail('fixture.approval', 'Not approved');
-      },
-    });
-    const engine = expectProperty(
-      createCodeEngine([definition], {
+        ),
+        'text',
+      ),
+      'collected',
+    );
+    const uncaptured = await scripts.execute({ ...request, capture: { kind: 'none' } }, context);
+    assert.equal(
+      expectProperty(await expectProperty(uncaptured, 'value').done, 'result').captured,
+      undefined,
+    );
+    await writeFile(join(root, 'collect.cjs'), source + 'process.stdout.write("extra");');
+    assert.equal((await scripts.execute(request, context)).ok, false);
+    const newSource = source + 'process.stdout.write("extra");',
+      /** @type {import('@slop-lab/part/reference').Scripts.Request} */
+      changed = {
+        ...request,
+        source: { ...request.source, digest: await digest(new TextEncoder().encode(newSource)) },
+      };
+    assert.equal(
+      (await expectProperty(await scripts.execute(changed, context), 'value').done).phase,
+      'failed',
+    );
+    const large = await scripts.execute(
+      { ...changed, capture: { kind: 'stdout-json', maxBytes: 2 } },
+      context,
+    );
+    assert.equal((await expectProperty(large, 'value').done).phase, 'failed');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+test('GW03/W01: code workflow executes script -> managed model -> validated result -> memory wait', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'part-code-test-')),
+    source = 'process.stdout.write(JSON.stringify({text:"collected"}));';
+  const operations = createOperations(),
+    scripts = createNodeScripts({ root, interpreters: { node: process.execPath }, operations }),
+    waits = createSuspensions(),
+    results = expectProperty(
+      createResults([
+        { id: jsonSchema.ref.id, version: 1, schema: jsonSchema, mediaType: 'application/json' },
+      ]),
+      'value',
+    );
+  const fake = fakeModel([{ text: 'model-result' }]),
+    model = expectProperty(
+      createModelGateway({
+        profiles: [fake.profile],
+        adapters: [fake.adapter],
+        transports: [fake.transport],
+        auth: { none: fake.auth },
         operations,
-        scripts,
-        model,
-        results,
-        waits,
       }),
       'value',
     );
-    try {
-      const prepared = (await prepare(engine, ref('code-review', 'part.code', definition.digest)))
-        .value;
-      const started = await engine.start(
-        { requestId: 'code-start', idempotencyKey: 'code-start', prepared, input: {} },
-        context,
+  await writeFile(join(root, 'collect.cjs'), source);
+  /** @type {import('@slop-lab/part/reference').Scripts.Request} */
+  const request = {
+    requestId: 'collect',
+    executorId: 'part/node-process',
+    source: {
+      relativePath: 'collect.cjs',
+      digest: await digest(new TextEncoder().encode(source)),
+    },
+    interpreter: 'node',
+    args: [],
+    capture: { kind: 'stdout-json', maxBytes: 1024 },
+    effects: 'read',
+    retry: 'never',
+  };
+  let acceptedResult;
+  const definition = await defineCodeWorkflow({
+    id: 'code-review',
+    version: '1',
+    input: jsonSchema,
+    output: jsonSchema,
+    replay: 'none',
+    async execute(input, c) {
+      const collected = await c.script(
+        await callIdentity(c.execution, 'collect', json(request)),
+        request,
       );
-      assert.equal(started.kind, 'accepted');
-      let waiting;
-      for (let i = 0; i < 200; i++) {
-        waiting = expectProperty(await engine.get(started.ref, context), 'value');
-        if (waiting.phase === 'waiting') break;
-        await delay(2);
-      }
-      assert.equal(waiting.phase, 'waiting');
-      assert.equal(fake.requests.length, 1);
-      assert.ok(acceptedResult);
-      assert.equal(acceptedResult.validation[0].status, 'pass');
-      const response = {
-        protocolVersion: 1,
-        commandId: 'approve',
-        actionId: 'part.workflow/respond',
-        actionVersion: 1,
-        input: { ticketId: waiting.waitingOn[0].id, revision: '0', response: true },
+      if (collected.phase !== 'completed') return fail('fixture.script', 'Script failed');
+      const item = await messageItem('user', [
+        { kind: 'json', value: expectProperty(collected.result.captured, 'value') },
+      ]);
+      const compiled = expectProperty(
+        await expectProperty(createContextCompiler(), 'value').compile(
+          {
+            input: [item],
+            sources: [item.source],
+            modelCapabilities: { revision: '1', entries: [] },
+            toolsDigest: 'none',
+          },
+          context,
+        ),
+        'value',
+      );
+      const invocation = { profileId: 'fake', context: compiled, tools: [], options: {} };
+      const invoked = await c.model(
+        await callIdentity(c.execution, 'model', json(invocation)),
+        invocation,
+      );
+      if (invoked.phase !== 'completed') return fail('fixture.model', 'Model failed');
+      /** @type {import('@slop-lab/part/reference').Results.Submission} */
+      const submission = {
+        submissionId: 'result',
+        expectedType: jsonSchema.ref,
+        data: {
+          kind: 'inline',
+          value: { text: expectProperty(invoked.result.content[0], 'text') },
+        },
+        producedBy: { owner: c.execution.engine, kind: 'workflow', id: c.execution.id },
+        validationProfile: 'schema',
       };
-      assert.equal((await engine.action(started.ref, response, context)).kind, 'completed');
-      assert.equal((await engine.action(started.ref, response, context)).kind, 'completed');
-      const done = await terminal(engine, started.ref);
-      assert.equal(done.phase, 'succeeded');
-      assert.equal(done.output.data.text, 'model-result');
-      assert.equal(done.guarantees.checkpoint, 'none');
-      const duplicate = await engine.start(
-        { requestId: 'another-id', idempotencyKey: 'code-start', prepared, input: {} },
-        context,
+      const accepted = await c.submit(
+        await callIdentity(c.execution, 'result', json(submission)),
+        submission,
       );
-      assert.equal(expectProperty(duplicate, 'ref').id, started.ref.id);
-      assert.equal(
-        (
-          await engine.start(
-            {
-              requestId: 'bad',
-              prepared: { ...prepared, definition: { ...prepared.definition, digest: 'forged' } },
-              input: {},
-            },
-            context,
-          )
-        ).kind,
-        'rejected',
+      if (accepted.ok === false) return accepted;
+      acceptedResult = accepted.value;
+      const spec = {
+        type: 'approve',
+        responseSchema: jsonSchema,
+        presentation: { prompt: 'Approve?' },
+        bindingDigest: accepted.value.digest,
+      };
+      const identity = await callIdentity(
+        c.execution,
+        'approval',
+        json({
+          type: spec.type,
+          responseSchema: jsonSchema.ref,
+          presentation: spec.presentation,
+          bindingDigest: spec.bindingDigest,
+        }),
       );
-    } finally {
-      await rm(root, { recursive: true, force: true });
+      const ticket = await c.wait(identity, spec);
+      if (ticket.ok === false) return ticket;
+      const response = await c.response(ticket.value);
+      if (response.ok === false) return response;
+      return response.value === true
+        ? ok({ text: expectProperty(invoked.result.content[0], 'text') })
+        : fail('fixture.approval', 'Not approved');
+    },
+  });
+  const engine = expectProperty(
+    createCodeEngine([definition], {
+      operations,
+      scripts,
+      model,
+      results,
+      waits,
+    }),
+    'value',
+  );
+  try {
+    const prepared = (await prepare(engine, ref('code-review', 'part.code', definition.digest)))
+      .value;
+    const started = await engine.start(
+      { requestId: 'code-start', idempotencyKey: 'code-start', prepared, input: {} },
+      context,
+    );
+    assert.equal(started.kind, 'accepted');
+    let waiting;
+    for (let i = 0; i < 200; i++) {
+      waiting = expectProperty(await engine.get(started.ref, context), 'value');
+      if (waiting.phase === 'waiting') break;
+      await delay(2);
     }
-  },
-);
+    assert.equal(waiting.phase, 'waiting');
+    assert.equal(fake.requests.length, 1);
+    assert.ok(acceptedResult);
+    assert.equal(acceptedResult.validation[0].status, 'pass');
+    const response = {
+      protocolVersion: 1,
+      commandId: 'approve',
+      actionId: 'part.workflow/respond',
+      actionVersion: 1,
+      input: { ticketId: waiting.waitingOn[0].id, revision: '0', response: true },
+    };
+    assert.equal((await engine.action(started.ref, response, context)).kind, 'completed');
+    assert.equal((await engine.action(started.ref, response, context)).kind, 'completed');
+    const done = await terminal(engine, started.ref);
+    assert.equal(done.phase, 'succeeded');
+    assert.equal(done.output.data.text, 'model-result');
+    assert.equal(done.guarantees.checkpoint, 'none');
+    const duplicate = await engine.start(
+      { requestId: 'another-id', idempotencyKey: 'code-start', prepared, input: {} },
+      context,
+    );
+    assert.equal(expectProperty(duplicate, 'ref').id, started.ref.id);
+    assert.equal(
+      (
+        await engine.start(
+          {
+            requestId: 'bad',
+            prepared: { ...prepared, definition: { ...prepared.definition, digest: 'forged' } },
+            input: {},
+          },
+          context,
+        )
+      ).kind,
+      'rejected',
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 test('GW04/W02/W04: pipeline enforces validation/assert before write and executes all required steps', async () => {
   let writes = 0;
   const handler = installStepHandler({

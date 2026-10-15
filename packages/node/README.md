@@ -1,9 +1,13 @@
 # @slop-lab/part-node
 
-Node.js adapters for part: POSIX script processes, authenticated loopback bridge,
+Node.js adapters for part: cross-platform script processes, authenticated loopback bridge,
 HTTP hosting, SQLite, immutable file artifacts and directory package snapshots.
 Depends only on the matching `@slop-lab/part` version. Node >=22.18 is required;
-process-group execution currently requires POSIX.
+scripts use process groups on POSIX and a Job Object supervisor on Windows.
+The Windows supervisor is compiled once and cached using the C# compiler included
+with .NET Framework 4.x; no separate native build tools or npm dependencies are needed.
+Normal exit, cancellation and timeouts terminate descendants, including Windows
+children detached from their immediate parent. Result channel fd 3 is preserved.
 
 ```js
 import { createNodeScripts } from '@slop-lab/part-node/scripts';

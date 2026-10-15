@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { windowsRunner } from './windows.js';
 import type { NodeScriptOptions } from './types.js';
 export async function runScriptProcess(
   options: NodeScriptOptions,
@@ -47,18 +48,43 @@ export async function runScriptProcess(
           error: bridgeEnvironment.error,
           effect: 'not-attempted',
         };
-      const child = spawn(interpreters[fixed.interpreter]!, [snapshot, ...fixed.args], {
-        cwd: workspace,
-        env: {
-          ...(fixed.environmentProfile ? environments[fixed.environmentProfile] : {}),
-          ...bridgeEnvironment.value,
+      const windows = process.platform === 'win32';
+      const interpreter = interpreters[fixed.interpreter]!;
+      let executable = interpreter;
+      if (windows) {
+        try {
+          executable = await windowsRunner();
+        } catch (error) {
+          return {
+            kind: 'failed',
+            effect: 'not-attempted',
+            error: fail(
+              'scripts.windows-runtime',
+              error instanceof Error ? error.message : 'Windows supervisor unavailable',
+              'unavailable',
+            ).error,
+          };
+        }
+      }
+      if (c.signal.aborted) return { kind: 'cancelled', effect: 'not-attempted' };
+      const child = spawn(
+        executable,
+        [...(windows ? [interpreter] : []), snapshot, ...fixed.args],
+        {
+          cwd: workspace,
+          env: {
+            ...(fixed.environmentProfile ? environments[fixed.environmentProfile] : {}),
+            ...bridgeEnvironment.value,
+          },
+          stdio: windows
+            ? ['pipe', 'pipe', 'pipe', fixed.capture.kind === 'channel' ? 'pipe' : 'ignore', 'pipe']
+            : fixed.capture.kind === 'channel'
+              ? ['pipe', 'pipe', 'pipe', 'pipe']
+              : ['pipe', 'pipe', 'pipe'],
+          detached: !windows,
+          windowsHide: true,
         },
-        stdio:
-          fixed.capture.kind === 'channel'
-            ? ['pipe', 'pipe', 'pipe', 'pipe']
-            : ['pipe', 'pipe', 'pipe'],
-        detached: true,
-      });
+      );
       processStarted = true;
       const stdout: Buffer[] = [];
       let channelBuffer = Buffer.alloc(0),
@@ -71,14 +97,25 @@ export async function runScriptProcess(
         truncated = false,
         spawnError = false,
         killTimer: ReturnType<typeof setTimeout> | undefined;
+      let launchAcknowledged = !windows;
+      let supervisorFailed = false;
+      if (windows) {
+        const control = child.stdio[4] as import('node:stream').Readable;
+        let message = '';
+        control.on('data', (chunk: Buffer) => {
+          message += chunk.toString('ascii');
+          launchAcknowledged = message === 'started\n';
+          supervisorFailed = message === 'failed\n';
+        });
+      }
       const terminate = () => {
         if (!child.pid) return;
         try {
-          process.kill(-child.pid, 'SIGTERM');
+          process.kill(windows ? child.pid : -child.pid, 'SIGTERM');
         } catch {}
         killTimer ??= setTimeout(() => {
           try {
-            process.kill(-child.pid!, 'SIGKILL');
+            process.kill(windows ? child.pid! : -child.pid!, 'SIGKILL');
           } catch {}
         }, 50);
       };
@@ -87,8 +124,8 @@ export async function runScriptProcess(
       child.on('error', () => {
         spawnError = true;
       });
-      child.stdin.on('error', () => {});
-      child.stdout.on('data', (chunk: Buffer) => {
+      child.stdin!.on('error', () => {});
+      child.stdout!.on('data', (chunk: Buffer) => {
         outBytes += chunk.length;
         if (outBytes <= maximum) stdout.push(chunk);
         else {
@@ -96,7 +133,7 @@ export async function runScriptProcess(
           terminate();
         }
       });
-      child.stderr.on('data', (chunk: Buffer) => {
+      child.stderr!.on('data', (chunk: Buffer) => {
         errorBytes += chunk.length;
         if (errorBytes > maximum) {
           truncated = true;
@@ -147,7 +184,7 @@ export async function runScriptProcess(
           }
         });
       }
-      child.stdin.end(fixed.stdin === undefined ? undefined : JSON.stringify(fixed.stdin));
+      child.stdin!.end(fixed.stdin === undefined ? undefined : JSON.stringify(fixed.stdin));
       if (c.signal.aborted) terminate();
       const exited = await new Promise<{ code: number | null; signal: string | null }>((resolve) =>
         child.on('close', (code, signal) => resolve({ code, signal })),
@@ -157,26 +194,33 @@ export async function runScriptProcess(
       let unresolved = false;
       if (child.pid) {
         try {
-          process.kill(-child.pid, 0);
+          process.kill(windows ? child.pid : -child.pid, 0);
           unresolved = true;
         } catch {}
       }
       if (unresolved) {
         try {
-          process.kill(-child.pid!, 'SIGKILL');
+          process.kill(windows ? child.pid! : -child.pid!, 'SIGKILL');
         } catch {}
         await new Promise((resolve) => setTimeout(resolve, 30));
         try {
-          process.kill(-child.pid!, 0);
+          process.kill(windows ? child.pid! : -child.pid!, 0);
         } catch {
           unresolved = false;
         }
       }
-      if (spawnError)
+      if (spawnError || supervisorFailed)
         return {
           kind: 'failed',
           effect: 'not-attempted',
           error: fail('scripts.spawn', 'Process did not start', 'unavailable').error,
+        };
+      if (!launchAcknowledged && !c.signal.aborted)
+        return {
+          kind: 'failed',
+          effect: fixed.effects === 'read' ? 'not-applied' : 'unknown',
+          error: fail('scripts.supervisor', 'Script launch acknowledgment was lost', 'unavailable')
+            .error,
         };
       const effect: Contracts.EffectState =
         fixed.effects === 'read'
@@ -192,7 +236,7 @@ export async function runScriptProcess(
           error: {
             code: 'part.scripts.process-tree',
             category: 'unavailable',
-            message: 'Process group termination is unconfirmed',
+            message: 'Process tree termination is unconfirmed',
             retry: 'after-reconciliation',
           },
         };

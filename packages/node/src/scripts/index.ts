@@ -146,12 +146,6 @@ export function createNodeScripts(options: NodeScriptOptions): NodeScriptService
       }
       if (context.signal.aborted)
         return fail('scripts.cancelled', 'Script cancelled before admission', 'cancelled');
-      if (process.platform === 'win32')
-        return fail(
-          'scripts.platform',
-          'This reference host requires POSIX process groups',
-          'unsupported',
-        );
       if (
         request.executorId !== 'part/node-process' ||
         !Object.hasOwn(interpreters, request.interpreter)
@@ -275,14 +269,14 @@ export function createNodeScripts(options: NodeScriptOptions): NodeScriptService
                   ? outcome.error
                   : fail(
                       'scripts.process-tree',
-                      'Process group termination is unconfirmed',
+                      'Process tree termination is unconfirmed',
                       'unavailable',
                       'unknown',
                     ).error,
               unsettledChildren: [
                 {
                   owner: 'part/node-process',
-                  kind: 'process-group',
+                  kind: 'process-tree',
                   id: String(unresolvedPid ?? attemptId),
                 },
               ],

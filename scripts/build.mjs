@@ -30,3 +30,9 @@ if (!selected || selected === 'browser')
     join(root, 'packages/browser/src/styles.css'),
     join(root, 'packages/browser/dist/styles.css'),
   );
+
+if (!selected || selected === 'node')
+  cpSync(
+    join(root, 'packages/node/src/scripts/windows-runner.cs'),
+    join(root, 'packages/node/dist/scripts/windows-runner.cs'),
+  );

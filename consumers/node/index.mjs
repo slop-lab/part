@@ -13,28 +13,26 @@ import { startAcpStdio } from '@slop-lab/part-node/acp';
 import { connectAcpMcpServers } from '@slop-lab/part-node/acp/mcp';
 const root = await mkdtemp(join(tmpdir(), 'part-node-consumer-'));
 try {
-  if (process.platform !== 'win32') {
-    const bytes = new TextEncoder().encode('process.stdout.write(JSON.stringify({ value: 42 }))');
-    await writeFile(join(root, 'task.cjs'), bytes);
-    const scripts = createNodeScripts({ root, interpreters: { node: process.execPath } });
-    const started = await scripts.execute(
-      {
-        requestId: 'consumer/script',
-        executorId: 'part/node-process',
-        source: { relativePath: 'task.cjs', digest: await digest(bytes) },
-        interpreter: 'node',
-        args: [],
-        effects: 'read',
-        retry: 'never',
-        capture: { kind: 'stdout-json', maxBytes: 1024 },
-      },
-      localContext(),
-    );
-    assert.equal(started.ok, true);
-    const outcome = await started.value.done;
-    assert.equal(outcome.phase, 'completed');
-    assert.deepEqual(expectProperty(outcome.result.captured, 'value'), { value: 42 });
-  }
+  const bytes = new TextEncoder().encode('process.stdout.write(JSON.stringify({ value: 42 }))');
+  await writeFile(join(root, 'task.cjs'), bytes);
+  const scripts = createNodeScripts({ root, interpreters: { node: process.execPath } });
+  const started = await scripts.execute(
+    {
+      requestId: 'consumer/script',
+      executorId: 'part/node-process',
+      source: { relativePath: 'task.cjs', digest: await digest(bytes) },
+      interpreter: 'node',
+      args: [],
+      effects: 'read',
+      retry: 'never',
+      capture: { kind: 'stdout-json', maxBytes: 1024 },
+    },
+    localContext(),
+  );
+  assert.equal(started.ok, true);
+  const outcome = await started.value.done;
+  assert.equal(outcome.phase, 'completed');
+  assert.deepEqual(expectProperty(outcome.result.captured, 'value'), { value: 42 });
   const request = { model: 'part-mock', messages: [{ role: 'user', content: 'packaged mock' }] };
   const mock = await startMockProvider({
     mode: 'fixed',

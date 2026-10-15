@@ -63,225 +63,221 @@ function composition() {
     'value',
   );
 }
-test(
-  'GW03/GW06: actual script -> managed child agent -> typed result -> approval applies pinned data once',
-  { skip: process.platform === 'win32' && 'Requires POSIX process groups' },
-  async () => {
-    const root = await mkdtemp(join(tmpdir(), 'part-vertical-')),
-      source = 'console.log(JSON.stringify({text:"collected"}));';
-    try {
-      await writeFile(join(root, 'collect.cjs'), source);
-      const operations = createOperations(),
-        model = fakeModel([{ text: 'reviewed' }]),
-        gateway = expectProperty(
-          createModelGateway({
-            profiles: [model.profile],
-            adapters: [model.adapter],
-            transports: [model.transport],
-            auth: { none: model.auth },
-            operations,
-          }),
-          'value',
-        );
-      const runs = expectProperty(
-        createRunService({
-          drivers: [installDriver(createBasicDriver({ profileId: 'fake' }))],
-          services: {
-            model: gateway,
-            context: expectProperty(createContextCompiler(), 'value'),
-            operations,
-            services: context.services,
-          },
+test('GW03/GW06: actual script -> managed child agent -> typed result -> approval applies pinned data once', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'part-vertical-')),
+    source = 'console.log(JSON.stringify({text:"collected"}));';
+  try {
+    await writeFile(join(root, 'collect.cjs'), source);
+    const operations = createOperations(),
+      model = fakeModel([{ text: 'reviewed' }]),
+      gateway = expectProperty(
+        createModelGateway({
+          profiles: [model.profile],
+          adapters: [model.adapter],
+          transports: [model.transport],
+          auth: { none: model.auth },
           operations,
         }),
         'value',
       );
-      const scripts = createNodeScripts({
-        root,
-        interpreters: { node: process.execPath },
+    const runs = expectProperty(
+      createRunService({
+        drivers: [installDriver(createBasicDriver({ profileId: 'fake' }))],
+        services: {
+          model: gateway,
+          context: expectProperty(createContextCompiler(), 'value'),
+          operations,
+          services: context.services,
+        },
         operations,
-      });
-      const results = expectProperty(
-        createResults([
-          { id: jsonSchema.ref.id, version: 1, schema: jsonSchema, mediaType: 'application/json' },
-        ]),
-        'value',
-      );
-      /** @type {import('@slop-lab/part/reference').Scripts.Request} */
-      const collect = {
-        requestId: 'collect',
-        executorId: 'part/node-process',
-        source: {
-          relativePath: 'collect.cjs',
-          digest: await digest(new TextEncoder().encode(source)),
-        },
-        interpreter: 'node',
-        args: [],
-        capture: { kind: 'stdout-json', maxBytes: 1024 },
-        effects: 'read',
-        retry: 'never',
-      };
-      const composed = composition();
-      /** @type {import('@slop-lab/part/reference').Runtime.WaitTicket} */
-      let ticket;
-      let applied = 0;
-      const code = await defineCodeWorkflow({
-        id: 'vertical',
-        version: '1',
-        input: jsonSchema,
-        output: jsonSchema,
-        replay: 'none',
-        async execute(input, c) {
-          const captured = await c.script(
-            await callIdentity(c.execution, 'collect', json(collect)),
-            collect,
-          );
-          if (captured.phase !== 'completed') return fail('test.collect', 'Collect failed');
-          const request = {
-            driver: 'part/basic',
-            composition: composed,
-            input: expectProperty(expectProperty(captured.result.captured, 'value'), 'text'),
-          };
-          const review = await c.agent(
-            await callIdentity(c.execution, 'agent', {
-              driver: request.driver,
-              input: request.input,
-              compositionRevision: composed.inspection.revision,
-            }),
-            request,
-          );
-          if (review.phase !== 'completed') return fail('test.agent', 'Agent failed');
-          /** @type {import('@slop-lab/part/reference').Results.Submission} */
-          const submission = {
-            submissionId: 'result',
-            expectedType: jsonSchema.ref,
-            data: {
-              kind: 'inline',
-              value: {
-                text: expectProperty(expectProperty(review.result, 'content')[0], 'text'),
-                input,
-              },
+      }),
+      'value',
+    );
+    const scripts = createNodeScripts({
+      root,
+      interpreters: { node: process.execPath },
+      operations,
+    });
+    const results = expectProperty(
+      createResults([
+        { id: jsonSchema.ref.id, version: 1, schema: jsonSchema, mediaType: 'application/json' },
+      ]),
+      'value',
+    );
+    /** @type {import('@slop-lab/part/reference').Scripts.Request} */
+    const collect = {
+      requestId: 'collect',
+      executorId: 'part/node-process',
+      source: {
+        relativePath: 'collect.cjs',
+        digest: await digest(new TextEncoder().encode(source)),
+      },
+      interpreter: 'node',
+      args: [],
+      capture: { kind: 'stdout-json', maxBytes: 1024 },
+      effects: 'read',
+      retry: 'never',
+    };
+    const composed = composition();
+    /** @type {import('@slop-lab/part/reference').Runtime.WaitTicket} */
+    let ticket;
+    let applied = 0;
+    const code = await defineCodeWorkflow({
+      id: 'vertical',
+      version: '1',
+      input: jsonSchema,
+      output: jsonSchema,
+      replay: 'none',
+      async execute(input, c) {
+        const captured = await c.script(
+          await callIdentity(c.execution, 'collect', json(collect)),
+          collect,
+        );
+        if (captured.phase !== 'completed') return fail('test.collect', 'Collect failed');
+        const request = {
+          driver: 'part/basic',
+          composition: composed,
+          input: expectProperty(expectProperty(captured.result.captured, 'value'), 'text'),
+        };
+        const review = await c.agent(
+          await callIdentity(c.execution, 'agent', {
+            driver: request.driver,
+            input: request.input,
+            compositionRevision: composed.inspection.revision,
+          }),
+          request,
+        );
+        if (review.phase !== 'completed') return fail('test.agent', 'Agent failed');
+        /** @type {import('@slop-lab/part/reference').Results.Submission} */
+        const submission = {
+          submissionId: 'result',
+          expectedType: jsonSchema.ref,
+          data: {
+            kind: 'inline',
+            value: {
+              text: expectProperty(expectProperty(review.result, 'content')[0], 'text'),
+              input,
             },
-            producedBy: { owner: c.execution.engine, kind: 'workflow', id: c.execution.id },
-            validationProfile: 'schema',
-          };
-          const accepted = await c.submit(
-            await callIdentity(c.execution, 'result', json(submission)),
-            submission,
-          );
-          if (accepted.ok === false) return accepted;
-          const spec = {
-            type: 'test/approve',
-            responseSchema: jsonSchema,
-            presentation: { prompt: 'Approve pinned result?' },
-            bindingDigest: accepted.value.digest,
-          };
-          const opened = await c.wait(
-            await callIdentity(
-              c.execution,
-              'approve',
-              json({
-                type: spec.type,
-                responseSchema: jsonSchema.ref,
-                presentation: spec.presentation,
-                bindingDigest: spec.bindingDigest,
-              }),
-            ),
-            spec,
-          );
-          if (opened.ok === false) return opened;
-          ticket = opened.value;
-          const response = await c.response(ticket);
-          if (response.ok === false) return response;
-          if (response.value !== true) return fail('test.denied', 'Approval declined');
-          applied++;
-          return ok(expectProperty(accepted.value.data, 'value'));
-        },
-      });
-      const engine = expectProperty(
-        createCodeEngine([code], {
-          operations,
-          scripts,
-          runs,
-          results,
-          waits: createSuspensions(),
-        }),
-        'value',
-      );
-      const prepared = expectProperty(
-        await engine.prepare(
-          {
-            engineId: engine.descriptor.id,
-            definition: {
-              id: code.definition.id,
-              format: 'part.code',
-              formatVersion: '1',
-              digest: code.digest,
-              source: { owner: 'test', native: {} },
-            },
-            profileId: 'default',
-            requiredCapabilities: [],
-            requiredControl: 'runner-enforced',
           },
-          context,
-        ),
-        'value',
-      );
-      const started = await engine.start(
+          producedBy: { owner: c.execution.engine, kind: 'workflow', id: c.execution.id },
+          validationProfile: 'schema',
+        };
+        const accepted = await c.submit(
+          await callIdentity(c.execution, 'result', json(submission)),
+          submission,
+        );
+        if (accepted.ok === false) return accepted;
+        const spec = {
+          type: 'test/approve',
+          responseSchema: jsonSchema,
+          presentation: { prompt: 'Approve pinned result?' },
+          bindingDigest: accepted.value.digest,
+        };
+        const opened = await c.wait(
+          await callIdentity(
+            c.execution,
+            'approve',
+            json({
+              type: spec.type,
+              responseSchema: jsonSchema.ref,
+              presentation: spec.presentation,
+              bindingDigest: spec.bindingDigest,
+            }),
+          ),
+          spec,
+        );
+        if (opened.ok === false) return opened;
+        ticket = opened.value;
+        const response = await c.response(ticket);
+        if (response.ok === false) return response;
+        if (response.value !== true) return fail('test.denied', 'Approval declined');
+        applied++;
+        return ok(expectProperty(accepted.value.data, 'value'));
+      },
+    });
+    const engine = expectProperty(
+      createCodeEngine([code], {
+        operations,
+        scripts,
+        runs,
+        results,
+        waits: createSuspensions(),
+      }),
+      'value',
+    );
+    const prepared = expectProperty(
+      await engine.prepare(
         {
-          requestId: 'one',
-          idempotencyKey: 'stable',
-          prepared,
-          input: { revision: 1 },
-          limits: { maxChildRuns: 1, maxModelInvocations: 1 },
+          engineId: engine.descriptor.id,
+          definition: {
+            id: code.definition.id,
+            format: 'part.code',
+            formatVersion: '1',
+            digest: code.digest,
+            source: { owner: 'test', native: {} },
+          },
+          profileId: 'default',
+          requiredCapabilities: [],
+          requiredControl: 'runner-enforced',
         },
         context,
-      );
-      await until(() => ticket !== undefined);
-      assert.equal(
-        (
-          await engine.start(
-            { requestId: 'changed', idempotencyKey: 'stable', prepared, input: { revision: 2 } },
-            context,
-          )
-        ).kind,
-        'rejected',
-      );
-      assert.ok(ticket);
-      const command = {
-        protocolVersion: 1,
-        commandId: 'approve',
-        actionId: 'part.workflow/respond',
-        actionVersion: 1,
-        input: { ticketId: ticket.id, revision: ticket.revision, response: true },
-      };
-      const receipts = await Promise.all([
-        engine.action(expectProperty(started, 'ref'), command, context),
-        engine.action(expectProperty(started, 'ref'), command, context),
-      ]);
-      assert.equal(receipts[0].kind, 'completed');
-      assert.equal(receipts[1].kind, 'completed');
-      await until(async () =>
-        ['succeeded', 'failed'].includes(
-          expectProperty(await engine.get(expectProperty(started, 'ref'), context), 'value').phase,
-        ),
-      );
-      const snapshot = expectProperty(
-        await engine.get(expectProperty(started, 'ref'), context),
-        'value',
-      );
-      assert.equal(snapshot.phase, 'succeeded');
-      assert.equal(applied, 1);
-      assert.equal(model.requests.length, 1);
-      assert.deepEqual(expectProperty(snapshot.output, 'data'), {
-        text: 'reviewed',
+      ),
+      'value',
+    );
+    const started = await engine.start(
+      {
+        requestId: 'one',
+        idempotencyKey: 'stable',
+        prepared,
         input: { revision: 1 },
-      });
-    } finally {
-      await rm(root, { recursive: true, force: true });
-    }
-  },
-);
+        limits: { maxChildRuns: 1, maxModelInvocations: 1 },
+      },
+      context,
+    );
+    await until(() => ticket !== undefined);
+    assert.equal(
+      (
+        await engine.start(
+          { requestId: 'changed', idempotencyKey: 'stable', prepared, input: { revision: 2 } },
+          context,
+        )
+      ).kind,
+      'rejected',
+    );
+    assert.ok(ticket);
+    const command = {
+      protocolVersion: 1,
+      commandId: 'approve',
+      actionId: 'part.workflow/respond',
+      actionVersion: 1,
+      input: { ticketId: ticket.id, revision: ticket.revision, response: true },
+    };
+    const receipts = await Promise.all([
+      engine.action(expectProperty(started, 'ref'), command, context),
+      engine.action(expectProperty(started, 'ref'), command, context),
+    ]);
+    assert.equal(receipts[0].kind, 'completed');
+    assert.equal(receipts[1].kind, 'completed');
+    await until(async () =>
+      ['succeeded', 'failed'].includes(
+        expectProperty(await engine.get(expectProperty(started, 'ref'), context), 'value').phase,
+      ),
+    );
+    const snapshot = expectProperty(
+      await engine.get(expectProperty(started, 'ref'), context),
+      'value',
+    );
+    assert.equal(snapshot.phase, 'succeeded');
+    assert.equal(applied, 1);
+    assert.equal(model.requests.length, 1);
+    assert.deepEqual(expectProperty(snapshot.output, 'data'), {
+      text: 'reviewed',
+      input: { revision: 1 },
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 test('GW08: hook timeout/failure policies, matcher, scope and concurrent once admission are explicit', async () => {
   const root = await mkdtemp(join(tmpdir(), 'part-hooks-matrix-'));
   try {

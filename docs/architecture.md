@@ -34,7 +34,7 @@ The repository is an npm workspace with four packages:
   model/tool ports, context, clients, generic storage and script bridge ports.
 - `packages/plugins` owns portable agent presets/drivers, providers, hooks/skills,
   script bridge policies, workflow engines and deterministic fake models.
-- `packages/node` owns POSIX process execution, authenticated loopback transport,
+- `packages/node` owns cross-platform process execution, authenticated loopback transport,
   HTTP hosting, SQLite, immutable file artifacts and directory snapshots.
 - `packages/browser` owns DOM/headless presentation and styles.
 
