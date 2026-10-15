@@ -1,0 +1,11 @@
+{
+  "kind": "completion",
+  "content": null,
+  "toolCalls": [
+    {
+      "id": "call_uppercase",
+      "name": "uppercase",
+      "arguments": "{\"text\":\"hello\"}"
+    }
+  ]
+}

@@ -1,0 +1,149 @@
+{
+  "provider": {
+    "schemaVersion": 1,
+    "mode": "fixed",
+    "project": {
+      "id": "part/mock-tool-flow"
+    },
+    "requests": [
+      {
+        "id": "request-1",
+        "project": {
+          "id": "part/mock-tool-flow"
+        },
+        "request": {
+          "stream": true,
+          "stream_options": {
+            "include_usage": true
+          },
+          "model": "part-mock",
+          "messages": [
+            {
+              "role": "user",
+              "content": "Uppercase hello using the uppercase tool."
+            }
+          ],
+          "tools": [
+            {
+              "type": "function",
+              "function": {
+                "name": "uppercase",
+                "description": "Convert text to uppercase",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["text"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          ]
+        },
+        "state": "responded",
+        "fixtureId": "choose-uppercase-tool",
+        "reply": {
+          "kind": "completion",
+          "content": null,
+          "toolCalls": [
+            {
+              "id": "call_uppercase",
+              "name": "uppercase",
+              "arguments": "{\"text\":\"hello\"}"
+            }
+          ]
+        },
+        "decisionId": "fixture/choose-uppercase-tool"
+      },
+      {
+        "id": "request-2",
+        "project": {
+          "id": "part/mock-tool-flow"
+        },
+        "request": {
+          "stream": true,
+          "stream_options": {
+            "include_usage": true
+          },
+          "model": "part-mock",
+          "messages": [
+            {
+              "role": "user",
+              "content": "Uppercase hello using the uppercase tool."
+            },
+            {
+              "role": "assistant",
+              "content": ""
+            },
+            {
+              "role": "assistant",
+              "content": null,
+              "tool_calls": [
+                {
+                  "id": "call_uppercase",
+                  "type": "function",
+                  "function": {
+                    "name": "uppercase",
+                    "arguments": "{\"text\":\"hello\"}"
+                  }
+                }
+              ]
+            },
+            {
+              "role": "tool",
+              "content": "\"HELLO\"",
+              "tool_call_id": "call_uppercase"
+            }
+          ],
+          "tools": [
+            {
+              "type": "function",
+              "function": {
+                "name": "uppercase",
+                "description": "Convert text to uppercase",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["text"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          ]
+        },
+        "state": "responded",
+        "fixtureId": "summarize-tool-result",
+        "reply": {
+          "kind": "completion",
+          "content": "HELLO",
+          "textChunks": ["HEL", "LO"],
+          "usage": {
+            "prompt_tokens": 30,
+            "completion_tokens": 2,
+            "total_tokens": 32
+          }
+        },
+        "decisionId": "fixture/summarize-tool-result"
+      }
+    ],
+    "failures": [],
+    "remaining": 0
+  },
+  "toolExecutions": [
+    {
+      "tool": "uppercase",
+      "input": {
+        "text": "hello"
+      },
+      "output": "HELLO"
+    }
+  ],
+  "output": "HELLO"
+}

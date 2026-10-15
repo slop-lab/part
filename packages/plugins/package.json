@@ -76,6 +76,10 @@
     "./testing": {
       "types": "./dist/testing/index.d.ts",
       "default": "./dist/testing/index.js"
+    },
+    "./providers/openai-compatible": {
+      "types": "./dist/providers/openai-compatible/index.d.ts",
+      "default": "./dist/providers/openai-compatible/index.js"
     }
   },
   "dependencies": {

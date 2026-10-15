@@ -1,0 +1,10 @@
+{
+  "kind": "completion",
+  "content": "HELLO",
+  "textChunks": ["HEL", "LO"],
+  "usage": {
+    "prompt_tokens": 30,
+    "completion_tokens": 2,
+    "total_tokens": 32
+  }
+}

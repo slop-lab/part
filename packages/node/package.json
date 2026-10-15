@@ -32,6 +32,14 @@
     "./artifacts": {
       "types": "./dist/artifacts.d.ts",
       "default": "./dist/artifacts.js"
+    },
+    "./testing/mock-provider": {
+      "types": "./dist/testing/mock-provider/index.d.ts",
+      "default": "./dist/testing/mock-provider/index.js"
+    },
+    "./testing/mock-provider/tools": {
+      "types": "./dist/testing/mock-provider/tools.d.ts",
+      "default": "./dist/testing/mock-provider/tools.js"
     }
   },
   "dependencies": {
@@ -43,5 +51,8 @@
   "scripts": {
     "build": "node ../../scripts/build.mjs node",
     "check": "tsc -b"
+  },
+  "bin": {
+    "part-mock-provider": "./dist/testing/mock-provider/cli.js"
   }
 }
