@@ -1,11 +1,11 @@
-import type { Contracts as C, Storage as S } from './reference.js';
+import type { Contracts, Storage } from './reference.js';
 import { ok, fail, canonical, isJson } from './contracts.js';
 export interface StoreData {
   revision: number;
-  state: Record<string, C.Versioned<S.StateValue>>;
-  journal: S.JournalEntry[];
-  changes: Record<string, { digest: string; receipt: S.CommitReceipt }>;
-  commands: Record<string, { requestDigest: string; receipt: C.Json }>;
+  state: Record<string, Contracts.Versioned<Storage.StateValue>>;
+  journal: Storage.JournalEntry[];
+  changes: Record<string, { digest: string; receipt: Storage.CommitReceipt }>;
+  commands: Record<string, { requestDigest: string; receipt: Contracts.Json }>;
 }
 export const initialStoreData = (): StoreData => ({
   revision: 0,
@@ -14,14 +14,14 @@ export const initialStoreData = (): StoreData => ({
   changes: {},
   commands: {},
 });
-export const addressKey = (address: S.StateAddress) =>
+export const addressKey = (address: Storage.StateAddress) =>
   canonical({ namespace: address.namespace, scope: { ...address.scope }, key: address.key });
 export function applyChanges(
   data: StoreData,
-  changes: S.ChangeSet,
+  changes: Storage.ChangeSet,
   id: string,
-  durability: C.CommitEvidence['durability'],
-): C.Result<{ data: StoreData; receipt: S.CommitReceipt }> {
+  durability: Contracts.CommitEvidence['durability'],
+): Contracts.Result<{ data: StoreData; receipt: Storage.CommitReceipt }> {
   if (
     !isJson(changes) ||
     !changes.id ||
@@ -29,7 +29,7 @@ export function applyChanges(
     !Array.isArray(changes.append)
   )
     return fail('storage.changes', 'Invalid change set');
-  const encoded = canonical(changes as unknown as C.Json),
+  const encoded = canonical(changes as unknown as Contracts.Json),
     existing = Object.hasOwn(data.changes, changes.id) ? data.changes[changes.id] : undefined;
   if (existing)
     return existing.digest === encoded
@@ -91,7 +91,7 @@ export function applyChanges(
     else delete next.state[key];
   }
   next.journal.push(...structuredClone(changes.append));
-  const receipt: S.CommitReceipt = {
+  const receipt: Storage.CommitReceipt = {
     owner: id,
     revision,
     durability,
@@ -114,17 +114,19 @@ export function applyChanges(
     });
   return ok({ data: next, receipt: structuredClone(receipt) });
 }
-export interface LocalStore extends S.StateJournalStore {
+export interface LocalStore extends Storage.StateJournalStore {
   close(): void;
-  commandReceipt(key: string): Promise<C.Result<{ requestDigest: string; receipt: C.Json } | null>>;
+  commandReceipt(
+    key: string,
+  ): Promise<Contracts.Result<{ requestDigest: string; receipt: Contracts.Json } | null>>;
 }
 export function storeFacade(
   id: string,
   durability: 'memory' | 'durable',
   access: <T>(
     write: boolean,
-    action: (data: StoreData) => C.Result<{ data: StoreData; value: T }>,
-  ) => C.Result<T>,
+    action: (data: StoreData) => Contracts.Result<{ data: StoreData; value: T }>,
+  ) => Contracts.Result<T>,
   close: () => void,
 ): LocalStore {
   return {

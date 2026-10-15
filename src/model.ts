@@ -1,4 +1,4 @@
-import type { Contracts as C, Model as M, Runtime as R } from './reference.js';
+import type { Contracts, Model, Runtime } from './reference.js';
 import { ok, fail, digest, freeze, isJson } from './contracts.js';
 import { createOperations, createBoundary, managedAttempt, budgetKey } from './runtime.js';
 import { costPolicyKey, costUnits } from './costs.js';
@@ -6,31 +6,31 @@ import type { CostEstimator } from './costs.js';
 import type { Operations } from './runtime.js';
 export { budgetKey } from './runtime.js';
 export function reserve(
-  context: C.InvocationContext,
+  context: Contracts.InvocationContext,
   dimension: string,
   quantity = 1,
-): C.Result<R.BudgetReservation | undefined> {
+): Contracts.Result<Runtime.BudgetReservation | undefined> {
   const budget = context.services.get(budgetKey);
   return budget.ok ? budget.value.reserve(dimension, quantity) : ok(undefined);
 }
 export function createModelGateway(options: {
-  profiles: readonly M.Profile[];
-  adapters: readonly M.Adapter[];
-  transports: readonly M.Transport[];
-  auth: Readonly<Record<string, M.AuthStrategy>>;
+  profiles: readonly Model.Profile[];
+  adapters: readonly Model.Adapter[];
+  transports: readonly Model.Transport[];
+  auth: Readonly<Record<string, Model.AuthStrategy>>;
   operations?: Operations;
-  boundary?: R.InvocationBoundary;
-  transforms?: readonly M.RequestTransform[];
+  boundary?: Runtime.InvocationBoundary;
+  transforms?: readonly Model.RequestTransform[];
   validateRequest?: (
-    request: M.EncodedRequest,
-    profile: M.Profile,
-    context: C.InvocationContext,
-  ) => Promise<C.Result<void>>;
-  inspect?: (inspection: M.RequestInspection) => void;
+    request: Model.EncodedRequest,
+    profile: Model.Profile,
+    context: Contracts.InvocationContext,
+  ) => Promise<Contracts.Result<void>>;
+  inspect?: (inspection: Model.RequestInspection) => void;
   maxResponseBytes?: number;
   compositionRevision?: string;
   costEstimator?: CostEstimator;
-}): C.Result<M.Gateway> {
+}): Contracts.Result<Model.Gateway> {
   const profiles = new Map(options.profiles.map((p) => [p.id, freeze(structuredClone(p))])),
     adapters = new Map(options.adapters.map((a) => [a.id, a])),
     transports = new Map(options.transports.map((t) => [t.id, t]));
@@ -79,10 +79,10 @@ export function createModelGateway(options: {
           'unsupported',
         );
       const fixed = freeze(structuredClone(request));
-      return operations.begin<M.Response>(
+      return operations.begin<Model.Response>(
         { kind: 'part/model', retryOwner: 'part/model', childPolicy: 'attached' },
         async (c) => {
-          const error = (failure: C.Failure): R.ManagedOutcome<M.Response> => ({
+          const error = (failure: Contracts.Failure): Runtime.ManagedOutcome<Model.Response> => ({
             phase: 'failed',
             error: failure,
             effect: 'not-attempted',
@@ -116,7 +116,7 @@ export function createModelGateway(options: {
             redactions: ['body', 'credentials'],
             transportId: transport.id,
           });
-          const effectPlan: R.EffectPlan = {
+          const effectPlan: Runtime.EffectPlan = {
             operationId: c.scope.id,
             attemptId,
             target: profile.id,
@@ -124,12 +124,13 @@ export function createModelGateway(options: {
             inputDigest: finalRequest.digest,
             scopeDigest: await digest({ principal: c.principal, scope: { ...c.scope } }),
             compositionRevision:
-              (c as C.InvocationContext & { compositionRevision?: string }).compositionRevision ??
+              (c as Contracts.InvocationContext & { compositionRevision?: string })
+                .compositionRevision ??
               options.compositionRevision ??
               'memory',
             classification: 'external',
           };
-          return managedAttempt<M.Response>(
+          return managedAttempt<Model.Response>(
             boundary,
             effectPlan,
             async () => {
@@ -221,13 +222,13 @@ export function createModelGateway(options: {
     },
   });
 }
-export const noAuth: M.AuthStrategy = {
+export const noAuth: Model.AuthStrategy = {
   async bind() {
     return ok({ strategy: 'none', material: undefined });
   },
 };
 /** Credential lookup is explicitly provided by the host; no process-global environment lookup. */
-export function bearerAuth(credential: () => Promise<string> | string): M.AuthStrategy {
+export function bearerAuth(credential: () => Promise<string> | string): Model.AuthStrategy {
   return {
     async bind() {
       try {
@@ -243,7 +244,7 @@ export function bearerAuth(credential: () => Promise<string> | string): M.AuthSt
 }
 export function createFetchTransport(
   options: { fetch?: typeof fetch; allowedOrigins?: readonly string[] } = {},
-): M.Transport {
+): Model.Transport {
   return {
     id: 'part/fetch',
     async send(request, profile, auth, context) {

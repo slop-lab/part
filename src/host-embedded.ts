@@ -1,21 +1,24 @@
 import type {
-  Contracts as C,
-  Client as L,
-  Convenience as V,
-  Context as X,
-  Model as M,
-  Runtime as R,
-  Projection as P,
+  Contracts,
+  Client,
+  Convenience,
+  Context,
+  Model,
+  Runtime,
+  Projection,
 } from './reference.js';
 import { ok, fail, localContext, stringSchema, schema, jsonSchema } from './contracts.js';
 import { createControl, installAction, installQuery } from './control.js';
 import { createWatchHub } from './client.js';
 export const nullSchema = schema<null>('part/null', (value): value is null => value === null);
 export function createEmbeddedEndpoint(
-  agent: V.Agent<string | readonly X.SemanticItem[], M.Response>,
-  options: { context?: C.InvocationContext; capabilities?: C.CapabilitySet } = {},
-): C.Result<
-  L.Endpoint & { hub: ReturnType<typeof createWatchHub>; close(): Promise<C.CleanupReport> }
+  agent: Convenience.Agent<string | readonly Context.SemanticItem[], Model.Response>,
+  options: { context?: Contracts.InvocationContext; capabilities?: Contracts.CapabilitySet } = {},
+): Contracts.Result<
+  Client.Endpoint & {
+    hub: ReturnType<typeof createWatchHub>;
+    close(): Promise<Contracts.CleanupReport>;
+  }
 > {
   const context = options.context ?? localContext(),
     composition = agent.inspectComposition();
@@ -33,19 +36,19 @@ export function createEmbeddedEndpoint(
     ],
   };
   const hub = createWatchHub(capabilities),
-    runs = new Map<string, R.ExecutionHandle<M.Response>>();
+    runs = new Map<string, Runtime.ExecutionHandle<Model.Response>>();
   let closed = false;
-  const allowed = (caller: C.InvocationContext) =>
+  const allowed = (caller: Contracts.InvocationContext) =>
     !closed &&
     caller.principal.subject === context.principal.subject &&
     caller.principal.authority === context.principal.authority;
   const descriptor = (
     id: string,
-    input: C.SchemaRef,
-    output: C.SchemaRef,
-    execution: C.ActionDescriptor['execution'],
+    input: Contracts.SchemaRef,
+    output: Contracts.SchemaRef,
+    execution: Contracts.ActionDescriptor['execution'],
     enabled = true,
-  ): C.ActionDescriptor => ({
+  ): Contracts.ActionDescriptor => ({
     id,
     version: 1,
     input,
@@ -81,8 +84,8 @@ export function createEmbeddedEndpoint(
         id: string,
         label: string,
         text: string,
-        actions: readonly C.ActionDescriptor[] = [],
-      ): P.Item => ({
+        actions: readonly Contracts.ActionDescriptor[] = [],
+      ): Projection.Item => ({
         id,
         type: 'part/message',
         schemaVersion: 1,
@@ -187,7 +190,7 @@ export function createEmbeddedEndpoint(
         ? {
             kind: 'completed' as const,
             commandId: request.commandId,
-            result: cancellation.value as unknown as C.Json,
+            result: cancellation.value as unknown as Contracts.Json,
             effect: 'not-applicable' as const,
             commit: [],
           }
@@ -202,14 +205,14 @@ export function createEmbeddedEndpoint(
         version: 1,
         input: nullSchema,
         output: jsonSchema,
-        read: async () => ok(capabilities as unknown as C.Json),
+        read: async () => ok(capabilities as unknown as Contracts.Json),
       }),
       installQuery({
         id: 'part/composition',
         version: 1,
         input: nullSchema,
         output: jsonSchema,
-        read: async () => ok(composition as unknown as C.Json),
+        read: async () => ok(composition as unknown as Contracts.Json),
       }),
       installQuery({
         id: 'part.run/get',
@@ -219,7 +222,7 @@ export function createEmbeddedEndpoint(
         read: async (id) => {
           const run = runs.get(id);
           return run
-            ? ok(run.snapshot() as unknown as C.Json)
+            ? ok(run.snapshot() as unknown as Contracts.Json)
             : fail('run.missing', 'Run not found');
         },
       }),
@@ -242,7 +245,7 @@ export function createEmbeddedEndpoint(
         return fail('endpoint.permission', 'Endpoint access denied', 'permission');
       if (request.queryId === 'part/actions' && request.version === 1) {
         const result = await control.value.describe(request.target, caller);
-        return result.ok ? ok(result.value as unknown as C.Json) : result;
+        return result.ok ? ok(result.value as unknown as Contracts.Json) : result;
       }
       return control.value.query(request, caller);
     },

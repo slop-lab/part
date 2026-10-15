@@ -1,9 +1,9 @@
-import type { Contracts as C, Client as L, UI as U } from './reference.js';
+import type { Contracts, Client, UI } from './reference.js';
 export function createComposer(options: {
-  invoke: (request: C.CommandRequest) => Promise<L.CommandDelivery>;
-  command: (draft: U.Draft) => C.CommandRequest;
-}): U.ComposerController {
-  let draft: U.Draft = { text: '', references: [], revision: 0 },
+  invoke: (request: Contracts.CommandRequest) => Promise<Client.CommandDelivery>;
+  command: (draft: UI.Draft) => Contracts.CommandRequest;
+}): UI.ComposerController {
+  let draft: UI.Draft = { text: '', references: [], revision: 0 },
     composing = false,
     pending = false;
   return {
@@ -53,8 +53,8 @@ export function createComposer(options: {
     },
   };
 }
-export function createScroll(): U.ScrollController & { contentChanged(): void } {
-  let state: U.ScrollState = { following: true, hasNewContent: false };
+export function createScroll(): UI.ScrollController & { contentChanged(): void } {
+  let state: UI.ScrollState = { following: true, hasNewContent: false };
   return {
     getState: () => ({ ...state }),
     onUserScroll(distance) {

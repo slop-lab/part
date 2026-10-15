@@ -1,8 +1,8 @@
-import type { Contracts as C, Model as M } from './reference.js';
+import type { Contracts, Model } from './reference.js';
 import { ok, fail, digest, isJson, isJsonObject } from './contracts.js';
 
 /** Ollama /api/chat NDJSON adapter; streaming text, thinking, and function tools. */
-export function createOllamaAdapter(): M.Adapter {
+export function createOllamaAdapter(): Model.Adapter {
   return {
     id: 'part/ollama',
     async encode(invocation, profile) {
@@ -18,7 +18,7 @@ export function createOllamaAdapter(): M.Adapter {
           'Hosted tools are unsupported by this adapter',
           'unsupported',
         );
-      const messages: C.Json[] = [];
+      const messages: Contracts.Json[] = [];
       for (const fragment of invocation.context.fragments) {
         let content = '',
           thinking = '';
@@ -39,7 +39,7 @@ export function createOllamaAdapter(): M.Adapter {
               'unsupported',
             );
         }
-        const message: Record<string, C.Json> = { role: fragment.role ?? 'user', content };
+        const message: Record<string, Contracts.Json> = { role: fragment.role ?? 'user', content };
         if (thinking) message.thinking = thinking;
         if (fragment.kind === 'tool-call') {
           const callPart = fragment.content.find((p) => p.kind === 'json');
@@ -106,12 +106,12 @@ export function createOllamaAdapter(): M.Adapter {
         text = '',
         thinking = '',
         terminal = false,
-        poisoned: C.Failure | undefined,
-        finish: C.Json = 'stop',
-        native: C.Json = {},
-        usage: M.Response['usage'] = {};
-      const calls: M.ToolCall[] = [];
-      const decodeLine = (line: string): C.Result<M.ProviderEvent[]> => {
+        poisoned: Contracts.Failure | undefined,
+        finish: Contracts.Json = 'stop',
+        native: Contracts.Json = {},
+        usage: Model.Response['usage'] = {};
+      const calls: Model.ToolCall[] = [];
+      const decodeLine = (line: string): Contracts.Result<Model.ProviderEvent[]> => {
         if (!line.trim()) return ok([]);
         if (terminal) return fail('ollama.trailing', 'Data after terminal provider response');
         let chunk: unknown;
@@ -126,7 +126,7 @@ export function createOllamaAdapter(): M.Adapter {
         if (typeof chunk.done !== 'boolean') return fail('ollama.chunk', 'Missing completion flag');
         const message = chunk.message;
         if (!isJsonObject(message)) return fail('ollama.message', 'Missing response message');
-        const events: M.ProviderEvent[] = [];
+        const events: Model.ProviderEvent[] = [];
         if (message.content !== undefined) {
           if (typeof message.content !== 'string')
             return fail('ollama.content', 'Invalid response content');
@@ -180,8 +180,8 @@ export function createOllamaAdapter(): M.Adapter {
         }
         return ok(events);
       };
-      const consume = (flush: boolean): C.Result<M.ProviderEvent[]> => {
-        const events: M.ProviderEvent[] = [];
+      const consume = (flush: boolean): Contracts.Result<Model.ProviderEvent[]> => {
+        const events: Model.ProviderEvent[] = [];
         while (buffered.includes('\n') || (flush && buffered.length)) {
           const index = buffered.indexOf('\n'),
             line = index < 0 ? buffered : buffered.slice(0, index);

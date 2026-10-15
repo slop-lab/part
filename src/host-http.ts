@@ -1,27 +1,29 @@
 import { createServer } from 'node:http';
 import type { IncomingMessage } from 'node:http';
 import { once } from 'node:events';
-import type { Contracts as C, Client as L } from './reference.js';
+import type { Contracts, Client } from './reference.js';
 import { ok, fail, isJsonObject } from './contracts.js';
 import { jsonCodec } from './client.js';
 import { commandSchema, querySchema } from './control.js';
 export async function startHttpHost(
-  endpoint: L.Endpoint,
+  endpoint: Client.Endpoint,
   options: {
     context(
       request: IncomingMessage,
-    ): Promise<C.Result<C.InvocationContext>> | C.Result<C.InvocationContext>;
+    ):
+      | Promise<Contracts.Result<Contracts.InvocationContext>>
+      | Contracts.Result<Contracts.InvocationContext>;
     host?: string;
     port?: number;
     maxBodyBytes?: number;
   },
-): Promise<C.Result<{ url: string; close(): Promise<void> }>> {
-  const watchers = new Set<L.WatchSession>();
+): Promise<Contracts.Result<{ url: string; close(): Promise<void> }>> {
+  const watchers = new Set<Client.WatchSession>();
   const server = createServer(async (request, response) => {
     const controller = new AbortController();
     response.on('close', () => controller.abort());
     const json = (status: number, data: unknown) => {
-      const encoded = jsonCodec.encode(data as C.Json);
+      const encoded = jsonCodec.encode(data as Contracts.Json);
       response.writeHead(status, { 'content-type': 'application/json' });
       response.end(encoded.ok ? encoded.value : '{"ok":false}');
     };
@@ -59,7 +61,10 @@ export async function startHttpHost(
           json(400, fail('command.envelope', 'Invalid command'));
           return;
         }
-        json(200, await endpoint.command(decoded.value as unknown as C.CommandRequest, context));
+        json(
+          200,
+          await endpoint.command(decoded.value as unknown as Contracts.CommandRequest, context),
+        );
         return;
       }
       if (request.url === '/queries') {
@@ -67,7 +72,10 @@ export async function startHttpHost(
           json(400, fail('query.envelope', 'Invalid query'));
           return;
         }
-        json(200, await endpoint.query(decoded.value as unknown as C.QueryRequest, context));
+        json(
+          200,
+          await endpoint.query(decoded.value as unknown as Contracts.QueryRequest, context),
+        );
         return;
       }
       if (request.url === '/events') {
@@ -75,7 +83,10 @@ export async function startHttpHost(
           json(400, fail('watch.envelope', 'Invalid watch request'));
           return;
         }
-        const watched = await endpoint.watch(decoded.value as unknown as L.WatchRequest, context);
+        const watched = await endpoint.watch(
+          decoded.value as unknown as Client.WatchRequest,
+          context,
+        );
         if (!watched.ok) {
           json(403, watched);
           return;

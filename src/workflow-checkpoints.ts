@@ -1,15 +1,15 @@
-import type { Contracts as C, Storage as D, Workflows as W } from './reference.js';
+import type { Contracts, Storage, Workflows } from './reference.js';
 import { ok, fail, canonical, isJson, freeze } from './contracts.js';
 import { provenance } from './context.js';
 /** A storage port only. Each engine still owns checkpoint eligibility and scheduling. */
 export function createCheckpointStore(
-  store: D.StateJournalStore,
+  store: Storage.StateJournalStore,
   namespace = 'part/workflow-checkpoints',
-): W.CheckpointStore {
-  const address = (ref: W.ExecutionRef): D.StateAddress => ({
+): Workflows.CheckpointStore {
+  const address = (ref: Workflows.ExecutionRef): Storage.StateAddress => ({
     namespace,
     scope: { kind: 'runtime', id: ref.engine },
-    key: canonical(ref as unknown as C.Json),
+    key: canonical(ref as unknown as Contracts.Json),
   });
   return {
     async read(ref, context) {
@@ -17,8 +17,8 @@ export function createCheckpointStore(
       if (!loaded.ok) return loaded;
       if (!loaded.value) return ok(null);
       const record = loaded.value.value.value as unknown as {
-        principal: C.InvocationContext['principal'];
-        checkpoint: W.Checkpoint;
+        principal: Contracts.InvocationContext['principal'];
+        checkpoint: Workflows.Checkpoint;
       };
       if (canonical(record.principal) !== canonical(context.principal))
         return fail('checkpoint.permission', 'Checkpoint access denied', 'permission');
@@ -42,8 +42,11 @@ export function createCheckpointStore(
       if (
         loaded.value &&
         canonical(
-          (loaded.value.value.value as unknown as { principal: C.InvocationContext['principal'] })
-            .principal,
+          (
+            loaded.value.value.value as unknown as {
+              principal: Contracts.InvocationContext['principal'];
+            }
+          ).principal,
         ) !== canonical(context.principal)
       )
         return fail('checkpoint.permission', 'Checkpoint access denied', 'permission');
@@ -56,7 +59,7 @@ export function createCheckpointStore(
               expected: expectedRevision,
               next: {
                 schemaVersion: 1,
-                value: { principal: context.principal, checkpoint } as unknown as C.Json,
+                value: { principal: context.principal, checkpoint } as unknown as Contracts.Json,
               },
             },
           ],
@@ -66,7 +69,7 @@ export function createCheckpointStore(
               type: 'part.workflow/checkpoint',
               version: 1,
               payload: {
-                execution: checkpoint.execution as unknown as C.Json,
+                execution: checkpoint.execution as unknown as Contracts.Json,
                 definitionDigest: checkpoint.definitionDigest,
               },
               provenance,

@@ -1,12 +1,12 @@
-import type { Contracts as C, Client as L, Projection as P, UI as U } from './reference.js';
+import type { Contracts, Client, Projection, UI } from './reference.js';
 import { orderSlots } from './ui-registry.js';
 export interface ArtifactReader {
   read(
-    ref: C.ArtifactRef,
-  ): Promise<C.Result<{ bytes: Uint8Array; mediaType: string; name?: string }>>;
+    ref: Contracts.ArtifactRef,
+  ): Promise<Contracts.Result<{ bytes: Uint8Array; mediaType: string; name?: string }>>;
 }
 export function createArtifactPreview(
-  ref: C.ArtifactRef,
+  ref: Contracts.ArtifactRef,
   reader: ArtifactReader,
   document: Document,
   maxBytes = 16 * 1024 * 1024,
@@ -60,10 +60,10 @@ export function createArtifactPreview(
   };
 }
 export function createInspector(options: {
-  client: L.Controller;
+  client: Client.Controller;
   document?: Document;
-  renderers?: readonly U.Renderer<C.Json, HTMLElement>[];
-  slots?: readonly U.SlotContribution<HTMLElement>[];
+  renderers?: readonly UI.Renderer<Contracts.Json, HTMLElement>[];
+  slots?: readonly UI.SlotContribution<HTMLElement>[];
   artifacts?: ArtifactReader;
   selected?: string;
   ownsClient?: boolean;
@@ -84,13 +84,13 @@ export function createInspector(options: {
   select.setAttribute('aria-label', 'Inspected item');
   root.append(select, content);
   let selected = options.selected,
-    shown: P.Item | undefined;
+    shown: Projection.Item | undefined;
   const previews: ReturnType<typeof createArtifactPreview>[] = [];
   function render() {
     const items = client
       .getState()
       .itemIds.map((id) => client.getItem(id))
-      .filter((item): item is P.Item => !!item);
+      .filter((item): item is Projection.Item => !!item);
     select.replaceChildren(
       ...items.map((item) => {
         const option = document.createElement('option');

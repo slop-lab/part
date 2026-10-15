@@ -1,11 +1,4 @@
-import type {
-  Contracts as C,
-  Workflows as W,
-  Runtime as R,
-  Model as M,
-  Scripts as S,
-  Results as O,
-} from './reference.js';
+import type { Contracts, Workflows, Runtime, Model, Scripts, Results } from './reference.js';
 import type { Operations, OperationContext } from './runtime.js';
 import { ok, fail, digest, canonical, jsonSchema, freeze, isJson } from './contracts.js';
 import { createOperations, budgetKey } from './runtime.js';
@@ -15,29 +8,35 @@ import { combineEffects } from './driver-basic.js';
 import { provenance } from './context.js';
 export interface WorkflowServices {
   readonly operations?: Operations;
-  readonly model?: M.Gateway;
-  readonly scripts?: S.Service;
-  readonly runs?: R.RunService;
-  readonly results?: O.Service;
-  readonly waits?: R.SuspensionPort;
+  readonly model?: Model.Gateway;
+  readonly scripts?: Scripts.Service;
+  readonly runs?: Runtime.RunService;
+  readonly results?: Results.Service;
+  readonly waits?: Runtime.SuspensionPort;
 }
 export interface PreparedRunner {
-  readonly input: C.Schema<C.Json>;
-  readonly output: C.Schema<C.Json>;
+  readonly input: Contracts.Schema<Contracts.Json>;
+  readonly output: Contracts.Schema<Contracts.Json>;
   execute(
-    input: C.Json,
-    steps: W.StepContext,
+    input: Contracts.Json,
+    steps: Workflows.StepContext,
     context: OperationContext,
-    record: (outcome: R.ManagedOutcome<unknown>) => void,
-  ): Promise<C.Result<C.Json>>;
+    record: (outcome: Runtime.ManagedOutcome<unknown>) => void,
+  ): Promise<Contracts.Result<Contracts.Json>>;
 }
-const stepScopes = new WeakMap<W.StepContext, (context: OperationContext) => W.StepContext>();
-export function scopeStepContext(steps: W.StepContext, context: OperationContext): W.StepContext {
+const stepScopes = new WeakMap<
+  Workflows.StepContext,
+  (context: OperationContext) => Workflows.StepContext
+>();
+export function scopeStepContext(
+  steps: Workflows.StepContext,
+  context: OperationContext,
+): Workflows.StepContext {
   const bind = stepScopes.get(steps);
   if (!bind) throw new Error('Step context cannot be rebound by this engine');
   return bind(context);
 }
-export const memoryGuarantees: W.Guarantees = freeze({
+export const memoryGuarantees: Workflows.Guarantees = freeze({
   control: 'runner-enforced',
   effects: 'runner-path-only',
   checkpoint: 'none',
@@ -49,49 +48,59 @@ export const memoryGuarantees: W.Guarantees = freeze({
   ],
 });
 export async function callIdentity(
-  execution: W.ExecutionRef,
+  execution: Workflows.ExecutionRef,
   stepKey: string,
-  input: C.Json,
+  input: Contracts.Json,
   iterationPath: readonly (string | number)[] = [],
   attempt = 1,
-): Promise<W.CallIdentity> {
+): Promise<Workflows.CallIdentity> {
   return { workflow: execution, stepKey, iterationPath, attempt, inputDigest: await digest(input) };
 }
 export function createMemoryWorkflowEngine(options: {
-  descriptor: W.EngineDescriptor;
+  descriptor: Workflows.EngineDescriptor;
   services: WorkflowServices;
   compile(
-    request: W.PrepareRequest,
-    context: C.InvocationContext,
-  ): Promise<C.Result<PreparedRunner>>;
+    request: Workflows.PrepareRequest,
+    context: Contracts.InvocationContext,
+  ): Promise<Contracts.Result<PreparedRunner>>;
   profileIds?: readonly string[];
-}): W.Engine {
+}): Workflows.Engine {
   options = {
     ...options,
     descriptor: freeze(structuredClone(options.descriptor)),
     services: { ...options.services },
   };
-  const issued = new WeakSet<W.Prepared>();
-  const pendingSubmissions = new Map<string, Promise<W.Submission>>();
+  const issued = new WeakSet<Workflows.Prepared>();
+  const pendingSubmissions = new Map<string, Promise<Workflows.Submission>>();
   const operations = options.services.operations ?? createOperations(),
     preparedTokens = new WeakMap<object, PreparedRunner>();
   interface Execution {
-    ref: W.ExecutionRef;
-    prepared: W.Prepared;
-    context: C.InvocationContext;
-    handle: R.ExecutionHandle<C.Json>;
-    native: C.Json;
+    ref: Workflows.ExecutionRef;
+    prepared: Workflows.Prepared;
+    context: Contracts.InvocationContext;
+    handle: Runtime.ExecutionHandle<Contracts.Json>;
+    native: Contracts.Json;
     nativeRevision: number;
-    waits: Map<string, { ticket: R.WaitTicket; schema: C.Schema<C.Json>; presentation: C.Json }>;
-    active: Set<C.EntityRef>;
-    output?: W.Output;
+    waits: Map<
+      string,
+      {
+        ticket: Runtime.WaitTicket;
+        schema: Contracts.Schema<Contracts.Json>;
+        presentation: Contracts.Json;
+      }
+    >;
+    active: Set<Contracts.EntityRef>;
+    output?: Workflows.Output;
   }
   const executions = new Map<string, Execution>(),
-    submissions = new Map<string, { digest: string; ref: W.ExecutionRef }>();
-  const authorized = (execution: Execution, context: C.InvocationContext) =>
+    submissions = new Map<string, { digest: string; ref: Workflows.ExecutionRef }>();
+  const authorized = (execution: Execution, context: Contracts.InvocationContext) =>
     execution.context.principal.subject === context.principal.subject &&
     execution.context.principal.authority === context.principal.authority;
-  const getExecution = (ref: W.ExecutionRef, context: C.InvocationContext): C.Result<Execution> => {
+  const getExecution = (
+    ref: Workflows.ExecutionRef,
+    context: Contracts.InvocationContext,
+  ): Contracts.Result<Execution> => {
     const execution = executions.get(ref.id);
     return !execution ||
       ref.engine !== options.descriptor.id ||
@@ -101,7 +110,7 @@ export function createMemoryWorkflowEngine(options: {
         ? ok(execution)
         : fail('workflow.permission', 'Workflow access denied', 'permission');
   };
-  const snapshot = (execution: Execution): W.Snapshot => {
+  const snapshot = (execution: Execution): Workflows.Snapshot => {
     const state = execution.handle.snapshot(),
       phase = (
         {
@@ -176,7 +185,7 @@ export function createMemoryWorkflowEngine(options: {
       if (!runner.ok) return runner;
       const localHandle = {};
       preparedTokens.set(localHandle, runner.value);
-      const prepared: W.Prepared = freeze({
+      const prepared: Workflows.Prepared = freeze({
         definition: structuredClone(request.definition),
         engine: structuredClone(options.descriptor),
         compositionRevision: options.descriptor.capabilities.revision,
@@ -238,7 +247,7 @@ export function createMemoryWorkflowEngine(options: {
         submissionDigest = await digest({
           definition: request.prepared.definition.digest,
           input: request.input,
-          limits: (request.limits as unknown as C.Json) ?? null,
+          limits: (request.limits as unknown as Contracts.Json) ?? null,
         });
       const prior = submissions.get(key);
       if (prior) {
@@ -260,7 +269,7 @@ export function createMemoryWorkflowEngine(options: {
       if (!parsedLimits.ok) return { kind: 'rejected', error: parsedLimits.error };
       const numeric = parsedLimits.value;
       const budget = createChildBudget(context, numeric);
-      const services: C.ServiceAccess = {
+      const services: Contracts.ServiceAccess = {
         get(key) {
           return key.id === budgetKey.id ? ok(budget as never) : context.services.get(key);
         },
@@ -277,26 +286,30 @@ export function createMemoryWorkflowEngine(options: {
         services: guarded.value,
         ...(deadlines.length ? { deadline: new Date(Math.min(...deadlines)).toISOString() } : {}),
       };
-      const ref: W.ExecutionRef = freeze({
+      const ref: Workflows.ExecutionRef = freeze({
         engine: options.descriptor.id,
         engineVersion: options.descriptor.version,
         id: crypto.randomUUID(),
       });
       const waiting = new Map<
           string,
-          { ticket: R.WaitTicket; schema: C.Schema<C.Json>; presentation: C.Json }
+          {
+            ticket: Runtime.WaitTicket;
+            schema: Contracts.Schema<Contracts.Json>;
+            presentation: Contracts.Json;
+          }
         >(),
-        active = new Set<C.EntityRef>();
+        active = new Set<Contracts.EntityRef>();
       let execution: Execution | undefined;
-      let resolveSubmission!: (result: W.Submission) => void;
+      let resolveSubmission!: (result: Workflows.Submission) => void;
       submissions.set(key, { digest: submissionDigest, ref });
       pendingSubmissions.set(
         key,
-        new Promise<W.Submission>((resolve) => {
+        new Promise<Workflows.Submission>((resolve) => {
           resolveSubmission = resolve;
         }),
       );
-      const started = await operations.begin<C.Json>(
+      const started = await operations.begin<Contracts.Json>(
         {
           kind: 'part/workflow',
           childPolicy: 'attached',
@@ -304,12 +317,12 @@ export function createMemoryWorkflowEngine(options: {
           ...(request.parent ? { parent: request.parent } : {}),
         },
         async (operationContext) => {
-          let effect: C.EffectState = 'not-attempted';
-          const commit: C.CommitEvidence[] = [];
+          let effect: Contracts.EffectState = 'not-attempted';
+          const commit: Contracts.CommitEvidence[] = [];
           const memo = new Map<string, { digest: string; pending: Promise<unknown> }>();
           const memoize = async <T>(
-            identity: W.CallIdentity,
-            input: C.Json,
+            identity: Workflows.CallIdentity,
+            input: Contracts.Json,
             body: () => Promise<T>,
           ): Promise<T> => {
             if (
@@ -351,7 +364,7 @@ export function createMemoryWorkflowEngine(options: {
             memo.set(key, { digest: fingerprint, pending });
             return pending;
           };
-          const missing = (name: string): R.ManagedOutcome<never> => ({
+          const missing = (name: string): Runtime.ManagedOutcome<never> => ({
             phase: 'failed',
             error: fail('workflow.service', `${name} is not installed`, 'unsupported').error,
             effect: 'not-attempted',
@@ -359,8 +372,8 @@ export function createMemoryWorkflowEngine(options: {
             unsettledChildren: [],
           });
           const runHandle = async <T>(
-            result: C.Result<R.ExecutionHandle<T>>,
-          ): Promise<R.ManagedOutcome<T>> => {
+            result: Contracts.Result<Runtime.ExecutionHandle<T>>,
+          ): Promise<Runtime.ManagedOutcome<T>> => {
             if (!result.ok)
               return {
                 phase: 'failed',
@@ -376,13 +389,13 @@ export function createMemoryWorkflowEngine(options: {
             commit.push(...outcome.commit);
             return outcome;
           };
-          const makeStepContext = (invocation: OperationContext): W.StepContext => {
-            const scoped: W.StepContext = {
+          const makeStepContext = (invocation: OperationContext): Workflows.StepContext => {
+            const scoped: Workflows.StepContext = {
               execution: ref,
               signal: invocation.signal,
               limits: request.limits ?? {},
               script: (identity, input) =>
-                memoize(identity, input as unknown as C.Json, async () => {
+                memoize(identity, input as unknown as Contracts.Json, async () => {
                   const outcome = options.services.scripts
                     ? await runHandle(await options.services.scripts.execute(input, invocation))
                     : missing('scripts');
@@ -403,7 +416,7 @@ export function createMemoryWorkflowEngine(options: {
                   return outcome;
                 }),
               model: (identity, input) =>
-                memoize(identity, input as unknown as C.Json, async () =>
+                memoize(identity, input as unknown as Contracts.Json, async () =>
                   options.services.model
                     ? runHandle(await options.services.model.invoke(input, invocation))
                     : missing('model'),
@@ -422,7 +435,7 @@ export function createMemoryWorkflowEngine(options: {
                       : missing('runs'),
                 ),
               submit: (identity, input) =>
-                memoize(identity, input as unknown as C.Json, async () =>
+                memoize(identity, input as unknown as Contracts.Json, async () =>
                   input.producedBy.id !== ref.id || input.producedBy.owner !== ref.engine
                     ? Promise.resolve(
                         fail(
@@ -495,7 +508,7 @@ export function createMemoryWorkflowEngine(options: {
             return scoped;
           };
           const stepContext = makeStepContext(operationContext);
-          let result: C.Result<C.Json>;
+          let result: Contracts.Result<Contracts.Json>;
           try {
             result = await runner.execute(
               structuredClone(checked.value),
@@ -562,7 +575,7 @@ export function createMemoryWorkflowEngine(options: {
         c,
       );
       if (!started.ok) {
-        const result: W.Submission = { kind: 'rejected', error: started.error };
+        const result: Workflows.Submission = { kind: 'rejected', error: started.error };
         resolveSubmission(result);
         pendingSubmissions.delete(key);
         submissions.delete(key);
@@ -580,7 +593,11 @@ export function createMemoryWorkflowEngine(options: {
       };
       executions.set(ref.id, execution);
       submissions.set(key, { digest: submissionDigest, ref });
-      const accepted: W.Submission = { kind: 'accepted', ref, snapshot: snapshot(execution) };
+      const accepted: Workflows.Submission = {
+        kind: 'accepted',
+        ref,
+        snapshot: snapshot(execution),
+      };
       resolveSubmission(accepted);
       pendingSubmissions.delete(key);
       return accepted;
@@ -601,7 +618,7 @@ export function createMemoryWorkflowEngine(options: {
     },
     async action(ref, command, context) {
       const result = getExecution(ref, context),
-        rejected = (error: C.Failure): C.CommandReceipt => ({
+        rejected = (error: Contracts.Failure): Contracts.CommandReceipt => ({
           kind: 'rejected',
           commandId: command.commandId,
           error,
@@ -616,7 +633,7 @@ export function createMemoryWorkflowEngine(options: {
       const input = command.input as unknown as {
         ticketId: string;
         revision: string;
-        response: C.Json;
+        response: Contracts.Json;
       };
       const entry = input && result.value.waits.get(input.ticketId);
       if (!entry || entry.ticket.revision !== input.revision)
@@ -631,7 +648,7 @@ export function createMemoryWorkflowEngine(options: {
       return {
         kind: 'completed',
         commandId: command.commandId,
-        result: responded.value as unknown as C.Json,
+        result: responded.value as unknown as Contracts.Json,
         effect: 'not-applicable',
         commit: [],
       };

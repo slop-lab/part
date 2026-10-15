@@ -1,4 +1,4 @@
-import type { Contracts as C, Workflows as W, Composition as P } from './reference.js';
+import type { Contracts, Workflows, Composition } from './reference.js';
 import type { WorkflowServices } from './workflow-memory.js';
 import { createMemoryWorkflowEngine, callIdentity } from './workflow-memory.js';
 import { ok, fail, digest, isJson } from './contracts.js';
@@ -6,8 +6,8 @@ export interface RecipeDefinition {
   readonly id: string;
   readonly format: 'part.recipe';
   readonly version: 1;
-  readonly input: C.SchemaRef;
-  readonly output: C.SchemaRef;
+  readonly input: Contracts.SchemaRef;
+  readonly output: Contracts.SchemaRef;
   readonly agentProfile: string;
   readonly maxAttempts: number;
   readonly retry: 'never' | 'read-only-validation';
@@ -15,16 +15,23 @@ export interface RecipeDefinition {
 /** A recipe retries only explicitly declared read-only agent validation, never publish effects. */
 export function createRecipeEngine(options: {
   definitions: readonly RecipeDefinition[];
-  schemas: readonly C.Schema<C.Json>[];
+  schemas: readonly Contracts.Schema<Contracts.Json>[];
   agents: Readonly<
     Record<
       string,
-      { driver: string; composition: P.CompositionHandle; effects: 'read' | 'write' | 'unknown' }
+      {
+        driver: string;
+        composition: Composition.CompositionHandle;
+        effects: 'read' | 'write' | 'unknown';
+      }
     >
   >;
   services: WorkflowServices;
-  check?: (output: C.Json, context: W.StepContext) => Promise<C.Result<C.Json>>;
-}): C.Result<W.Engine> {
+  check?: (
+    output: Contracts.Json,
+    context: Workflows.StepContext,
+  ) => Promise<Contracts.Result<Contracts.Json>>;
+}): Contracts.Result<Workflows.Engine> {
   const definitions = new Map(options.definitions.map((d) => [d.id, structuredClone(d)]));
   const schemas = new Map(options.schemas.map((s) => [`${s.ref.id}@${s.ref.version}`, s]));
   const agents = { ...options.agents };
@@ -74,7 +81,7 @@ export function createRecipeEngine(options: {
           )
         )
           return fail('recipe.definition', 'Invalid or uninstalled recipe');
-        if ((await digest(definition as unknown as C.Json)) !== request.definition.digest)
+        if ((await digest(definition as unknown as Contracts.Json)) !== request.definition.digest)
           return fail('recipe.digest', 'Recipe digest mismatch', 'conflict');
         const input = schemas.get(`${definition.input.id}@${definition.input.version}`),
           output = schemas.get(`${definition.output.id}@${definition.output.version}`),

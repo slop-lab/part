@@ -1,10 +1,10 @@
 import { DatabaseSync } from 'node:sqlite';
-import type { Contracts as C } from './reference.js';
+import type { Contracts } from './reference.js';
 import { ok, fail, isJson } from './contracts.js';
 import { initialStoreData, storeFacade } from './storage-memory.js';
 import type { StoreData, LocalStore } from './storage-memory.js';
 /** Explicitly opens a single local database. No resource is created on import. */
-export function openSqliteStore(path: string, id = 'part/sqlite'): C.Result<LocalStore> {
+export function openSqliteStore(path: string, id = 'part/sqlite'): Contracts.Result<LocalStore> {
   let database: DatabaseSync;
   try {
     database = new DatabaseSync(path);

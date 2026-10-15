@@ -1,9 +1,9 @@
-import type { Contracts as C, Storage as D } from './reference.js';
+import type { Contracts, Storage } from './reference.js';
 import { ok, fail, digest, canonical, freeze, isJson } from './contracts.js';
 
 export interface ArtifactRecord {
-  metadata: D.ArtifactMetadata;
-  principal: C.InvocationContext['principal'];
+  metadata: Storage.ArtifactMetadata;
+  principal: Contracts.InvocationContext['principal'];
   bytes: Uint8Array;
   digest: string;
 }
@@ -17,7 +17,7 @@ export interface ArtifactBackend {
 export function createArtifactStore(
   backend: ArtifactBackend,
   maxBytes = 16 * 1024 * 1024,
-): D.ArtifactStore {
+): Storage.ArtifactStore {
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1)
     throw new TypeError('Invalid artifact limit');
   return {
@@ -34,7 +34,7 @@ export function createArtifactStore(
       const chunks: Uint8Array[] = [];
       let size = 0,
         state: 'open' | 'finalizing' | 'finalized' | 'aborted' = 'open';
-      let finalized: D.FinalizedArtifact | undefined;
+      let finalized: Storage.FinalizedArtifact | undefined;
       const abort = () => {
         if (state === 'open') {
           state = 'aborted';
@@ -136,7 +136,7 @@ export function createArtifactStore(
 }
 export function createMemoryArtifacts(
   options: { id?: string; maxBytes?: number } = {},
-): D.ArtifactStore {
+): Storage.ArtifactStore {
   const records = new Map<string, ArtifactRecord>();
   return createArtifactStore(
     {

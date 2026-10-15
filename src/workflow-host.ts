@@ -1,17 +1,19 @@
-import type { Contracts as C, Composition as P, Workflows as W } from './reference.js';
+import type { Contracts, Composition, Workflows } from './reference.js';
 import { ok, fail } from './contracts.js';
-export const enginesPoint: P.ExtensionPoint<W.Engine> = {
+export const enginesPoint: Composition.ExtensionPoint<Workflows.Engine> = {
   id: 'part.workflow/engines',
   owner: 'part/workflow-host',
   contractVersion: 1,
   kind: 'registry',
   scope: 'runtime',
 };
-export function createWorkflowHost(engines: readonly W.Engine[]): C.Result<W.Host> {
+export function createWorkflowHost(
+  engines: readonly Workflows.Engine[],
+): Contracts.Result<Workflows.Host> {
   const registry = new Map(engines.map((engine) => [engine.descriptor.id, engine]));
   if (registry.size !== engines.length)
     return fail('workflow.duplicate', 'Duplicate workflow engine', 'conflict');
-  const resolve = (id: string): C.Result<W.Engine> =>
+  const resolve = (id: string): Contracts.Result<Workflows.Engine> =>
     registry.has(id)
       ? ok(registry.get(id)!)
       : fail('workflow.engine', `Engine not installed: ${id}`, 'unsupported');

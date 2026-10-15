@@ -1,15 +1,15 @@
 import { scheduleDeadline } from './deadline.js';
-import type { Contracts as C, Runtime as R } from './reference.js';
+import type { Contracts, Runtime } from './reference.js';
 import { ok, fail, digest, isJson } from './contracts.js';
 
-export const budgetKey: C.ServiceKey<R.BudgetPort> = {
+export const budgetKey: Contracts.ServiceKey<Runtime.BudgetPort> = {
   id: 'part/budget',
   contractVersion: 1,
   scope: 'run',
 };
-export function createBudget(limits: Readonly<Record<string, number>> = {}): R.BudgetPort {
+export function createBudget(limits: Readonly<Record<string, number>> = {}): Runtime.BudgetPort {
   const used = new Map<string, number>(),
-    reservations = new Map<string, R.BudgetReservation>();
+    reservations = new Map<string, Runtime.BudgetReservation>();
   return {
     reserve(dimension, quantity) {
       if (!Number.isFinite(quantity) || quantity < 0)
@@ -44,12 +44,12 @@ export function createBudget(limits: Readonly<Record<string, number>> = {}): R.B
 export function createProgress(defaultCapacity = 64) {
   let index = 0,
     ended = false;
-  type Reader = { queue: R.Update[]; wake?: () => void; capacity: number; closed: boolean };
+  type Reader = { queue: Runtime.Update[]; wake?: () => void; capacity: number; closed: boolean };
   const readers = new Set<Reader>();
-  const publish: R.ProgressSink['publish'] = (type, payload) => {
+  const publish: Runtime.ProgressSink['publish'] = (type, payload) => {
     if (ended) return ok({ accepted: false, dropped: 0 });
     if (!isJson(payload)) return fail('progress.payload', 'Progress payload must be lossless JSON');
-    const update: R.Update = {
+    const update: Runtime.Update = {
       kind: 'data',
       index: ++index,
       type,
@@ -80,7 +80,9 @@ export function createProgress(defaultCapacity = 64) {
       ended = true;
       for (const reader of readers) reader.wake?.();
     },
-    observe(options: { signal?: AbortSignal; bufferSize?: number } = {}): AsyncIterable<R.Update> {
+    observe(
+      options: { signal?: AbortSignal; bufferSize?: number } = {},
+    ): AsyncIterable<Runtime.Update> {
       return {
         [Symbol.asyncIterator]() {
           const reader: Reader = {
@@ -129,19 +131,19 @@ export function createProgress(defaultCapacity = 64) {
     },
   };
 }
-export type OperationContext = C.InvocationContext & {
-  readonly progress: R.ProgressSink;
+export type OperationContext = Contracts.InvocationContext & {
+  readonly progress: Runtime.ProgressSink;
   wait<T>(pending: Promise<T>): Promise<T>;
 };
-export interface Operations extends R.OperationService {
+export interface Operations extends Runtime.OperationService {
   begin<T>(
-    spec: R.OperationSpec,
-    body: (context: OperationContext) => Promise<R.ManagedOutcome<T>>,
-    context: C.InvocationContext,
-  ): Promise<C.Result<R.ExecutionHandle<T>>>;
-  get(ref: C.EntityRef): C.Result<R.ExecutionSnapshot>;
+    spec: Runtime.OperationSpec,
+    body: (context: OperationContext) => Promise<Runtime.ManagedOutcome<T>>,
+    context: Contracts.InvocationContext,
+  ): Promise<Contracts.Result<Runtime.ExecutionHandle<T>>>;
+  get(ref: Contracts.EntityRef): Contracts.Result<Runtime.ExecutionSnapshot>;
 }
-export const operationOwnerKey: C.ServiceKey<Operations> = {
+export const operationOwnerKey: Contracts.ServiceKey<Operations> = {
   id: 'part/operation-owner',
   contractVersion: 1,
   scope: 'operation',
@@ -152,11 +154,11 @@ export function createOperations(
   const records = new Map<
     string,
     {
-      handle: R.ExecutionHandle<unknown>;
+      handle: Runtime.ExecutionHandle<unknown>;
       children: Set<string>;
       controller: AbortController;
       deadline?: string;
-      services: C.ServiceAccess;
+      services: Contracts.ServiceAccess;
     }
   >();
   const grace = options.cancellationGraceMs ?? 100;
@@ -168,9 +170,9 @@ export function createOperations(
         : fail('operation.missing', ref.id);
     },
     async begin<T>(
-      spec: R.OperationSpec,
-      body: (context: OperationContext) => Promise<R.ManagedOutcome<T>>,
-      parentContext: C.InvocationContext,
+      spec: Runtime.OperationSpec,
+      body: (context: OperationContext) => Promise<Runtime.ManagedOutcome<T>>,
+      parentContext: Contracts.InvocationContext,
     ) {
       const owner =
         parentContext.scope.kind === 'operation'
@@ -218,14 +220,14 @@ export function createOperations(
           ? budget.value.reserve('maxConcurrentOperations', 1)
           : ok(undefined);
       if (!concurrency.ok) return concurrency;
-      const ref: C.EntityRef = Object.freeze({
+      const ref: Contracts.EntityRef = Object.freeze({
         owner: 'part/operations',
         kind: spec.kind,
         id: crypto.randomUUID(),
       });
       const controller = new AbortController(),
         progress = createProgress();
-      let snapshot: R.ExecutionSnapshot = {
+      let snapshot: Runtime.ExecutionSnapshot = {
         ref,
         revision: '0',
         phase: 'pending',
@@ -237,16 +239,16 @@ export function createOperations(
         finished = false,
         cancelTimer: ReturnType<typeof setTimeout> | undefined,
         cancelDeadline: (() => void) | undefined;
-      let resolveDone!: (value: R.ManagedOutcome<T>) => void;
-      const done = new Promise<R.ManagedOutcome<T>>((resolve) => {
+      let resolveDone!: (value: Runtime.ManagedOutcome<T>) => void;
+      const done = new Promise<Runtime.ManagedOutcome<T>>((resolve) => {
         resolveDone = resolve;
       });
       const children = new Set<string>();
-      const update = (change: Partial<R.ExecutionSnapshot>) => {
+      const update = (change: Partial<Runtime.ExecutionSnapshot>) => {
         snapshot = { ...snapshot, ...change, revision: String(++revision) };
-        progress.publish('part.operation/state', snapshot as unknown as C.Json);
+        progress.publish('part.operation/state', snapshot as unknown as Contracts.Json);
       };
-      const finish = (outcome: R.ManagedOutcome<T>) => {
+      const finish = (outcome: Runtime.ManagedOutcome<T>) => {
         if (finished) return;
         finished = true;
         if (budget.ok && concurrency.value && outcome.phase !== 'abandoned')
@@ -255,7 +257,7 @@ export function createOperations(
         cancelDeadline?.();
         parentContext.signal.removeEventListener('abort', abort);
         parent?.controller.signal.removeEventListener('abort', abort);
-        const cancel: R.Cancellation = controller.signal.aborted
+        const cancel: Runtime.Cancellation = controller.signal.aborted
           ? {
               state:
                 outcome.phase === 'abandoned' || outcome.unsettledChildren.length
@@ -289,7 +291,9 @@ export function createOperations(
               records.delete(id);
           }
       };
-      const requestCancel = async (_reason: string): Promise<C.Result<R.Cancellation>> => {
+      const requestCancel = async (
+        _reason: string,
+      ): Promise<Contracts.Result<Runtime.Cancellation>> => {
         if (finished || controller.signal.aborted) return ok(snapshot.cancel);
         controller.abort();
         update({ cancel: { state: 'requested', unresolvedTargets: [ref] } });
@@ -315,7 +319,7 @@ export function createOperations(
       const abort = () => {
         void requestCancel('parent-cancelled');
       };
-      const handle: R.ExecutionHandle<T> = {
+      const handle: Runtime.ExecutionHandle<T> = {
         ref,
         done,
         snapshot: () => structuredClone(snapshot),
@@ -371,7 +375,7 @@ export function createOperations(
             }
           },
         };
-        let outcome: R.ManagedOutcome<T>;
+        let outcome: Runtime.ManagedOutcome<T>;
         try {
           outcome = await body(context);
         } catch {
@@ -429,15 +433,18 @@ export function createOperations(
 
 export function createBoundary(
   hooks: {
-    prepare?: (plan: R.EffectPlan, context: C.InvocationContext) => Promise<C.Result<void>>;
+    prepare?: (
+      plan: Runtime.EffectPlan,
+      context: Contracts.InvocationContext,
+    ) => Promise<Contracts.Result<void>>;
     settle?: (
-      plan: R.EffectPlan,
-      outcome: R.AttemptOutcome<unknown>,
-      context: C.InvocationContext,
-    ) => Promise<C.Result<readonly C.CommitEvidence[]>>;
+      plan: Runtime.EffectPlan,
+      outcome: Runtime.AttemptOutcome<unknown>,
+      context: Contracts.InvocationContext,
+    ) => Promise<Contracts.Result<readonly Contracts.CommitEvidence[]>>;
   } = {},
-): R.InvocationBoundary {
-  const permits = new WeakMap<R.AttemptPermit, R.EffectPlan>();
+): Runtime.InvocationBoundary {
+  const permits = new WeakMap<Runtime.AttemptPermit, Runtime.EffectPlan>();
   return {
     async prepare(plan, context) {
       if (context.signal.aborted)
@@ -449,7 +456,7 @@ export function createBoundary(
         return fail('boundary.cancelled', 'Cancelled during prepare', 'cancelled');
       const permit = Object.freeze({
         attemptId: fixed.attemptId,
-        planDigest: await digest(fixed as unknown as C.Json),
+        planDigest: await digest(fixed as unknown as Contracts.Json),
         boundary: 'part/boundary',
       });
       permits.set(permit, fixed);
@@ -463,19 +470,19 @@ export function createBoundary(
     },
   };
 }
-const consumed = new WeakSet<R.AttemptPermit>();
+const consumed = new WeakSet<Runtime.AttemptPermit>();
 export async function managedAttempt<T>(
-  boundary: R.InvocationBoundary,
-  plan: R.EffectPlan,
-  execute: (permit: R.AttemptPermit) => Promise<R.AttemptOutcome<T>>,
-  context: C.InvocationContext,
-): Promise<R.ManagedOutcome<T>> {
+  boundary: Runtime.InvocationBoundary,
+  plan: Runtime.EffectPlan,
+  execute: (permit: Runtime.AttemptPermit) => Promise<Runtime.AttemptOutcome<T>>,
+  context: Contracts.InvocationContext,
+): Promise<Runtime.ManagedOutcome<T>> {
   const evidence = {
-    effect: 'not-attempted' as C.EffectState,
-    unsettledChildren: [] as C.EntityRef[],
-    commit: [] as readonly C.CommitEvidence[],
+    effect: 'not-attempted' as Contracts.EffectState,
+    unsettledChildren: [] as Contracts.EntityRef[],
+    commit: [] as readonly Contracts.CommitEvidence[],
   };
-  let permit: C.Result<R.AttemptPermit>;
+  let permit: Contracts.Result<Runtime.AttemptPermit>;
   try {
     permit = await boundary.prepare(plan, context);
   } catch {
@@ -485,7 +492,7 @@ export async function managedAttempt<T>(
   if (
     consumed.has(permit.value) ||
     permit.value.attemptId !== plan.attemptId ||
-    permit.value.planDigest !== (await digest(plan as unknown as C.Json))
+    permit.value.planDigest !== (await digest(plan as unknown as Contracts.Json))
   )
     return {
       ...evidence,
@@ -498,7 +505,7 @@ export async function managedAttempt<T>(
       },
     };
   consumed.add(permit.value);
-  let attempt: R.AttemptOutcome<T>;
+  let attempt: Runtime.AttemptOutcome<T>;
   if (context.signal.aborted || (context.deadline && Date.parse(context.deadline) <= Date.now()))
     attempt = { kind: 'cancelled', effect: 'not-attempted' };
   else
@@ -516,7 +523,7 @@ export async function managedAttempt<T>(
         },
       };
     }
-  let settled: C.Result<readonly C.CommitEvidence[]>;
+  let settled: Contracts.Result<readonly Contracts.CommitEvidence[]>;
   try {
     settled = await boundary.settle(permit.value, attempt, context);
   } catch {

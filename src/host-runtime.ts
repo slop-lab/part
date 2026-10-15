@@ -1,15 +1,15 @@
-import type { Contracts as C, Host as H, Runtime as R } from './reference.js';
+import type { Contracts, Host, Runtime } from './reference.js';
 import { ok, fail, canonical, isJson, freeze, emptyCleanup } from './contracts.js';
 import { scheduleDeadline } from './deadline.js';
 export function createRuntimeHost(options: {
-  runs: R.RunService;
+  runs: Runtime.RunService;
   maxConcurrent?: number;
   maxQueued?: number;
   maxRetained?: number;
-  policy?: H.InputPolicy;
-  resources?: H.ResourceManager;
-}): H.Service & {
-  getJob(id: string, context: C.InvocationContext): C.Result<H.Admission>;
+  policy?: Host.InputPolicy;
+  resources?: Host.ResourceManager;
+}): Host.Service & {
+  getJob(id: string, context: Contracts.InvocationContext): Contracts.Result<Host.Admission>;
 } {
   const concurrent = options.maxConcurrent ?? 1,
     maximum = options.maxQueued ?? 1000;
@@ -21,29 +21,29 @@ export function createRuntimeHost(options: {
   )
     throw new TypeError('Invalid host capacity');
   interface Job {
-    request: H.AdmissionRequest;
+    request: Host.AdmissionRequest;
     principal: string;
     fingerprint: string;
-    admission: H.Admission;
-    context: C.InvocationContext;
-    handle?: R.ExecutionHandle<unknown>;
-    outcome?: R.ManagedOutcome<unknown>;
+    admission: Host.Admission;
+    context: Contracts.InvocationContext;
+    handle?: Runtime.ExecutionHandle<unknown>;
+    outcome?: Runtime.ManagedOutcome<unknown>;
   }
   const jobs = new Map<string, Job>(),
     pending: Job[] = [],
     active = new Set<Job>();
   const cancellation = new AbortController();
-  let root: C.InvocationContext | undefined,
+  let root: Contracts.InvocationContext | undefined,
     state: 'idle' | 'running' | 'stopping' | 'stopped' = 'idle',
     pumping = false;
-  let stopped: Promise<C.CleanupReport> | undefined;
+  let stopped: Promise<Contracts.CleanupReport> | undefined;
   const notify = new Set<() => void>();
   const changed = () => {
     for (const wake of notify) wake();
   };
-  const authorized = (context: C.InvocationContext) =>
+  const authorized = (context: Contracts.InvocationContext) =>
     root && canonical(root.principal) === canonical(context.principal);
-  const reject = (message: string): H.Admission => ({
+  const reject = (message: string): Host.Admission => ({
     kind: 'rejected',
     error: fail('host.admission', message, 'conflict').error,
   });
@@ -133,7 +133,7 @@ export function createRuntimeHost(options: {
         input: request.run.input,
         driver: request.run.driver,
         composition: request.run.composition.inspection.revision,
-        limits: (request.run.limits as unknown as C.Json) ?? null,
+        limits: (request.run.limits as unknown as Contracts.Json) ?? null,
         concurrencyKey: request.concurrencyKey ?? null,
         priority: request.priority ?? 0,
         expiresAt: request.expiresAt ?? null,
@@ -218,7 +218,7 @@ export function createRuntimeHost(options: {
         });
       state = 'stopping';
       stopped = (async () => {
-        const errors: C.Failure[] = [];
+        const errors: Contracts.Failure[] = [];
         if (stopOptions.mode === 'cancel') {
           cancellation.abort('host-stopped');
           for (const job of pending.splice(0))

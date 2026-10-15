@@ -1,10 +1,10 @@
-import type { Contracts as C, Client as L, Projection as P, UI as U } from './reference.js';
+import type { Contracts, Client, Projection, UI } from './reference.js';
 import { isJson, isJsonObject } from './contracts.js';
 export function createWorkflowView(options: {
-  client: L.Controller;
+  client: Client.Controller;
   document?: Document;
   ownsClient?: boolean;
-  renderers?: readonly U.Renderer<C.Json, HTMLElement>[];
+  renderers?: readonly UI.Renderer<Contracts.Json, HTMLElement>[];
   className?: string;
   theme?: Readonly<Record<string, string>>;
 }): { element: HTMLElement; dispose(): Promise<void> } {
@@ -20,13 +20,16 @@ export function createWorkflowView(options: {
   list.setAttribute('role', 'list');
   status.setAttribute('aria-live', 'polite');
   root.append(list, status);
-  const drafts = new Map<string, { text: string; request?: C.CommandRequest; busy: boolean }>();
-  const rendered = new Map<string, { item: P.Item; element: HTMLElement }>();
+  const drafts = new Map<
+    string,
+    { text: string; request?: Contracts.CommandRequest; busy: boolean }
+  >();
+  const rendered = new Map<string, { item: Projection.Item; element: HTMLElement }>();
   let disposed = false;
   function actionForm(
-    item: P.Item,
-    action: C.ActionDescriptor,
-    seed: C.Json,
+    item: Projection.Item,
+    action: Contracts.ActionDescriptor,
+    seed: Contracts.Json,
     key: string,
   ): HTMLElement {
     const draft = drafts.get(key) ?? { text: JSON.stringify(seed, null, 2), busy: false };
@@ -53,7 +56,7 @@ export function createWorkflowView(options: {
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       if (draft.busy || action.availability.state !== 'available') return;
-      let value: C.Json;
+      let value: Contracts.Json;
       try {
         value = JSON.parse(input.value);
         if (!isJson(value)) throw new Error('Invalid JSON');
@@ -102,7 +105,7 @@ export function createWorkflowView(options: {
     });
     return form;
   }
-  function fallback(item: P.Item): HTMLElement {
+  function fallback(item: Projection.Item): HTMLElement {
     const card = document.createElement('article');
     card.setAttribute('role', 'listitem');
     card.dataset.partPart = 'workflow';
@@ -159,7 +162,7 @@ export function createWorkflowView(options: {
     const items = client
       .getState()
       .itemIds.map((id) => client.getItem(id))
-      .filter((item): item is P.Item => !!item);
+      .filter((item): item is Projection.Item => !!item);
     for (const [id, previous] of rendered)
       if (!items.some((item) => item.id === id)) {
         previous.element.remove();

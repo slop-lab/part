@@ -1,18 +1,18 @@
-import type { Convenience as V, Model as M, Contracts as C } from './reference.js';
+import type { Convenience, Model, Contracts } from './reference.js';
 import { ok, digest } from './contracts.js';
 import { createOllamaAdapter } from './provider-ollama.js';
 import { noAuth } from './model.js';
 export function fakeModel(
   replies: readonly {
     text?: string;
-    toolCalls?: readonly { name: string; arguments: C.Json }[];
+    toolCalls?: readonly { name: string; arguments: Contracts.Json }[];
     thinking?: string;
     error?: string;
     incomplete?: boolean;
   }[],
-): V.ConfiguredModel & { readonly requests: M.EncodedRequest[] } {
+): Convenience.ConfiguredModel & { readonly requests: Model.EncodedRequest[] } {
   let index = 0;
-  const requests: M.EncodedRequest[] = [];
+  const requests: Model.EncodedRequest[] = [];
   return {
     profile: {
       id: 'fake',

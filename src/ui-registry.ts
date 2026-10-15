@@ -1,10 +1,10 @@
-import type { Contracts as C, UI as U } from './reference.js';
+import type { Contracts, UI } from './reference.js';
 import { ok, fail } from './contracts.js';
 /** Highest layer wins; equal-layer collisions fail at installation. */
 export function createRendererRegistry<View>(
-  layers: readonly (readonly U.Renderer<C.Json, View>[])[],
-): C.Result<U.RendererRegistry<View>> {
-  const registry = new Map<string, U.Renderer<C.Json, View>>();
+  layers: readonly (readonly UI.Renderer<Contracts.Json, View>[])[],
+): Contracts.Result<UI.RendererRegistry<View>> {
+  const registry = new Map<string, UI.Renderer<Contracts.Json, View>>();
   for (const layer of layers) {
     const keys = new Set<string>();
     for (const renderer of layer)
@@ -28,8 +28,8 @@ export function createRendererRegistry<View>(
   });
 }
 export function orderSlots<View>(
-  slots: readonly U.SlotContribution<View>[],
-): C.Result<readonly U.SlotContribution<View>[]> {
+  slots: readonly UI.SlotContribution<View>[],
+): Contracts.Result<readonly UI.SlotContribution<View>[]> {
   const registry = new Map(slots.map((slot) => [slot.id, slot]));
   if (registry.size !== slots.length)
     return fail('ui.slot-conflict', 'Duplicate slot ID', 'conflict');
@@ -42,7 +42,7 @@ export function orderSlots<View>(
     for (const id of slot.before ?? []) dependencies.get(id)!.add(slot.id);
   }
   const remaining = new Set(registry.keys()),
-    ordered: U.SlotContribution<View>[] = [];
+    ordered: UI.SlotContribution<View>[] = [];
   while (remaining.size) {
     const id = [...remaining]
       .sort()

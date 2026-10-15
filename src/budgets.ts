@@ -1,15 +1,15 @@
-import type { Contracts as C, Runtime as R } from './reference.js';
+import type { Contracts, Runtime } from './reference.js';
 import { createBudget, budgetKey } from './runtime.js';
 import { costUnits } from './costs.js';
 import { ok, fail } from './contracts.js';
 /** Every local reservation also reserves the upstream owner. Failed admission rolls back. */
 export function createChildBudget(
-  context: C.InvocationContext,
+  context: Contracts.InvocationContext,
   limits: Readonly<Record<string, number>>,
-): R.BudgetPort {
+): Runtime.BudgetPort {
   const child = createBudget(limits),
     upstream = context.services.get(budgetKey);
-  const pairs = new WeakMap<R.BudgetReservation, R.BudgetReservation>();
+  const pairs = new WeakMap<Runtime.BudgetReservation, Runtime.BudgetReservation>();
   return {
     reserve(dimension, quantity) {
       const reserved = child.reserve(dimension, quantity);
@@ -32,8 +32,8 @@ export function createChildBudget(
   };
 }
 export function numericLimits(
-  limits: R.ExecutionLimits = {},
-): C.Result<Readonly<Record<string, number>>> {
+  limits: Runtime.ExecutionLimits = {},
+): Contracts.Result<Readonly<Record<string, number>>> {
   const numeric: Record<string, number> = {};
   for (const [key, value] of Object.entries(limits)) {
     if (key === 'deadline') continue;

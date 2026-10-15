@@ -1,12 +1,12 @@
-import type { Contracts as C, Runtime as R, Storage as S } from './reference.js';
+import type { Contracts, Runtime, Storage } from './reference.js';
 import { ok, fail } from './contracts.js';
 import { createBoundary } from './runtime.js';
 import { provenance } from './context.js';
 export function createStoredBoundary(
-  store: S.StateJournalStore,
+  store: Storage.StateJournalStore,
   namespace = 'part/execution',
-): R.InvocationBoundary {
-  const address = (plan: R.EffectPlan): S.StateAddress => ({
+): Runtime.InvocationBoundary {
+  const address = (plan: Runtime.EffectPlan): Storage.StateAddress => ({
     namespace,
     scope: { kind: 'operation', id: plan.operationId },
     key: plan.attemptId,
@@ -23,7 +23,7 @@ export function createStoredBoundary(
               next: {
                 schemaVersion: 1,
                 value: {
-                  plan: plan as unknown as C.Json,
+                  plan: plan as unknown as Contracts.Json,
                   phase: 'running',
                   effect: 'not-attempted',
                 },
@@ -35,7 +35,7 @@ export function createStoredBoundary(
               id: `intent/${plan.attemptId}`,
               type: 'part.execution/intent',
               version: 1,
-              payload: { plan: plan as unknown as C.Json, namespace },
+              payload: { plan: plan as unknown as Contracts.Json, namespace },
               provenance,
             },
           ],
@@ -60,7 +60,7 @@ export function createStoredBoundary(
               next: {
                 schemaVersion: 1,
                 value: {
-                  plan: plan as unknown as C.Json,
+                  plan: plan as unknown as Contracts.Json,
                   phase:
                     outcome.kind === 'returned'
                       ? 'completed'
@@ -93,10 +93,10 @@ export function createStoredBoundary(
     },
   });
 }
-export function createExecutionRecovery(store: S.StateJournalStore): S.RecoveryAdapter {
+export function createExecutionRecovery(store: Storage.StateJournalStore): Storage.RecoveryAdapter {
   return {
     async recover(context) {
-      const intents: { plan: R.EffectPlan; namespace: string }[] = [],
+      const intents: { plan: Runtime.EffectPlan; namespace: string }[] = [],
         settled = new Set<string>();
       let cursor: string | undefined;
       do {
@@ -104,15 +104,17 @@ export function createExecutionRecovery(store: S.StateJournalStore): S.RecoveryA
         if (!page.ok) return page;
         for (const entry of page.value.items) {
           if (entry.type === 'part.execution/intent')
-            intents.push(entry.payload as unknown as { plan: R.EffectPlan; namespace: string });
+            intents.push(
+              entry.payload as unknown as { plan: Runtime.EffectPlan; namespace: string },
+            );
           if (entry.type === 'part.execution/settled')
             settled.add((entry.payload as { attemptId: string }).attemptId);
         }
         cursor = page.value.nextCursor;
       } while (cursor);
-      const abandoned: C.EntityRef[] = [],
-        reconciliationRequired: C.EntityRef[] = [],
-        errors: C.Failure[] = [];
+      const abandoned: Contracts.EntityRef[] = [],
+        reconciliationRequired: Contracts.EntityRef[] = [],
+        errors: Contracts.Failure[] = [];
       for (const { plan, namespace } of intents) {
         if (settled.has(plan.attemptId)) continue;
         const address = {
@@ -136,7 +138,11 @@ export function createExecutionRecovery(store: S.StateJournalStore): S.RecoveryA
                 expected: current.value.revision,
                 next: {
                   schemaVersion: 1,
-                  value: { plan: plan as unknown as C.Json, phase: 'abandoned', effect: 'unknown' },
+                  value: {
+                    plan: plan as unknown as Contracts.Json,
+                    phase: 'abandoned',
+                    effect: 'unknown',
+                  },
                 },
               },
             ],

@@ -1,11 +1,11 @@
-import type { Contracts as C, Client as L, Projection as P } from '../../src/reference.js';
+import type { Contracts, Client, Projection } from '../../src/reference.js';
 import { createController, createLocalPort, createWatchHub } from '../../src/client.js';
 import { localContext, ok, fail } from '../../src/contracts.js';
 import { createChat } from '../../src/ui-dom.js';
 const context = localContext(),
   hub = createWatchHub({ revision: 'demo', entries: [] });
 const runs = new Map<string, AbortController>();
-const item = (id: string, label: string, text: string): P.Item => ({
+const item = (id: string, label: string, text: string): Projection.Item => ({
   id,
   type: 'part/message',
   schemaVersion: 1,
@@ -15,7 +15,7 @@ const item = (id: string, label: string, text: string): P.Item => ({
   actions: [],
   artifacts: [],
 });
-const endpoint: L.Endpoint = {
+const endpoint: Client.Endpoint = {
   async command(request) {
     if (request.actionId === 'part.run/cancel') {
       const run = request.target && runs.get(request.target.id);

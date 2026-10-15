@@ -1,16 +1,19 @@
-import type { Contracts as C, Workflows as W, Runtime as R } from './reference.js';
+import type { Contracts, Workflows, Runtime } from './reference.js';
 import { ok, fail, canonical, freeze, isJson } from './contracts.js';
 /** Native schedulers choose stable logical keys; this adapter owns one attached run. */
 export function createAgentStepBinding(
-  runs: R.RunService,
+  runs: Runtime.RunService,
   options: { id?: string; maxRetained?: number } = {},
-): W.AgentStepBinding {
+): Workflows.AgentStepBinding {
   const id = options.id ?? 'part/agent-step';
   const records = new Map<
     string,
-    { fingerprint: string; result: Promise<C.Result<C.EntityRef>> }
+    { fingerprint: string; result: Promise<Contracts.Result<Contracts.EntityRef>> }
   >();
-  const handles = new Map<string, { handle: R.ExecutionHandle<unknown>; principal: string }>();
+  const handles = new Map<
+    string,
+    { handle: Runtime.ExecutionHandle<unknown>; principal: string }
+  >();
   return {
     id,
     boundary: freeze({
@@ -29,8 +32,8 @@ export function createAgentStepBinding(
         driver: request.driver,
         composition: request.composition.inspection.revision,
         input: request.input,
-        limits: (request.limits as unknown as C.Json) ?? null,
-        history: (request.history as unknown as C.Json) ?? null,
+        limits: (request.limits as unknown as Contracts.Json) ?? null,
+        history: (request.history as unknown as Contracts.Json) ?? null,
       });
       const prior = records.get(key);
       if (prior)
@@ -68,7 +71,8 @@ export function createAgentStepBinding(
       if (
         !entry ||
         entry.principal !== canonical(context.principal) ||
-        canonical(entry.handle.ref as unknown as C.Json) !== canonical(ref as unknown as C.Json)
+        canonical(entry.handle.ref as unknown as Contracts.Json) !==
+          canonical(ref as unknown as Contracts.Json)
       )
         return fail(
           'agent-step.permission',

@@ -1,12 +1,12 @@
 import { readdir, readFile, realpath, lstat } from 'node:fs/promises';
 import { join, relative, resolve, basename } from 'node:path';
-import type { Contracts as C, Packages as P } from './reference.js';
+import type { Contracts, Packages } from './reference.js';
 import { ok, fail, digest, freeze } from './contracts.js';
-export function createDirectoryPackages(options: { maxBytes?: number } = {}): P.Source {
-  const installed = new Map<string, { snapshot: P.Snapshot; root: string }>();
+export function createDirectoryPackages(options: { maxBytes?: number } = {}): Packages.Source {
+  const installed = new Map<string, { snapshot: Packages.Snapshot; root: string }>();
   return {
     async discover(roots, context) {
-      const snapshots: P.Snapshot[] = [];
+      const snapshots: Packages.Snapshot[] = [];
       for (const root of roots) {
         if (context.signal.aborted)
           return fail('package.cancelled', 'Discovery cancelled', 'cancelled');
@@ -16,9 +16,9 @@ export function createDirectoryPackages(options: { maxBytes?: number } = {}): P.
         } catch {
           return fail('package.root', 'Package root unavailable', 'unavailable');
         }
-        const assets: P.Asset[] = [];
+        const assets: Packages.Asset[] = [];
         let bytes = 0;
-        const scan = async (directory: string): Promise<C.Result<void>> => {
+        const scan = async (directory: string): Promise<Contracts.Result<void>> => {
           const entries = await readdir(directory, { withFileTypes: true });
           entries.sort((a, b) => a.name.localeCompare(b.name, 'en'));
           for (const entry of entries) {
@@ -53,9 +53,9 @@ export function createDirectoryPackages(options: { maxBytes?: number } = {}): P.
         } catch {
           return fail('package.scan', 'Package scan failed', 'unavailable');
         }
-        const hash = await digest(assets as unknown as C.Json),
+        const hash = await digest(assets as unknown as Contracts.Json),
           id = `${basename(base)}/${hash}`;
-        const snapshot: P.Snapshot = freeze({
+        const snapshot: Packages.Snapshot = freeze({
           id,
           digest: hash,
           assets,

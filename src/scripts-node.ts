@@ -2,26 +2,32 @@ import { spawn } from 'node:child_process';
 import { readFile, realpath, mkdtemp, writeFile, rm, stat } from 'node:fs/promises';
 import { join, relative, resolve, isAbsolute, extname } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { Contracts as C, Scripts as S, Runtime as R, Tools as T } from './reference.js';
+import type { Contracts, Scripts, Runtime, Tools } from './reference.js';
 import type { Operations } from './runtime.js';
 import { ok, fail, digest, isJson, isJsonObject } from './contracts.js';
 import { createOperations, createBoundary, managedAttempt } from './runtime.js';
 import { reserve } from './model.js';
 import { isScriptRequest } from './scripts.js';
 import type { ScriptBridgeEnvironment } from './script-bridge-node.js';
-export interface NodeScriptService extends S.Service {
-  executor(id?: string): T.Executor;
+export interface NodeScriptService extends Scripts.Service {
+  executor(id?: string): Tools.Executor;
 }
 export function createNodeScripts(options: {
   root: string;
   interpreters: Readonly<Record<string, string>>;
   environments?: Readonly<Record<string, Readonly<Record<string, string>>>>;
   operations?: Operations;
-  boundary?: R.InvocationBoundary;
+  boundary?: Runtime.InvocationBoundary;
   maxOutputBytes?: number;
   bridge?: ScriptBridgeEnvironment;
-  source?: (source: S.Source, context: C.InvocationContext) => Promise<C.Result<Uint8Array>>;
-  workspace?: (ref: C.DataRef, context: C.InvocationContext) => Promise<C.Result<string>>;
+  source?: (
+    source: Scripts.Source,
+    context: Contracts.InvocationContext,
+  ) => Promise<Contracts.Result<Uint8Array>>;
+  workspace?: (
+    ref: Contracts.DataRef,
+    context: Contracts.InvocationContext,
+  ) => Promise<Contracts.Result<string>>;
   maxSourceBytes?: number;
 }): NodeScriptService {
   const root = resolve(options.root),
@@ -30,7 +36,7 @@ export function createNodeScripts(options: {
     operations = options.operations ?? createOperations(),
     boundary = options.boundary ?? createBoundary();
   const consumedPermits = new WeakSet<object>();
-  const delegated = new WeakMap<C.InvocationContext, { digest: string; used: boolean }>();
+  const delegated = new WeakMap<Contracts.InvocationContext, { digest: string; used: boolean }>();
   const service: NodeScriptService = {
     executor(id = 'part/node-script') {
       return {
@@ -60,7 +66,7 @@ export function createNodeScripts(options: {
                 'Tool effect classification and script request must agree',
               ).error,
             };
-          const expectedPlan: R.EffectPlan = {
+          const expectedPlan: Runtime.EffectPlan = {
             operationId: context.operationId,
             attemptId: context.attemptId,
             target: plan.definition.id,
@@ -75,7 +81,7 @@ export function createNodeScripts(options: {
           };
           if (
             permit.attemptId !== context.attemptId ||
-            permit.planDigest !== (await digest(expectedPlan as unknown as C.Json)) ||
+            permit.planDigest !== (await digest(expectedPlan as unknown as Contracts.Json)) ||
             consumedPermits.has(permit)
           )
             return {
@@ -89,7 +95,7 @@ export function createNodeScripts(options: {
           consumedPermits.add(permit);
           const fixedContext = { ...context };
           delegated.set(fixedContext, {
-            digest: await digest(plan.validatedArguments as unknown as C.Json),
+            digest: await digest(plan.validatedArguments as unknown as Contracts.Json),
             used: false,
           });
           const created = await service.execute(plan.validatedArguments, fixedContext);
@@ -146,7 +152,7 @@ export function createNodeScripts(options: {
       request = structuredClone(request);
       const shared = delegated.get(context);
       if (shared) {
-        if (shared.used || shared.digest !== (await digest(request as unknown as C.Json)))
+        if (shared.used || shared.digest !== (await digest(request as unknown as Contracts.Json)))
           return fail(
             'scripts.shared-attempt',
             'Shared script attempt is consumed or changed',
@@ -239,17 +245,17 @@ export function createNodeScripts(options: {
       if ((await digest(bytes)) !== request.source.digest)
         return fail('scripts.digest', 'Script content changed', 'conflict');
       const fixed = structuredClone(request),
-        executionDigest = await digest(fixed as unknown as C.Json);
+        executionDigest = await digest(fixed as unknown as Contracts.Json);
       const deadlines = [
         context.deadline ? Date.parse(context.deadline) : Infinity,
         request.timeoutMs ? Date.now() + request.timeoutMs : Infinity,
       ];
       const deadline = Math.min(...deadlines);
-      return operations.begin<S.Output>(
+      return operations.begin<Scripts.Output>(
         { kind: 'part/script', childPolicy: 'attached', retryOwner: 'part/scripts' },
         async (c) => {
           const attemptId = crypto.randomUUID(),
-            plan: R.EffectPlan = {
+            plan: Runtime.EffectPlan = {
               operationId: c.scope.id,
               attemptId,
               target: fixed.source.relativePath,
@@ -264,7 +270,7 @@ export function createNodeScripts(options: {
               classification: fixed.effects,
             };
           let unresolvedPid: number | undefined;
-          const executeAttempt = async (): Promise<R.AttemptOutcome<S.Output>> => {
+          const executeAttempt = async (): Promise<Runtime.AttemptOutcome<Scripts.Output>> => {
             const budget = shared ? ok(undefined) : reserve(c, 'maxExecutorAttempts');
             if (!budget.ok) return { kind: 'failed', error: budget.error, effect: 'not-attempted' };
             const temporary = await mkdtemp(join(tmpdir(), 'part-script-')),
@@ -300,7 +306,7 @@ export function createNodeScripts(options: {
               let channelBuffer = Buffer.alloc(0),
                 channelBytes = 0,
                 channelError = false,
-                channelResult: C.Json | undefined,
+                channelResult: Contracts.Json | undefined,
                 channelReturned = false;
               let outBytes = 0,
                 errorBytes = 0,
@@ -416,7 +422,7 @@ export function createNodeScripts(options: {
                   effect: 'not-attempted',
                   error: fail('scripts.spawn', 'Process did not start', 'unavailable').error,
                 };
-              const effect: C.EffectState =
+              const effect: Contracts.EffectState =
                 fixed.effects === 'read'
                   ? 'not-applied'
                   : unresolved || c.signal.aborted
@@ -442,7 +448,7 @@ export function createNodeScripts(options: {
                   effect,
                   error: fail('scripts.truncated', 'Output exceeded byte limit').error,
                 };
-              let captured: S.Output['captured'];
+              let captured: Scripts.Output['captured'];
               if (fixed.capture.kind === 'channel') {
                 if (channelError || channelBuffer.length || !channelReturned)
                   return {
@@ -521,7 +527,7 @@ export function createNodeScripts(options: {
               await rm(temporary, { recursive: true, force: true });
             }
           };
-          const borrowed = async (): Promise<R.ManagedOutcome<S.Output>> => {
+          const borrowed = async (): Promise<Runtime.ManagedOutcome<Scripts.Output>> => {
             const result = await executeAttempt();
             return result.kind === 'returned'
               ? {
@@ -543,7 +549,7 @@ export function createNodeScripts(options: {
           };
           const outcome = shared
             ? await borrowed()
-            : await managedAttempt<S.Output>(boundary, plan, executeAttempt, c);
+            : await managedAttempt<Scripts.Output>(boundary, plan, executeAttempt, c);
 
           if (unresolvedPid && outcome.phase !== 'completed')
             return {

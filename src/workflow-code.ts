@@ -1,11 +1,14 @@
-import type { Contracts as C, Workflows as W } from './reference.js';
+import type { Contracts, Workflows } from './reference.js';
 import { ok, fail, digest } from './contracts.js';
 import { createMemoryWorkflowEngine } from './workflow-memory.js';
 import type { WorkflowServices } from './workflow-memory.js';
 export function createCodeEngine(
-  definitions: readonly { definition: W.CodeDefinition<C.Json, C.Json>; digest: string }[],
+  definitions: readonly {
+    definition: Workflows.CodeDefinition<Contracts.Json, Contracts.Json>;
+    digest: string;
+  }[],
   services: WorkflowServices,
-): C.Result<W.Engine> {
+): Contracts.Result<Workflows.Engine> {
   const registry = new Map(
     definitions.map((d) => [d.definition.id, { ...d, definition: { ...d.definition } }]),
   );
@@ -51,8 +54,8 @@ export function createCodeEngine(
   );
 }
 
-export async function defineCodeWorkflow<I extends C.Json, O extends C.Json>(
-  definition: W.CodeDefinition<I, O>,
+export async function defineCodeWorkflow<I extends Contracts.Json, O extends Contracts.Json>(
+  definition: Workflows.CodeDefinition<I, O>,
 ) {
   return {
     definition,

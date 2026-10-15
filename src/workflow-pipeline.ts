@@ -1,10 +1,10 @@
 import type {
-  Contracts as C,
-  PipelineV1 as P,
-  Workflows as W,
-  Composition as L,
-  Runtime as R,
-  Skills as K,
+  Contracts,
+  PipelineV1,
+  Workflows,
+  Composition,
+  Runtime,
+  Skills,
 } from './reference.js';
 import { ok, fail, digest, canonical, isJson, isJsonObject } from './contracts.js';
 import { createMemoryWorkflowEngine, callIdentity, scopeStepContext } from './workflow-memory.js';
@@ -13,7 +13,7 @@ import { isScriptRequest } from './scripts.js';
 import { reserve } from './model.js';
 import type { OperationContext } from './runtime.js';
 import type { WorkflowServices } from './workflow-memory.js';
-export const handlersPoint: L.ExtensionPoint<P.InstalledStepHandler> = {
+export const handlersPoint: Composition.ExtensionPoint<PipelineV1.InstalledStepHandler> = {
   id: 'part.pipeline/handlers',
   owner: 'part/workflow-pipeline-v1',
   contractVersion: 1,
@@ -23,27 +23,27 @@ export const handlersPoint: L.ExtensionPoint<P.InstalledStepHandler> = {
 interface Handler {
   id: string;
   version: number;
-  input: C.Schema<C.Json>;
-  output: C.Schema<C.Json>;
-  config: C.Schema<C.Json>;
+  input: Contracts.Schema<Contracts.Json>;
+  output: Contracts.Schema<Contracts.Json>;
+  config: Contracts.Schema<Contracts.Json>;
   requires: readonly string[];
   effects: 'read' | 'write' | 'external' | 'unknown';
   execute(
-    input: C.Json,
-    config: C.Json,
-    identity: W.CallIdentity,
-    context: W.StepContext,
-  ): Promise<C.Result<C.Json>>;
+    input: Contracts.Json,
+    config: Contracts.Json,
+    identity: Workflows.CallIdentity,
+    context: Workflows.StepContext,
+  ): Promise<Contracts.Result<Contracts.Json>>;
 }
 const bindings = new WeakMap<object, Handler>();
-export function installStepHandler<I extends C.Json, O extends C.Json>(
-  handler: P.StepHandler<I, O>,
-): P.InstalledStepHandler {
+export function installStepHandler<I extends Contracts.Json, O extends Contracts.Json>(
+  handler: PipelineV1.StepHandler<I, O>,
+): PipelineV1.InstalledStepHandler {
   const token = {};
   bindings.set(token, {
     ...handler,
-    input: handler.input as C.Schema<C.Json>,
-    output: handler.output as C.Schema<C.Json>,
+    input: handler.input as Contracts.Schema<Contracts.Json>,
+    output: handler.output as Contracts.Schema<Contracts.Json>,
     async execute(input, config, identity, context) {
       const checked = handler.input.validate(input);
       if (!checked.ok) return fail('pipeline.handler-input', 'Handler input validation failed');
@@ -67,7 +67,7 @@ export function installStepHandler<I extends C.Json, O extends C.Json>(
 }
 const objectValid = (value: unknown): boolean => isJsonObject(value);
 const jsonValid = (value: unknown): boolean => isJson(value);
-function pointer(value: C.Json, path: string): C.Result<C.Json> {
+function pointer(value: Contracts.Json, path: string): Contracts.Result<Contracts.Json> {
   if (!path) return ok(value);
   if (!path.startsWith('/') || /~(?![01])/u.test(path))
     return fail('pipeline.pointer', 'Invalid JSON Pointer');
@@ -81,11 +81,11 @@ function pointer(value: C.Json, path: string): C.Result<C.Json> {
       (Array.isArray(current) && !/^(0|[1-9][0-9]*)$/.test(key))
     )
       return fail('pipeline.pointer', `JSON Pointer target missing: ${path}`);
-    current = (current as Record<string, C.Json>)[key]!;
+    current = (current as Record<string, Contracts.Json>)[key]!;
   }
   return ok(current);
 }
-function valueValid(value: unknown): value is P.Value {
+function valueValid(value: unknown): value is PipelineV1.Value {
   if (!isJsonObject(value)) return false;
   const keys = Object.keys(value);
   return (
@@ -102,18 +102,21 @@ function valueValid(value: unknown): value is P.Value {
   );
 }
 export function createPipelineEngine(options: {
-  definitions: readonly P.Definition[];
-  schemas: readonly C.Schema<C.Json>[];
+  definitions: readonly PipelineV1.Definition[];
+  schemas: readonly Contracts.Schema<Contracts.Json>[];
   services: WorkflowServices;
-  handlers?: readonly P.InstalledStepHandler[];
-  agents?: Readonly<Record<string, { driver: string; composition: L.CompositionHandle }>>;
-  boundary?: R.InvocationBoundary;
-  capabilities?: C.CapabilitySet;
+  handlers?: readonly PipelineV1.InstalledStepHandler[];
+  agents?: Readonly<Record<string, { driver: string; composition: Composition.CompositionHandle }>>;
+  boundary?: Runtime.InvocationBoundary;
+  capabilities?: Contracts.CapabilitySet;
   skills?: {
-    service: K.Service;
-    bind(input: C.Json, activations: readonly K.Activation[]): C.Result<C.Json>;
+    service: Skills.Service;
+    bind(
+      input: Contracts.Json,
+      activations: readonly Skills.Activation[],
+    ): Contracts.Result<Contracts.Json>;
   };
-}): C.Result<W.Engine> {
+}): Contracts.Result<Workflows.Engine> {
   options = {
     ...options,
     services: { ...options.services },
@@ -145,7 +148,7 @@ export function createPipelineEngine(options: {
     handlers.set(handler.id, handler);
   }
   const operations = options.services.operations ?? createOperations();
-  const schemaFor = (ref: C.SchemaRef) =>
+  const schemaFor = (ref: Contracts.SchemaRef) =>
     ref && typeof ref.id === 'string' && Number.isSafeInteger(ref.version)
       ? schemas.get(`${ref.id}@${ref.version}`)
       : undefined;
@@ -187,7 +190,7 @@ export function createPipelineEngine(options: {
       async compile(request, caller) {
         const listedSkills = options.skills
           ? await options.skills.service.list(caller)
-          : ok([] as readonly K.Descriptor[]);
+          : ok([] as readonly Skills.Descriptor[]);
         if (!listedSkills.ok) return listedSkills;
         const installedSkills = listedSkills.value;
         const definition = definitions.get(request.definition.id);
@@ -208,16 +211,19 @@ export function createPipelineEngine(options: {
           )
         )
           return fail('pipeline.field', 'Unknown required definition field', 'unsupported');
-        if ((await digest(definition as unknown as C.Json)) !== request.definition.digest)
+        if ((await digest(definition as unknown as Contracts.Json)) !== request.definition.digest)
           return fail('pipeline.digest', 'Pipeline digest mismatch', 'conflict');
         const input = schemaFor(definition.input),
           output = schemaFor(definition.output);
         if (!input || !output)
           return fail('pipeline.schema', 'Input/output schema not installed', 'unsupported');
-        type Block = { sorted: P.Step[]; steps: Map<string, P.Step> };
+        type Block = { sorted: PipelineV1.Step[]; steps: Map<string, PipelineV1.Step> };
         const blocks = new WeakMap<object, Block>();
         let total = 0;
-        function compileBlock(source: readonly P.Step[], depth = 0): C.Result<Block> {
+        function compileBlock(
+          source: readonly PipelineV1.Step[],
+          depth = 0,
+        ): Contracts.Result<Block> {
           if (
             !Array.isArray(source) ||
             !source.length ||
@@ -225,7 +231,7 @@ export function createPipelineEngine(options: {
             (total += source.length) > 10000
           )
             return fail('pipeline.block', 'Invalid or oversized lexical block');
-          const steps = new Map<string, P.Step>(),
+          const steps = new Map<string, PipelineV1.Step>(),
             ancestors = new Map<string, Set<string>>();
           for (const step of source) {
             if (
@@ -331,27 +337,29 @@ export function createPipelineEngine(options: {
               if (!handler.config.validate(step.config).ok)
                 return fail('pipeline.handler-config', 'Handler config validation failed');
             }
-            let nested: readonly (readonly P.Step[])[] = [];
+            let nested: readonly (readonly PipelineV1.Step[])[] = [];
             if (step.kind === 'branch') {
               if (
                 !valueValid(step.value) ||
                 !Array.isArray(step.cases) ||
                 !step.cases.length ||
                 step.cases.some(
-                  (c: { equals: C.Json; run: readonly P.Step[] }) =>
+                  (c: { equals: Contracts.Json; run: readonly PipelineV1.Step[] }) =>
                     !isJsonObject(c) ||
                     Object.keys(c).some((k) => !['equals', 'run'].includes(k)) ||
                     !Object.hasOwn(c, 'equals'),
                 ) ||
                 new Set(
-                  step.cases.map((c: { equals: C.Json; run: readonly P.Step[] }) =>
+                  step.cases.map((c: { equals: Contracts.Json; run: readonly PipelineV1.Step[] }) =>
                     canonical(c.equals),
                   ),
                 ).size !== step.cases.length
               )
                 return fail('pipeline.branch', 'Invalid or duplicate branch cases');
               nested = [
-                ...step.cases.map((c: { equals: C.Json; run: readonly P.Step[] }) => c.run),
+                ...step.cases.map(
+                  (c: { equals: Contracts.Json; run: readonly PipelineV1.Step[] }) => c.run,
+                ),
                 ...(step.otherwise ? [step.otherwise] : []),
               ];
             } else if (step.kind === 'repeat') {
@@ -394,7 +402,7 @@ export function createPipelineEngine(options: {
               );
             steps.set(step.id, step);
           }
-          const sorted: P.Step[] = [],
+          const sorted: PipelineV1.Step[] = [],
             remaining = new Set(steps.keys());
           while (remaining.size) {
             for (const id of remaining)
@@ -443,13 +451,13 @@ export function createPipelineEngine(options: {
           async execute(input, context, invocation, record) {
             async function runBlock(
               block: Block,
-              context: W.StepContext,
+              context: Workflows.StepContext,
               invocation: OperationContext,
               path: readonly (string | number)[],
-              selection?: P.Value,
-            ): Promise<C.Result<C.Json>> {
-              const results = new Map<string, C.Json>();
-              const read = (value: P.Value): C.Result<C.Json> =>
+              selection?: PipelineV1.Value,
+            ): Promise<Contracts.Result<Contracts.Json>> {
+              const results = new Map<string, Contracts.Json>();
+              const read = (value: PipelineV1.Value): Contracts.Result<Contracts.Json> =>
                 'literal' in value
                   ? ok(structuredClone(value.literal))
                   : 'input' in value
@@ -457,16 +465,19 @@ export function createPipelineEngine(options: {
                     : results.has(value.step)
                       ? pointer(results.get(value.step)!, value.pointer)
                       : fail('pipeline.value', 'Step result is unavailable');
-              const identify = (execution: W.ExecutionRef, stepKey: string, value: C.Json) =>
-                callIdentity(execution, stepKey, value, path);
+              const identify = (
+                execution: Workflows.ExecutionRef,
+                stepKey: string,
+                value: Contracts.Json,
+              ) => callIdentity(execution, stepKey, value, path);
               async function runStep(
-                step: P.Step,
-                context: W.StepContext,
+                step: PipelineV1.Step,
+                context: Workflows.StepContext,
                 invocation: OperationContext,
-              ): Promise<C.Result<C.Json>> {
+              ): Promise<Contracts.Result<Contracts.Json>> {
                 if (context.signal.aborted)
                   return fail('pipeline.cancelled', 'Pipeline cancelled', 'cancelled');
-                let result: C.Result<C.Json>;
+                let result: Contracts.Result<Contracts.Json>;
                 if (step.kind === 'validate' || step.kind === 'assert') {
                   result = read(step.value);
                   if (!result.ok) return result;
@@ -503,7 +514,7 @@ export function createPipelineEngine(options: {
                     identity = await identify(
                       context.execution,
                       step.id,
-                      request as unknown as C.Json,
+                      request as unknown as Contracts.Json,
                     );
                   const outcome = await context.script(identity, request);
                   if (outcome.phase !== 'completed')
@@ -519,7 +530,7 @@ export function createPipelineEngine(options: {
                 } else if (step.kind === 'agent') {
                   const value = read(step.input);
                   if (!value.ok) return value;
-                  const activations: K.Activation[] = [];
+                  const activations: Skills.Activation[] = [];
                   let boundInput = value.value;
                   try {
                     for (const skill of step.skills ?? []) {
@@ -574,7 +585,7 @@ export function createPipelineEngine(options: {
                   if (!handler.input.validate(value.value).ok)
                     return fail('pipeline.handler-input', 'Handler input validation failed');
                   const identity = await identify(context.execution, step.id, value.value);
-                  const outcome = await managedAttempt<C.Json>(
+                  const outcome = await managedAttempt<Contracts.Json>(
                     options.boundary ?? createBoundary(),
                     {
                       operationId: invocation.scope.id,
@@ -643,13 +654,18 @@ export function createPipelineEngine(options: {
                       step.until.value,
                     );
                     if (!checked.ok) return checked;
-                    const values = checked.value as { condition: C.Json; result: C.Json };
+                    const values = checked.value as {
+                      condition: Contracts.Json;
+                      result: Contracts.Json;
+                    };
                     if (canonical(values.condition) === canonical(step.until.equals))
                       return ok(values.result);
                   }
                   return fail('pipeline.repeat', 'Repeat exceeded maxIterations');
                 } else if (step.kind === 'parallel') {
-                  const outputs: C.Result<C.Json>[] = new Array(step.branches.length);
+                  const outputs: Contracts.Result<Contracts.Json>[] = new Array(
+                    step.branches.length,
+                  );
                   const cancellation = new AbortController();
                   let cursor = 0,
                     failed = false;
@@ -662,7 +678,7 @@ export function createPipelineEngine(options: {
                       ) {
                         const index = cursor++,
                           branch = step.branches[index]!;
-                        const child = await operations.begin<C.Json>(
+                        const child = await operations.begin<Contracts.Json>(
                           {
                             kind: 'part/pipeline-branch',
                             childPolicy: 'attached',
@@ -724,7 +740,9 @@ export function createPipelineEngine(options: {
                       'pipeline.parallel',
                       'One or more required parallel branches failed',
                     );
-                  result = ok(outputs.map((value) => (value as { ok: true; value: C.Json }).value));
+                  result = ok(
+                    outputs.map((value) => (value as { ok: true; value: Contracts.Json }).value),
+                  );
                 } else return fail('pipeline.kind', 'Unsupported step', 'unsupported');
                 return result;
               }
@@ -736,7 +754,7 @@ export function createPipelineEngine(options: {
                   step.timeoutMs ? Date.now() + step.timeoutMs : Infinity,
                 ];
                 const deadline = Math.min(...deadlines);
-                const child = await operations.begin<C.Json>(
+                const child = await operations.begin<Contracts.Json>(
                   {
                     kind: 'part/pipeline-step',
                     childPolicy: 'attached',

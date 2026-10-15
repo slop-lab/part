@@ -1,25 +1,28 @@
-import type { Contracts as C, Results as R, Storage as D } from './reference.js';
+import type { Contracts, Results, Storage } from './reference.js';
 import { ok, fail, digest, canonical, freeze, isJson } from './contracts.js';
 import { createOperations } from './runtime.js';
 import type { Operations } from './runtime.js';
 import { provenance } from './context.js';
 export interface ResultsOptions {
-  artifacts?: D.ArtifactStore;
+  artifacts?: Storage.ArtifactStore;
   capture?: (
     id: string,
-    context: C.InvocationContext,
-  ) => Promise<C.Result<{ bytes: Uint8Array; producedBy: C.EntityRef }>>;
-  authorizeProducer?: (ref: C.EntityRef, context: C.InvocationContext) => Promise<C.Result<void>>;
-  processors?: readonly R.Processor[];
+    context: Contracts.InvocationContext,
+  ) => Promise<Contracts.Result<{ bytes: Uint8Array; producedBy: Contracts.EntityRef }>>;
+  authorizeProducer?: (
+    ref: Contracts.EntityRef,
+    context: Contracts.InvocationContext,
+  ) => Promise<Contracts.Result<void>>;
+  processors?: readonly Results.Processor[];
   profiles?: Readonly<Record<string, readonly string[]>>;
   maxBytes?: number;
   operations?: Operations;
   processorTimeoutMs?: number;
 }
 export function createResults(
-  types: readonly R.TypeDefinition<unknown>[],
+  types: readonly Results.TypeDefinition<unknown>[],
   options: ResultsOptions = {},
-): C.Result<R.Service> {
+): Contracts.Result<Results.Service> {
   if (
     types.some((type) => type.id !== type.schema.ref.id || type.version !== type.schema.ref.version)
   )
@@ -36,20 +39,23 @@ export function createResults(
     return fail('results.profile', 'Invalid validation profile');
   const records = new Map<
     string,
-    { accepted: R.Accepted; principal: C.InvocationContext['principal'] }
+    { accepted: Results.Accepted; principal: Contracts.InvocationContext['principal'] }
   >();
-  const submissions = new Map<string, { digest: string; result: Promise<C.Result<R.Accepted>> }>();
+  const submissions = new Map<
+    string,
+    { digest: string; result: Promise<Contracts.Result<Results.Accepted>> }
+  >();
   const operations = options.operations ?? createOperations();
   const timeout = options.processorTimeoutMs ?? 30000;
   if (!Number.isSafeInteger(timeout) || timeout < 1)
     return fail('results.timeout', 'Invalid processor timeout');
   const maximum = options.maxBytes ?? 16 * 1024 * 1024;
-  const schemaFor = (ref: C.SchemaRef) => schemas.get(`${ref.id}@${ref.version}`);
+  const schemaFor = (ref: Contracts.SchemaRef) => schemas.get(`${ref.id}@${ref.version}`);
   async function decode(
-    data: R.Input,
-    producer: C.EntityRef,
-    context: C.InvocationContext,
-  ): Promise<C.Result<C.Json>> {
+    data: Results.Input,
+    producer: Contracts.EntityRef,
+    context: Contracts.InvocationContext,
+  ): Promise<Contracts.Result<Contracts.Json>> {
     if (data.kind === 'inline')
       return isJson(data.value)
         ? ok(structuredClone(data.value))
@@ -79,8 +85,8 @@ export function createResults(
       const loaded = await options.capture(data.captureId, context);
       if (!loaded.ok) return loaded;
       if (
-        canonical(loaded.value.producedBy as unknown as C.Json) !==
-        canonical(producer as unknown as C.Json)
+        canonical(loaded.value.producedBy as unknown as Contracts.Json) !==
+        canonical(producer as unknown as Contracts.Json)
       )
         return fail('results.producer', 'Capture producer does not match', 'permission');
       bytes = loaded.value.bytes.slice();
@@ -95,9 +101,9 @@ export function createResults(
     }
   }
   async function submit(
-    input: R.Submission,
-    context: C.InvocationContext,
-  ): Promise<C.Result<R.Accepted>> {
+    input: Results.Submission,
+    context: Contracts.InvocationContext,
+  ): Promise<Contracts.Result<Results.Accepted>> {
     if (context.signal.aborted)
       return fail('results.cancelled', 'Submission cancelled', 'cancelled');
     if (options.authorizeProducer) {
@@ -114,8 +120,11 @@ export function createResults(
     const expected = schemaFor(input.expectedType);
     if (!expected) return fail('results.type', 'Result schema not installed', 'unsupported');
     let data = input.data;
-    const validation: R.Validation[] = [];
-    async function check(data: R.Input, ref: C.SchemaRef): Promise<C.Result<C.Json>> {
+    const validation: Results.Validation[] = [];
+    async function check(
+      data: Results.Input,
+      ref: Contracts.SchemaRef,
+    ): Promise<Contracts.Result<Contracts.Json>> {
       const schema = schemaFor(ref);
       if (!schema) return fail('results.type', 'Processor schema not installed', 'unsupported');
       const decoded = await decode(data, input.producedBy, context);
@@ -133,7 +142,10 @@ export function createResults(
       if (context.signal.aborted)
         return fail('results.cancelled', 'Processing cancelled', 'cancelled');
       // Pass a fixed explicit capture; processors never re-read mutable source files.
-      const invocation = await operations.begin<{ output: R.Input; evidence: R.Validation }>(
+      const invocation = await operations.begin<{
+        output: Results.Input;
+        evidence: Results.Validation;
+      }>(
         { kind: 'part/result-processor', childPolicy: 'attached', retryOwner: 'part/results' },
         async (c) => {
           const processed = await processor.process(
@@ -205,7 +217,7 @@ export function createResults(
       status: 'pass',
       diagnostics: [],
     });
-    const accepted: R.Accepted = freeze({
+    const accepted: Results.Accepted = freeze({
       id: crypto.randomUUID(),
       type: { ...input.expectedType },
       data: { kind: 'inline', value: checked.value },
@@ -223,7 +235,7 @@ export function createResults(
       if (!isJson(input)) return fail('results.input', 'Submission must be lossless JSON');
       input = structuredClone(input);
       const key = canonical({ principal: context.principal, submissionId: input.submissionId }),
-        fingerprint = canonical(input as unknown as C.Json);
+        fingerprint = canonical(input as unknown as Contracts.Json);
       const existing = submissions.get(key);
       if (existing)
         return existing.digest === fingerprint

@@ -1,24 +1,26 @@
 import { scheduleDeadline } from './deadline.js';
-import type { Contracts as C, Runtime as R } from './reference.js';
+import type { Contracts, Runtime } from './reference.js';
 import { ok, fail, canonical, isJson } from './contracts.js';
 
 interface Waiting {
-  ticket: R.WaitTicket;
-  spec: R.WaitSpec<unknown>;
-  principal: C.InvocationContext['principal'];
+  ticket: Runtime.WaitTicket;
+  spec: Runtime.WaitSpec<unknown>;
+  principal: Contracts.InvocationContext['principal'];
   result?: unknown;
   commands: Map<string, string>;
   listeners: Set<() => void>;
   cleanup(): void;
 }
 export function createSuspensions(
-  options: { authorize?: (ticket: R.WaitTicket, context: C.InvocationContext) => boolean } = {},
-): R.SuspensionPort & {
-  get(id: string): C.Result<R.WaitTicket>;
-  cancel(id: string): C.Result<R.WaitTicket>;
+  options: {
+    authorize?: (ticket: Runtime.WaitTicket, context: Contracts.InvocationContext) => boolean;
+  } = {},
+): Runtime.SuspensionPort & {
+  get(id: string): Contracts.Result<Runtime.WaitTicket>;
+  cancel(id: string): Contracts.Result<Runtime.WaitTicket>;
 } {
   const entries = new Map<string, Waiting>();
-  const touch = (entry: Waiting, state: R.WaitTicket['state']) => {
+  const touch = (entry: Waiting, state: Runtime.WaitTicket['state']) => {
     entry.ticket = { ...entry.ticket, state, revision: String(Number(entry.ticket.revision) + 1) };
     if (state !== 'open') entry.cleanup();
     for (const listener of entry.listeners) listener();
@@ -45,7 +47,7 @@ export function createSuspensions(
       );
       if (Number.isNaN(expires) || expires <= Date.now())
         return fail('wait.expired', 'Invalid or elapsed expiry', 'timeout');
-      const ticket: R.WaitTicket = {
+      const ticket: Runtime.WaitTicket = {
         id: crypto.randomUUID(),
         revision: '0',
         type: spec.type,

@@ -1,49 +1,64 @@
-import type { Contracts as C, Workflows as W, Runtime as R } from './reference.js';
+import type { Contracts, Workflows, Runtime } from './reference.js';
 import { ok, fail, canonical, freeze, isJson } from './contracts.js';
 /** The native owner supplies scheduling, continuation, actions and recovery semantics. */
 export interface NativeWorkflowPort {
   prepare(
-    request: W.PrepareRequest,
-    context: C.InvocationContext,
-  ): Promise<C.Result<Omit<W.Prepared, 'engine' | 'definition'>>>;
+    request: Workflows.PrepareRequest,
+    context: Contracts.InvocationContext,
+  ): Promise<Contracts.Result<Omit<Workflows.Prepared, 'engine' | 'definition'>>>;
   submit(
     key: string,
     prepared: unknown,
-    input: C.Json,
-    limits: R.ExecutionLimits | undefined,
-    context: C.InvocationContext,
+    input: Contracts.Json,
+    limits: Runtime.ExecutionLimits | undefined,
+    context: Contracts.InvocationContext,
   ): Promise<
-    | { kind: 'accepted'; native: C.Json }
-    | { kind: 'rejected'; error: C.Failure }
-    | { kind: 'unknown'; reconciliationKey: string; error: C.Failure }
+    | { kind: 'accepted'; native: Contracts.Json }
+    | { kind: 'rejected'; error: Contracts.Failure }
+    | { kind: 'unknown'; reconciliationKey: string; error: Contracts.Failure }
   >;
-  get(native: C.Json, context: C.InvocationContext): Promise<C.Result<Omit<W.Snapshot, 'ref'>>>;
+  get(
+    native: Contracts.Json,
+    context: Contracts.InvocationContext,
+  ): Promise<Contracts.Result<Omit<Workflows.Snapshot, 'ref'>>>;
   cancel(
-    native: C.Json,
+    native: Contracts.Json,
     reason: string,
-    context: C.InvocationContext,
-  ): Promise<C.Result<R.Cancellation>>;
-  observe(native: C.Json, context: C.InvocationContext): AsyncIterable<R.Update>;
+    context: Contracts.InvocationContext,
+  ): Promise<Contracts.Result<Runtime.Cancellation>>;
+  observe(
+    native: Contracts.Json,
+    context: Contracts.InvocationContext,
+  ): AsyncIterable<Runtime.Update>;
   action(
-    native: C.Json,
-    command: C.CommandRequest,
-    context: C.InvocationContext,
-  ): Promise<C.CommandReceipt>;
-  reconcile(key: string, context: C.InvocationContext): Promise<C.Result<C.Json | null>>;
+    native: Contracts.Json,
+    command: Contracts.CommandRequest,
+    context: Contracts.InvocationContext,
+  ): Promise<Contracts.CommandReceipt>;
+  reconcile(
+    key: string,
+    context: Contracts.InvocationContext,
+  ): Promise<Contracts.Result<Contracts.Json | null>>;
 }
 export function createExternalEngine(
-  descriptor: W.EngineDescriptor,
+  descriptor: Workflows.EngineDescriptor,
   port: NativeWorkflowPort,
-): W.Engine {
+): Workflows.Engine {
   descriptor = freeze(structuredClone(descriptor));
-  const prepared = new WeakMap<W.Prepared, { local: unknown; principal: string }>();
-  const executions = new Map<string, { ref: W.ExecutionRef; principal: string }>();
-  const submissions = new Map<string, { fingerprint: string; pending: Promise<W.Submission> }>();
+  const prepared = new WeakMap<Workflows.Prepared, { local: unknown; principal: string }>();
+  const executions = new Map<string, { ref: Workflows.ExecutionRef; principal: string }>();
+  const submissions = new Map<
+    string,
+    { fingerprint: string; pending: Promise<Workflows.Submission> }
+  >();
   const reconciliations = new Map<
     string,
-    { nativeKey: string; principal: string; ref?: W.ExecutionRef }
+    { nativeKey: string; principal: string; ref?: Workflows.ExecutionRef }
   >();
-  function attach(native: C.Json, context: C.InvocationContext): W.ExecutionRef {
+  function attach(
+    native: Contracts.Json,
+    context: Contracts.InvocationContext,
+  ): Workflows.ExecutionRef {
     const principal = canonical(context.principal);
     const existing = [...executions.values()].find(
       (e) => e.principal === principal && canonical(e.ref.native!) === canonical(native),
@@ -58,13 +73,17 @@ export function createExternalEngine(
     executions.set(ref.id, { ref, principal });
     return ref;
   }
-  function resolve(ref: W.ExecutionRef, context: C.InvocationContext): C.Result<C.Json> {
+  function resolve(
+    ref: Workflows.ExecutionRef,
+    context: Contracts.InvocationContext,
+  ): Contracts.Result<Contracts.Json> {
     const entry = executions.get(ref.id);
     return entry &&
       entry.principal === canonical(context.principal) &&
       ref.engine === descriptor.id &&
       ref.engineVersion === descriptor.version &&
-      canonical(ref as unknown as C.Json) === canonical(entry.ref as unknown as C.Json)
+      canonical(ref as unknown as Contracts.Json) ===
+        canonical(entry.ref as unknown as Contracts.Json)
       ? ok(entry.ref.native!)
       : fail(
           'external.permission',
@@ -72,7 +91,7 @@ export function createExternalEngine(
           'permission',
         );
   }
-  const engine: W.Engine = {
+  const engine: Workflows.Engine = {
     descriptor,
     async prepare(request, context) {
       if (
@@ -99,7 +118,7 @@ export function createExternalEngine(
         result.value.guarantees.control !== 'runner-enforced'
       )
         return fail('external.control', 'Native control guarantee is insufficient', 'unsupported');
-      const value: W.Prepared = Object.freeze({
+      const value: Workflows.Prepared = Object.freeze({
         ...result.value,
         definition: freeze(structuredClone(request.definition)),
         engine: descriptor,
@@ -127,9 +146,9 @@ export function createExternalEngine(
         key: request.idempotencyKey ?? request.requestId,
       });
       const fingerprint = canonical({
-        definition: request.prepared.definition as unknown as C.Json,
+        definition: request.prepared.definition as unknown as Contracts.Json,
         input: request.input,
-        limits: (request.limits as unknown as C.Json) ?? null,
+        limits: (request.limits as unknown as Contracts.Json) ?? null,
       });
       const prior = submissions.get(key);
       if (prior)
@@ -142,7 +161,7 @@ export function createExternalEngine(
             };
       const input = structuredClone(request.input),
         limits = request.limits ? structuredClone(request.limits) : undefined;
-      const pending: Promise<W.Submission> = Promise.resolve().then(async () => {
+      const pending: Promise<Workflows.Submission> = Promise.resolve().then(async () => {
         try {
           if (context.signal.aborted)
             return {

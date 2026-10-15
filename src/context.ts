@@ -1,42 +1,42 @@
-import type { Contracts as C, Context as X, Model as M, Composition as P } from './reference.js';
+import type { Contracts, Context, Model, Composition } from './reference.js';
 import { ok, fail, digest, freeze, isJson } from './contracts.js';
 
-export const lowerersPoint: P.ExtensionPoint<X.Lowerer<unknown>> = {
+export const lowerersPoint: Composition.ExtensionPoint<Context.Lowerer<unknown>> = {
   id: 'part.context/lowerers',
   owner: 'part/context',
   contractVersion: 1,
   kind: 'registry',
   scope: 'runtime',
 };
-export const lowerersKey: C.ServiceKey<ReadonlyMap<string, X.Lowerer<unknown>>> = {
+export const lowerersKey: Contracts.ServiceKey<ReadonlyMap<string, Context.Lowerer<unknown>>> = {
   id: lowerersPoint.id,
   contractVersion: lowerersPoint.contractVersion,
   scope: lowerersPoint.scope,
 };
-export const transformsPoint: P.ExtensionPoint<X.SetTransform> = {
+export const transformsPoint: Composition.ExtensionPoint<Context.SetTransform> = {
   id: 'part.context/transforms',
   owner: 'part/context',
   contractVersion: 1,
   kind: 'pipeline',
   scope: 'runtime',
 };
-export const transformsKey: C.ServiceKey<readonly X.SetTransform[]> = {
+export const transformsKey: Contracts.ServiceKey<readonly Context.SetTransform[]> = {
   id: transformsPoint.id,
   contractVersion: transformsPoint.contractVersion,
   scope: transformsPoint.scope,
 };
-export const provenance: C.Provenance = Object.freeze({
+export const provenance: Contracts.Provenance = Object.freeze({
   component: 'part/context',
   componentVersion: '0.1.0-alpha.2',
   origin: 'module',
 });
-const sourceKey = (source: X.SourceRef) => JSON.stringify(source);
+const sourceKey = (source: Context.SourceRef) => JSON.stringify(source);
 export async function semanticItem(
   type: string,
-  payload: C.Json,
+  payload: Contracts.Json,
   id: string = crypto.randomUUID(),
   schemaVersion = 1,
-): Promise<X.SemanticItem<C.Json>> {
+): Promise<Context.SemanticItem<Contracts.Json>> {
   const copy = structuredClone(payload),
     hash = await digest(copy);
   return freeze({
@@ -49,24 +49,24 @@ export async function semanticItem(
   });
 }
 export async function messageItem(
-  role: X.Fragment['role'],
-  content: readonly M.ContentPart[],
-  relation?: X.Fragment['toolRelation'],
-): Promise<X.SemanticItem<C.Json>> {
+  role: Context.Fragment['role'],
+  content: readonly Model.ContentPart[],
+  relation?: Context.Fragment['toolRelation'],
+): Promise<Context.SemanticItem<Contracts.Json>> {
   return semanticItem('part/message', {
     role: role ?? 'user',
-    content: content as unknown as C.Json,
+    content: content as unknown as Contracts.Json,
     ...(relation ? { relation: { ...relation } } : {}),
   });
 }
-export const messageLowerer: X.Lowerer<unknown> = {
+export const messageLowerer: Context.Lowerer<unknown> = {
   id: 'part/message-lowerer',
   accepts: { id: 'part/message', version: 1 },
   lower(item) {
     const payload = item.payload as {
-      role?: X.Fragment['role'];
-      content?: M.ContentPart[];
-      relation?: X.Fragment['toolRelation'];
+      role?: Context.Fragment['role'];
+      content?: Model.ContentPart[];
+      relation?: Context.Fragment['toolRelation'];
     } | null;
     if (
       !payload ||
@@ -108,7 +108,7 @@ export const messageLowerer: X.Lowerer<unknown> = {
     });
   },
 };
-export const defaultPlanner: X.Planner = {
+export const defaultPlanner: Context.Planner = {
   async plan(request) {
     return ok({
       id: crypto.randomUUID(),
@@ -121,7 +121,7 @@ export const defaultPlanner: X.Planner = {
     });
   },
 };
-export const defaultAssembler: X.Assembler = {
+export const defaultAssembler: Context.Assembler = {
   assemble(fragments) {
     const ids = new Set<string>(),
       calls = new Map<string, string>(),
@@ -155,15 +155,15 @@ export const defaultAssembler: X.Assembler = {
 };
 export function createContextCompiler(
   options: {
-    planner?: X.Planner;
-    resolver?: X.Resolver;
-    lowerers?: readonly X.Lowerer<unknown>[];
-    transforms?: readonly X.SetTransform[];
-    assembler?: X.Assembler;
+    planner?: Context.Planner;
+    resolver?: Context.Resolver;
+    lowerers?: readonly Context.Lowerer<unknown>[];
+    transforms?: readonly Context.SetTransform[];
+    assembler?: Context.Assembler;
     compositionRevision?: string;
   } = {},
-): C.Result<X.Compiler> {
-  const lowerers = new Map<string, X.Lowerer<unknown>>();
+): Contracts.Result<Context.Compiler> {
+  const lowerers = new Map<string, Context.Lowerer<unknown>>();
   for (const lowerer of options.lowerers ?? [messageLowerer]) {
     const key = `${lowerer.accepts.id}@${lowerer.accepts.version}`;
     if (lowerers.has(key)) return fail('context.duplicate-lowerer', key, 'conflict');
@@ -178,12 +178,12 @@ export function createContextCompiler(
         return fail('context.cancelled', 'Compilation cancelled', 'cancelled');
       const planned = await planner.plan(request, context);
       if (!planned.ok) return planned;
-      let fragments: X.Fragment[] = [];
-      const sourceVersions: X.SourceVersion[] = [],
-        decisions: X.CompiledContext['decisions'][number][] = [],
+      let fragments: Context.Fragment[] = [];
+      const sourceVersions: Context.SourceVersion[] = [],
+        decisions: Context.CompiledContext['decisions'][number][] = [],
         required = new Set<string>();
       for (const selection of planned.value.selections) {
-        let items: readonly X.SemanticItem[];
+        let items: readonly Context.SemanticItem[];
         if (selection.source.kind === 'inline') {
           const matches = request.input.filter(
             (item) => sourceKey(item.source) === sourceKey(selection.source),
@@ -281,7 +281,7 @@ export function createContextCompiler(
         consistency: 'per-source' as const,
         losses: [],
       };
-      return ok(freeze({ ...value, digest: await digest(value as unknown as C.Json) }));
+      return ok(freeze({ ...value, digest: await digest(value as unknown as Contracts.Json) }));
     },
   });
 }

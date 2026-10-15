@@ -1,4 +1,4 @@
-import type { Contracts as C, Skills as S, Packages as P, Context as X } from './reference.js';
+import type { Contracts, Skills, Packages, Context } from './reference.js';
 import { ok, fail, freeze, canonical } from './contracts.js';
 import { semanticItem } from './context.js';
 interface Decoded {
@@ -6,7 +6,7 @@ interface Decoded {
   description: string;
   instructions: string;
 }
-function decode(text: string): C.Result<Decoded> {
+function decode(text: string): Contracts.Result<Decoded> {
   const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)([\s\S]*)$/u.exec(text);
   if (!match) return fail('skill.frontmatter', 'SKILL.md requires frontmatter');
   const fields = new Map<string, string>();
@@ -53,20 +53,20 @@ function decode(text: string): C.Result<Decoded> {
   return ok({ name, description, instructions: match[2]! });
 }
 export function createSkills(
-  source: P.Source,
-  packages: readonly P.Snapshot[],
-): S.Service & { closeOwner(owner: C.EntityRef): void } {
+  source: Packages.Source,
+  packages: readonly Packages.Snapshot[],
+): Skills.Service & { closeOwner(owner: Contracts.EntityRef): void } {
   const active = new Map<
     string,
-    { activation: S.Activation; principal: C.InvocationContext['principal'] }
+    { activation: Skills.Activation; principal: Contracts.InvocationContext['principal'] }
   >();
   const descriptor = async (
-    snapshot: P.Snapshot,
-    context: C.InvocationContext,
-  ): Promise<C.Result<{ descriptor: S.Descriptor; instructions: string }>> => {
+    snapshot: Packages.Snapshot,
+    context: Contracts.InvocationContext,
+  ): Promise<Contracts.Result<{ descriptor: Skills.Descriptor; instructions: string }>> => {
     const content = await source.read(snapshot, 'SKILL.md', context);
     if (!content.ok) return content;
-    let decoded: C.Result<Decoded>;
+    let decoded: Contracts.Result<Decoded>;
     try {
       decoded = decode(new TextDecoder('utf-8', { fatal: true }).decode(content.value));
     } catch {
@@ -91,7 +91,7 @@ export function createSkills(
   };
   return {
     async list(context) {
-      const descriptors: S.Descriptor[] = [];
+      const descriptors: Skills.Descriptor[] = [];
       for (const snapshot of packages) {
         if (!snapshot.assets.some((a) => a.path === 'SKILL.md')) continue;
         const decoded = await descriptor(snapshot, context);
@@ -109,7 +109,7 @@ export function createSkills(
         return fail('skill.scope', 'Unsupported activation scope');
       const decoded = await descriptor(snapshot, context);
       if (!decoded.ok) return decoded;
-      const activation: S.Activation = freeze({
+      const activation: Skills.Activation = freeze({
         id: crypto.randomUUID(),
         descriptor: decoded.value.descriptor,
         owner: { ...request.owner },
@@ -140,16 +140,16 @@ export function createSkills(
     closeOwner(owner) {
       for (const [id, value] of active)
         if (
-          canonical(value.activation.owner as unknown as C.Json) ===
-          canonical(owner as unknown as C.Json)
+          canonical(value.activation.owner as unknown as Contracts.Json) ===
+          canonical(owner as unknown as Contracts.Json)
         )
           active.delete(id);
     },
   };
 }
 export function skillLowerer(
-  role: X.Fragment['role'] = 'user',
-): X.Lowerer<{ instructions: string }> {
+  role: Context.Fragment['role'] = 'user',
+): Context.Lowerer<{ instructions: string }> {
   return {
     id: 'part/skill-instructions',
     accepts: { id: 'part/skill-instructions', version: 1 },

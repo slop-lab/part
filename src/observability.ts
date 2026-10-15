@@ -1,14 +1,21 @@
-import type { Contracts as C, Observability as O } from './reference.js';
+import type { Contracts, Observability } from './reference.js';
 import { ok, fail, canonical, freeze, isJsonObject, isJson } from './contracts.js';
 export function createObservability(options: {
-  policy: O.TracePolicy;
+  policy: Observability.TracePolicy;
   maxExecutions?: number;
   maxEvents?: number;
-  redact?: (event: C.Json) => C.Result<C.Json>;
-}): O.Service & {
-  register(manifest: O.InvocationManifest, context: C.InvocationContext): C.Result<void>;
-  record(ref: C.EntityRef, event: C.Json, context: C.InvocationContext): C.Result<void>;
-  delete(ref: C.EntityRef, context: C.InvocationContext): C.Result<void>;
+  redact?: (event: Contracts.Json) => Contracts.Result<Contracts.Json>;
+}): Observability.Service & {
+  register(
+    manifest: Observability.InvocationManifest,
+    context: Contracts.InvocationContext,
+  ): Contracts.Result<void>;
+  record(
+    ref: Contracts.EntityRef,
+    event: Contracts.Json,
+    context: Contracts.InvocationContext,
+  ): Contracts.Result<void>;
+  delete(ref: Contracts.EntityRef, context: Contracts.InvocationContext): Contracts.Result<void>;
 } {
   const policy = freeze(structuredClone(options.policy)),
     maxEvents = options.maxEvents ?? 1000;
@@ -29,15 +36,15 @@ export function createObservability(options: {
   const records = new Map<
     string,
     {
-      manifest: O.InvocationManifest;
+      manifest: Observability.InvocationManifest;
       principal: string;
       expires: number;
-      events: { sequence: number; value: C.Json }[];
+      events: { sequence: number; value: Contracts.Json }[];
       next: number;
     }
   >();
-  const key = (ref: C.EntityRef) => canonical(ref as unknown as C.Json);
-  const lookup = (ref: C.EntityRef, context: C.InvocationContext) => {
+  const key = (ref: Contracts.EntityRef) => canonical(ref as unknown as Contracts.Json);
+  const lookup = (ref: Contracts.EntityRef, context: Contracts.InvocationContext) => {
     const record = records.get(key(ref));
     if (record && record.expires <= Date.now()) {
       records.delete(key(ref));
@@ -49,8 +56,8 @@ export function createObservability(options: {
     register(manifest, context) {
       if (
         !isJson(manifest) ||
-        canonical(manifest.tracePolicy as unknown as C.Json) !==
-          canonical(policy as unknown as C.Json)
+        canonical(manifest.tracePolicy as unknown as Contracts.Json) !==
+          canonical(policy as unknown as Contracts.Json)
       )
         return fail('trace.manifest', 'Invalid manifest or trace policy mismatch');
       for (const [id, record] of records) if (record.expires <= Date.now()) records.delete(id);
@@ -73,9 +80,9 @@ export function createObservability(options: {
       if (!record) return fail('trace.permission', 'Trace access denied', 'permission');
       if (policy.mode === 'none') return ok(undefined);
       if (!isJsonObject(event)) return fail('trace.event', 'Trace event must be a JSON object');
-      let value: C.Json;
+      let value: Contracts.Json;
       if (policy.mode === 'metadata') {
-        const safe: Record<string, C.Json> = {};
+        const safe: Record<string, Contracts.Json> = {};
         for (const field of [
           'type',
           'timestamp',
@@ -92,7 +99,7 @@ export function createObservability(options: {
             safe[field] = event[field]!;
         value = safe;
       } else {
-        const selected: Record<string, C.Json> = { ...structuredClone(event) };
+        const selected: Record<string, Contracts.Json> = { ...structuredClone(event) };
         if (!policy.captureRequestBody) delete selected.requestBody;
         if (!policy.captureToolOutput) delete selected.toolOutput;
         if (policy.mode === 'redacted') {

@@ -1,27 +1,27 @@
-import type { Contracts as C, Storage as D } from './reference.js';
+import type { Contracts, Storage } from './reference.js';
 import { ok, fail, isJson, canonical } from './contracts.js';
 import { provenance } from './context.js';
 /** Explicit owner migration: data and successful schema publication commit atomically. */
 export function createNamespaceMigrations(
-  store: D.StateJournalStore,
+  store: Storage.StateJournalStore,
   options: {
     namespace: string;
     owner: string;
     targetVersion: number;
-    migrations: readonly D.Migration[];
-    schema: C.Schema<C.Json>;
+    migrations: readonly Storage.Migration[];
+    schema: Contracts.Schema<Contracts.Json>;
   },
 ): {
   migrate(
-    addresses: readonly D.StateAddress[],
-    context: C.InvocationContext,
-  ): Promise<C.Result<C.CommitEvidence>>;
+    addresses: readonly Storage.StateAddress[],
+    context: Contracts.InvocationContext,
+  ): Promise<Contracts.Result<Contracts.CommitEvidence>>;
   read(
-    address: D.StateAddress,
-    context: C.InvocationContext,
-  ): ReturnType<D.StateJournalStore['read']>;
+    address: Storage.StateAddress,
+    context: Contracts.InvocationContext,
+  ): ReturnType<Storage.StateJournalStore['read']>;
 } {
-  const address: D.StateAddress = {
+  const address: Storage.StateAddress = {
     namespace: 'part/migrations',
     scope: { kind: 'runtime', id: options.owner },
     key: options.namespace,
@@ -52,7 +52,8 @@ export function createNamespaceMigrations(
     async migrate(addresses, context) {
       if (
         addresses.some((a) => a.namespace !== options.namespace) ||
-        new Set(addresses.map((a) => canonical(a as unknown as C.Json))).size !== addresses.length
+        new Set(addresses.map((a) => canonical(a as unknown as Contracts.Json))).size !==
+          addresses.length
       )
         return fail('migration.address', 'Invalid or duplicate migration address');
       const ledger = await store.read(address, context);
@@ -85,7 +86,7 @@ export function createNamespaceMigrations(
       if (!running.ok || !running.value)
         return fail('migration.ledger', 'Migration ledger unavailable');
       try {
-        const mutations: D.Mutation[] = [];
+        const mutations: Storage.Mutation[] = [];
         for (const target of addresses) {
           const loaded = await store.read(target, context);
           if (!loaded.ok) throw loaded.error;

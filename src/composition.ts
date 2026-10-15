@@ -1,16 +1,16 @@
 import { sha256 } from './hash.js';
-import type { Composition as P, Contracts as C } from './reference.js';
+import type { Composition, Contracts } from './reference.js';
 import { ok, fail, emptyCleanup, localContext, freeze, isJson, canonical } from './contracts.js';
 
-type Point = P.ExtensionPoint<unknown>;
-type Binding = P.Contribution<unknown>;
+type Point = Composition.ExtensionPoint<unknown>;
+type Binding = Composition.Contribution<unknown>;
 interface Plan {
-  inspection: P.ResolvedComposition;
-  components: readonly P.ComponentFactory[];
-  config: C.Json;
+  inspection: Composition.ResolvedComposition;
+  components: readonly Composition.ComponentFactory[];
+  config: Contracts.Json;
   points: Map<string, Point>;
   bindings: Map<string, Binding[]>;
-  factories: Map<string, P.ServiceFactory<unknown>>;
+  factories: Map<string, Composition.ServiceFactory<unknown>>;
   factoryOrder: string[];
 }
 const plans = new WeakMap<object, Plan>();
@@ -20,7 +20,7 @@ const same = (a: Point, b: Point) =>
   a.contractVersion === b.contractVersion &&
   a.kind === b.kind &&
   a.scope === b.scope;
-function order(ids: string[], edges: [string, string][]): C.Result<string[]> {
+function order(ids: string[], edges: [string, string][]): Contracts.Result<string[]> {
   const remaining = new Set(ids),
     result: string[] = [];
   for (const [a, b] of edges)
@@ -36,24 +36,24 @@ function order(ids: string[], edges: [string, string][]): C.Result<string[]> {
   }
   return ok(result);
 }
-export function isCompositionHandle(value: P.CompositionHandle): boolean {
+export function isCompositionHandle(value: Composition.CompositionHandle): boolean {
   if (!value || typeof value.localToken !== 'object' || value.localToken === null) return false;
   return plans.get(value.localToken)?.inspection === value.inspection;
 }
 export function createPlanner(
-  options: { schemas?: readonly C.Schema<unknown>[]; surface?: P.Surface } = {},
-): P.CompositionPlanner {
+  options: { schemas?: readonly Contracts.Schema<unknown>[]; surface?: Composition.Surface } = {},
+): Composition.CompositionPlanner {
   return {
     resolve(spec) {
       const points = new Map<string, Point>(),
         bindings = new Map<string, Binding[]>(),
-        factories = new Map<string, P.ServiceFactory<unknown>>();
-      const errors: C.Failure[] = [];
-      const record = (r: C.Result<void>) => {
+        factories = new Map<string, Composition.ServiceFactory<unknown>>();
+      const errors: Contracts.Failure[] = [];
+      const record = (r: Contracts.Result<void>) => {
         if (!r.ok) errors.push(r.error);
         return r;
       };
-      const port: P.RegistrationPort = {
+      const port: Composition.RegistrationPort = {
         declare(point) {
           if (
             !point.id ||
@@ -101,7 +101,7 @@ export function createPlanner(
           factories.set(point.id, {
             ...factory,
             dependencies: factory.dependencies.map((d) => ({ ...d })),
-          } as P.ServiceFactory<unknown>);
+          } as Composition.ServiceFactory<unknown>);
           return ok(undefined);
         },
         replace(replacement) {
@@ -236,7 +236,7 @@ export function createPlanner(
       const components = componentOrder.value.map((id) =>
         spec.components.find((c) => c.descriptor.id === id)!,
       );
-      let config: C.Json;
+      let config: Contracts.Json;
       try {
         if (!isJson(spec.config))
           return fail('composition.config', 'Configuration must be lossless JSON');
@@ -244,13 +244,13 @@ export function createPlanner(
       } catch {
         return fail('composition.config', 'Configuration must be cloneable JSON');
       }
-      const inspection: P.ResolvedComposition = freeze({
+      const inspection: Composition.ResolvedComposition = freeze({
         id: crypto.randomUUID(),
         revision,
         digest: sha256(
           new TextEncoder().encode(
             canonical({
-              components: components.map((c) => c.descriptor) as unknown as C.Json,
+              components: components.map((c) => c.descriptor) as unknown as Contracts.Json,
               config,
               factories: factoryOrder.value.map((point) => ({
                 point,
@@ -297,8 +297,8 @@ export function createPlanner(
   };
 }
 export function createScopeManager(
-  options: { context?: Partial<C.InvocationContext> } = {},
-): P.ScopeManager {
+  options: { context?: Partial<Contracts.InvocationContext> } = {},
+): Composition.ScopeManager {
   return {
     async open(scope, composition) {
       const plan =
@@ -308,10 +308,10 @@ export function createScopeManager(
       if (!plan || composition.inspection !== plan.inspection)
         return fail('composition.handle', 'Unknown or modified composition handle');
       const values = new Map<string, unknown>(),
-        cleanup: (() => Promise<C.CleanupReport>)[] = [];
-      let closing: Promise<C.CleanupReport> | undefined,
+        cleanup: (() => Promise<Contracts.CleanupReport>)[] = [];
+      let closing: Promise<Contracts.CleanupReport> | undefined,
         closed = false;
-      const services: C.ServiceAccess = {
+      const services: Contracts.ServiceAccess = {
         get(key) {
           const point = plan.points.get(key.id);
           if (
@@ -327,20 +327,23 @@ export function createScopeManager(
         },
       };
       const context = localContext({ ...options.context, scope, services });
-      const failureWithCleanup = (error: C.Failure, cleanup: C.CleanupReport): C.Result<never> => ({
+      const failureWithCleanup = (
+        error: Contracts.Failure,
+        cleanup: Contracts.CleanupReport,
+      ): Contracts.Result<never> => ({
         ok: false,
         error: {
           ...error,
           details: {
-            cleanup: cleanup as unknown as C.Json,
+            cleanup: cleanup as unknown as Contracts.Json,
             originalDetails: error.details ?? null,
           },
         },
       });
-      const close = (): Promise<C.CleanupReport> =>
+      const close = (): Promise<Contracts.CleanupReport> =>
         (closing ??= (async () => {
           closed = true;
-          const reports: C.CleanupReport[] = [];
+          const reports: Contracts.CleanupReport[] = [];
           for (const dispose of cleanup.reverse()) {
             try {
               reports.push(await dispose());
@@ -390,7 +393,10 @@ export function createScopeManager(
             const report = await close();
             return {
               ok: false,
-              error: { ...created.error, details: { cleanup: report as unknown as C.Json } },
+              error: {
+                ...created.error,
+                details: { cleanup: report as unknown as Contracts.Json },
+              },
             };
           }
           values.set(id, created.value.value);

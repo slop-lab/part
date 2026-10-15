@@ -1,27 +1,39 @@
-import type { Contracts as C, Hooks as H, Scripts as S, Runtime as R } from './reference.js';
+import type { Contracts, Hooks, Scripts, Runtime } from './reference.js';
 import { ok, fail, canonical, isJsonObject } from './contracts.js';
 export function createScriptHooks(
-  points: readonly H.Point<unknown, unknown>[],
-  scripts: S.Service,
+  points: readonly Hooks.Point<unknown, unknown>[],
+  scripts: Scripts.Service,
   options: {
-    match?: (matcher: C.Json, input: unknown, context: C.InvocationContext) => C.Result<boolean>;
-    report?: (binding: H.Binding, error: C.Failure, context: C.InvocationContext) => void;
+    match?: (
+      matcher: Contracts.Json,
+      input: unknown,
+      context: Contracts.InvocationContext,
+    ) => Contracts.Result<boolean>;
+    report?: (
+      binding: Hooks.Binding,
+      error: Contracts.Failure,
+      context: Contracts.InvocationContext,
+    ) => void;
   } = {},
-): C.Result<
-  H.Service & {
+): Contracts.Result<
+  Hooks.Service & {
     fire(
       id: string,
       input: unknown,
-      context: C.InvocationContext,
-    ): Promise<C.Result<readonly unknown[]>>;
-    closeOwner(owner: C.EntityRef): void;
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<readonly unknown[]>>;
+    closeOwner(owner: Contracts.EntityRef): void;
   }
 > {
   const registry = new Map(points.map((p) => [p.id, p]));
   if (registry.size !== points.length) return fail('hook.duplicate', 'Duplicate hook point');
   const bindings = new Map<
       string,
-      { binding: H.Binding; principal: C.InvocationContext['principal']; consumed: boolean }
+      {
+        binding: Hooks.Binding;
+        principal: Contracts.InvocationContext['principal'];
+        consumed: boolean;
+      }
     >(),
     depth = new Map<string, number>();
   return ok({
@@ -58,8 +70,8 @@ export function createScriptHooks(
     closeOwner(owner) {
       for (const [id, entry] of bindings)
         if (
-          canonical(entry.binding.activationOwner as unknown as C.Json) ===
-          canonical(owner as unknown as C.Json)
+          canonical(entry.binding.activationOwner as unknown as Contracts.Json) ===
+          canonical(owner as unknown as Contracts.Json)
         )
           bindings.delete(id);
     },
@@ -90,13 +102,13 @@ export function createScriptHooks(
         if (binding.once) entry.consumed = true;
         depth.set(key, current + 1);
         try {
-          const executed = await (async (): Promise<C.Result<unknown>> => {
+          const executed = await (async (): Promise<Contracts.Result<unknown>> => {
             const script = await scripts.execute(
               {
                 ...binding.script,
                 stdin: {
                   point: { id: point.id, version: point.version },
-                  input: checked.value as C.Json,
+                  input: checked.value as Contracts.Json,
                 },
               },
               context,
@@ -131,10 +143,13 @@ export function createScriptHooks(
             try {
               options.report?.(binding, executed.error, context);
             } catch {}
-            (context as C.InvocationContext & { progress?: R.ProgressSink }).progress?.publish(
-              'part.hook/failure',
-              { bindingId: binding.id, code: executed.error.code, policy: binding.failure },
-            );
+            (
+              context as Contracts.InvocationContext & { progress?: Runtime.ProgressSink }
+            ).progress?.publish('part.hook/failure', {
+              bindingId: binding.id,
+              code: executed.error.code,
+              policy: binding.failure,
+            });
             if (binding.failure === 'report-and-continue') continue;
             return executed;
           }

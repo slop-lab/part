@@ -1,11 +1,17 @@
-import type { Contracts as C, Host as H } from './reference.js';
+import type { Contracts, Host } from './reference.js';
 import { ok, fail, canonical, emptyCleanup } from './contracts.js';
-export function createResourceManager(options: { closeGraceMs?: number } = {}): H.ResourceManager {
+export function createResourceManager(
+  options: { closeGraceMs?: number } = {},
+): Host.ResourceManager {
   const entries = new Map<
     string,
-    { resource: H.RuntimeResource; owner: C.ScopeRef; closing?: Promise<C.Result<void>> }
+    {
+      resource: Host.RuntimeResource;
+      owner: Contracts.ScopeRef;
+      closing?: Promise<Contracts.Result<void>>;
+    }
   >();
-  const key = (ref: C.ResourceRef) => canonical(ref as unknown as C.Json);
+  const key = (ref: Contracts.ResourceRef) => canonical(ref as unknown as Contracts.Json);
   return {
     register(resource) {
       const id = key(resource.ref);
@@ -33,14 +39,15 @@ export function createResourceManager(options: { closeGraceMs?: number } = {}): 
     },
     async closeOwner(owner) {
       const report = emptyCleanup();
-      const released: C.EntityRef[] = [],
-        unresolved: C.EntityRef[] = [],
-        errors: C.Failure[] = [];
+      const released: Contracts.EntityRef[] = [],
+        unresolved: Contracts.EntityRef[] = [],
+        errors: Contracts.Failure[] = [];
       await Promise.all(
         [...entries]
           .filter(
             ([, entry]) =>
-              canonical(entry.owner as unknown as C.Json) === canonical(owner as unknown as C.Json),
+              canonical(entry.owner as unknown as Contracts.Json) ===
+              canonical(owner as unknown as Contracts.Json),
           )
           .map(async ([id, entry]) => {
             entry.closing ??= Promise.resolve()
@@ -49,7 +56,7 @@ export function createResourceManager(options: { closeGraceMs?: number } = {}): 
             let timer: ReturnType<typeof setTimeout> | undefined;
             const result = await Promise.race([
               entry.closing,
-              new Promise<C.Result<void>>((resolve) => {
+              new Promise<Contracts.Result<void>>((resolve) => {
                 timer = setTimeout(
                   () =>
                     resolve(

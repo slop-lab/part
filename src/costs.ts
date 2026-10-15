@@ -1,6 +1,6 @@
-import type { Contracts as C, Runtime as R, Model as M } from './reference.js';
+import type { Contracts, Runtime, Model } from './reference.js';
 import { ok, fail } from './contracts.js';
-export const costPolicyKey: C.ServiceKey<{ currency: string }> = {
+export const costPolicyKey: Contracts.ServiceKey<{ currency: string }> = {
   id: 'part/estimated-cost-policy',
   contractVersion: 1,
   scope: 'run',
@@ -9,13 +9,13 @@ export interface CostEstimator {
   readonly id: string;
   readonly version: string;
   estimate(
-    request: M.Invocation,
-    profile: M.Profile,
-    context: C.InvocationContext,
-  ): Promise<C.Result<{ amount: string; currency: string }>>;
+    request: Model.Invocation,
+    profile: Model.Profile,
+    context: Contracts.InvocationContext,
+  ): Promise<Contracts.Result<{ amount: string; currency: string }>>;
 }
 /** Integer millionths avoid floating point changes to decimal budget decisions. */
-export function costUnits(amount: string): C.Result<number> {
+export function costUnits(amount: string): Contracts.Result<number> {
   if (!/^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$/.test(amount))
     return fail(
       'cost.amount',
@@ -28,10 +28,10 @@ export function costUnits(amount: string): C.Result<number> {
     : fail('cost.amount', 'Cost exceeds supported precision');
 }
 export function costServices(
-  context: C.InvocationContext,
-  services: C.ServiceAccess,
-  limits?: R.ExecutionLimits,
-): C.Result<C.ServiceAccess> {
+  context: Contracts.InvocationContext,
+  services: Contracts.ServiceAccess,
+  limits?: Runtime.ExecutionLimits,
+): Contracts.Result<Contracts.ServiceAccess> {
   const selected = limits?.estimatedCostCeiling;
   if (!selected) return ok(services);
   const units = costUnits(selected.amount);

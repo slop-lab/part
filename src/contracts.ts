@@ -1,12 +1,12 @@
-import type { Contracts as C } from './reference.js';
+import type { Contracts } from './reference.js';
 export type * from './reference.js';
-export const ok = <T>(value: T): C.Result<T> => ({ ok: true, value });
+export const ok = <T>(value: T): Contracts.Result<T> => ({ ok: true, value });
 export function fail(
   code: string,
   message: string,
-  category: C.Failure['category'] = 'validation',
-  effect?: C.EffectState,
-): { readonly ok: false; readonly error: C.Failure } {
+  category: Contracts.Failure['category'] = 'validation',
+  effect?: Contracts.EffectState,
+): { readonly ok: false; readonly error: Contracts.Failure } {
   return {
     ok: false,
     error: {
@@ -18,8 +18,12 @@ export function fail(
     },
   };
 }
-export const emptyCleanup = (): C.CleanupReport => ({ released: [], unresolved: [], errors: [] });
-export function isJson(value: unknown, seen = new Set<object>()): value is C.Json {
+export const emptyCleanup = (): Contracts.CleanupReport => ({
+  released: [],
+  unresolved: [],
+  errors: [],
+});
+export function isJson(value: unknown, seen = new Set<object>()): value is Contracts.Json {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
   if (typeof value === 'number') return Number.isFinite(value);
   if (typeof value !== 'object' || seen.has(value)) return false;
@@ -47,16 +51,16 @@ export function isJson(value: unknown, seen = new Set<object>()): value is C.Jso
   seen.delete(value);
   return valid;
 }
-export function isJsonObject(value: unknown): value is { readonly [key: string]: C.Json } {
+export function isJsonObject(value: unknown): value is { readonly [key: string]: Contracts.Json } {
   return isJson(value) && value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 export function schema<T>(
   id: string,
   validate: (value: unknown) => value is T,
   version = 1,
-): C.Schema<T> {
+): Contracts.Schema<T> {
   const ref = { id, version };
-  const check: C.Schema<T>['validate'] = (input) => {
+  const check: Contracts.Schema<T>['validate'] = (input) => {
     try {
       return validate(input)
         ? { ok: true, value: input }
@@ -85,29 +89,34 @@ export function schema<T>(
     },
   };
 }
-export const jsonSchema = schema<C.Json>('part/json', isJson);
+export const jsonSchema = schema<Contracts.Json>('part/json', isJson);
 export const stringSchema = schema<string>(
   'part/string',
   (value): value is string => typeof value === 'string',
 );
-export function canonical(value: C.Json): string {
+export function canonical(value: Contracts.Json): string {
   if (!isJson(value)) throw new TypeError('Expected lossless JSON');
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   return `{${Object.keys(value)
     .sort()
-    .map((key) => `${JSON.stringify(key)}:${canonical((value as Record<string, C.Json>)[key]!)}`)
+    .map(
+      (key) =>
+        `${JSON.stringify(key)}:${canonical((value as Record<string, Contracts.Json>)[key]!)}`,
+    )
     .join(',')}}`;
 }
-export async function digest(value: C.Json | Uint8Array): Promise<string> {
+export async function digest(value: Contracts.Json | Uint8Array): Promise<string> {
   const bytes = value instanceof Uint8Array ? value : new TextEncoder().encode(canonical(value));
   const hash = await crypto.subtle.digest('SHA-256', Uint8Array.from(bytes));
   return [...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
-export function localContext(options: Partial<C.InvocationContext> = {}): C.InvocationContext {
+export function localContext(
+  options: Partial<Contracts.InvocationContext> = {},
+): Contracts.InvocationContext {
   return Object.freeze({
     services: {
-      get: <T>(key: C.ServiceKey<T>) =>
+      get: <T>(key: Contracts.ServiceKey<T>) =>
         fail('service.missing', `Missing service ${key.id}`, 'unsupported'),
     },
     signal: new AbortController().signal,

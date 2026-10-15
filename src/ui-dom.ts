@@ -1,32 +1,32 @@
-import type { Contracts as C, Client as L, Projection as P, UI as U } from './reference.js';
+import type { Contracts, Client, Projection, UI } from './reference.js';
 import { createMarkdownView } from './ui-markdown.js';
 import { orderSlots } from './ui-registry.js';
 import { createComposer, createScroll } from './ui-headless.js';
 export interface ChatComponents {
-  Message(item: P.Item, context: U.RenderContext, body: HTMLElement): HTMLElement;
-  Fallback(item: P.Item, context: U.RenderContext): HTMLElement;
-  ToolDetails(item: P.Item, context: U.RenderContext): HTMLElement;
+  Message(item: Projection.Item, context: UI.RenderContext, body: HTMLElement): HTMLElement;
+  Fallback(item: Projection.Item, context: UI.RenderContext): HTMLElement;
+  ToolDetails(item: Projection.Item, context: UI.RenderContext): HTMLElement;
   Composer(context: {
     document: Document;
     form: HTMLFormElement;
     input: HTMLTextAreaElement;
     send: HTMLButtonElement;
-    composer: U.ComposerController;
+    composer: UI.ComposerController;
     submit(): Promise<void>;
   }): HTMLElement;
 }
-export interface ChatOptions extends Omit<U.ChatOptions<HTMLElement>, 'components'> {
+export interface ChatOptions extends Omit<UI.ChatOptions<HTMLElement>, 'components'> {
   readonly components?: Partial<ChatComponents>;
   readonly document?: Document;
-  readonly client: L.Controller & {
-    getPart?(itemId: string, partId: string): L.StreamPartSnapshot | undefined;
+  readonly client: Client.Controller & {
+    getPart?(itemId: string, partId: string): Client.StreamPartSnapshot | undefined;
   };
-  readonly command?: (draft: U.Draft) => C.CommandRequest;
+  readonly command?: (draft: UI.Draft) => Contracts.CommandRequest;
   readonly maxVisibleItems?: number;
 }
 export interface ChatView {
   readonly element: HTMLElement;
-  readonly composer: U.ComposerController;
+  readonly composer: UI.ComposerController;
   dispose(): Promise<void>;
 }
 export function createChat(options: ChatOptions): ChatView {
@@ -89,14 +89,14 @@ export function createChat(options: ChatOptions): ChatView {
         }),
     }),
     scroll = createScroll();
-  const renderers = new Map<string, U.Renderer<C.Json, HTMLElement>>();
+  const renderers = new Map<string, UI.Renderer<Contracts.Json, HTMLElement>>();
   for (const renderer of options.renderers ?? [])
     for (const version of renderer.schemaVersions) {
       const key = `${renderer.target}/${renderer.type}@${version}`;
       if (renderers.has(key)) throw new Error(`Duplicate renderer ${key}`);
       renderers.set(key, renderer);
     }
-  const rendered = new Map<string, { item: P.Item; element: HTMLElement }>();
+  const rendered = new Map<string, { item: Projection.Item; element: HTMLElement }>();
   let visible = options.maxVisibleItems ?? 100,
     disposed = false;
   const markdownViews = new WeakMap<HTMLElement, ReturnType<typeof createMarkdownView>>();
@@ -111,7 +111,7 @@ export function createChat(options: ChatOptions): ChatView {
       if (pre) pre.textContent = text;
     }
   };
-  const fallback = (item: P.Item): HTMLElement => {
+  const fallback = (item: Projection.Item): HTMLElement => {
     if (options.components?.Fallback) {
       try {
         return options.components.Fallback(item, { controller, target: 'chat', itemId: item.id });

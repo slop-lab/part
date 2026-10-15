@@ -1,4 +1,4 @@
-import type { Contracts as C, Runtime as R, Driver as D } from './reference.js';
+import type { Contracts, Runtime, Driver } from './reference.js';
 import type { RunHistoryAttachment, RunHistoryLease } from './history-runs.js';
 import type { Operations } from './runtime.js';
 import { ok, fail, emptyCleanup, canonical } from './contracts.js';
@@ -10,16 +10,16 @@ import { budgetKey } from './model.js';
 
 interface DriverBinding {
   readonly id: string;
-  readonly requires: D.Factory<unknown, unknown>['requires'];
-  validate(input: unknown): C.Result<unknown>;
-  create(services: D.Services, ref: C.EntityRef): D.Instance<unknown, unknown>;
+  readonly requires: Driver.Factory<unknown, unknown>['requires'];
+  validate(input: unknown): Contracts.Result<unknown>;
+  create(services: Driver.Services, ref: Contracts.EntityRef): Driver.Instance<unknown, unknown>;
 }
 export interface InstalledDriver {
   readonly id: string;
   readonly binding: unknown;
 }
 const drivers = new WeakMap<object, DriverBinding>();
-export function installDriver<I, O>(factory: D.Factory<I, O>): InstalledDriver {
+export function installDriver<I, O>(factory: Driver.Factory<I, O>): InstalledDriver {
   const binding = {};
   drivers.set(binding, {
     id: factory.id,
@@ -70,32 +70,32 @@ export function installDriver<I, O>(factory: D.Factory<I, O>): InstalledDriver {
   });
   return Object.freeze({ id: factory.id, binding });
 }
-export interface RunControlService extends R.RunService {
+export interface RunControlService extends Runtime.RunService {
   describeActions(
-    ref: C.EntityRef,
-    context: C.InvocationContext,
-  ): Promise<C.Result<readonly C.ActionDescriptor[]>>;
+    ref: Contracts.EntityRef,
+    context: Contracts.InvocationContext,
+  ): Promise<Contracts.Result<readonly Contracts.ActionDescriptor[]>>;
   receive(
-    ref: C.EntityRef,
+    ref: Contracts.EntityRef,
     actionId: string,
     version: number,
     input: unknown,
-    context: C.InvocationContext,
-  ): Promise<C.Result<D.InputReceipt>>;
+    context: Contracts.InvocationContext,
+  ): Promise<Contracts.Result<Driver.InputReceipt>>;
 }
 export function createRunService(options: {
   drivers: readonly InstalledDriver[];
-  services: D.Services;
+  services: Driver.Services;
   operations: Operations;
   history?: RunHistoryAttachment;
-}): C.Result<RunControlService> {
+}): Contracts.Result<RunControlService> {
   const registry = new Map<string, DriverBinding>(),
-    runs = new Map<string, { handle: R.ExecutionHandle<unknown>; principal: string }>();
+    runs = new Map<string, { handle: Runtime.ExecutionHandle<unknown>; principal: string }>();
   const instances = new Map<
     string,
-    { instance: D.Instance<unknown, unknown>; context: C.InvocationContext }
+    { instance: Driver.Instance<unknown, unknown>; context: Contracts.InvocationContext }
   >();
-  const owned = (ref: C.EntityRef, context: C.InvocationContext) => {
+  const owned = (ref: Contracts.EntityRef, context: Contracts.InvocationContext) => {
     const record = runs.get(ref.id);
     return record &&
       record.principal === canonical(context.principal) &&
@@ -157,10 +157,10 @@ export function createRunService(options: {
       const limits = parsedLimits.value;
       const budget = createBudget(limits),
         upstream = context.services.get(budgetKey);
-      const services: C.ServiceAccess = {
+      const services: Contracts.ServiceAccess = {
         get(key) {
           if (key.id !== budgetKey.id) return context.services.get(key);
-          const port: R.BudgetPort = {
+          const port: Runtime.BudgetPort = {
             reserve(dimension, quantity) {
               const child = budget.reserve(dimension, quantity);
               if (!child.ok || !upstream.ok) return child;
@@ -186,7 +186,7 @@ export function createRunService(options: {
           return ok(port as never);
         },
       };
-      const paired = new WeakMap<R.BudgetReservation, R.BudgetReservation>();
+      const paired = new WeakMap<Runtime.BudgetReservation, Runtime.BudgetReservation>();
       if (upstream.ok) {
         const admitted = upstream.value.reserve('maxChildRuns', 1);
         if (!admitted.ok) return admitted;
@@ -232,9 +232,13 @@ export function createRunService(options: {
           ...(request.parent ? { parent: request.parent } : {}),
         },
         async (c) => {
-          const ref: C.EntityRef = { owner: 'part/operations', kind: 'part/run', id: c.scope.id };
-          let instance: D.Instance<unknown, unknown> | undefined;
-          let outcome: R.ManagedOutcome<unknown> = {
+          const ref: Contracts.EntityRef = {
+            owner: 'part/operations',
+            kind: 'part/run',
+            id: c.scope.id,
+          };
+          let instance: Driver.Instance<unknown, unknown> | undefined;
+          let outcome: Runtime.ManagedOutcome<unknown> = {
             phase: 'failed',
             error: fail('run.exception', 'Driver execution failed', 'internal', 'unknown').error,
             effect: 'unknown',
@@ -290,7 +294,7 @@ export function createRunService(options: {
                 commit: outcome.commit,
                 unsettledChildren: [...outcome.unsettledChildren, ...cleaned.unresolved],
               };
-              c.progress.publish('part.run/cleanup', cleaned as unknown as C.Json);
+              c.progress.publish('part.run/cleanup', cleaned as unknown as Contracts.Json);
             }
           }
           return outcome;

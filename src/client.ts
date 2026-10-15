@@ -1,8 +1,8 @@
-import type { Contracts as C, Client as L, Projection as P } from './reference.js';
+import type { Contracts, Client, Projection } from './reference.js';
 import { ok, fail, isJson, isJsonObject, freeze, canonical } from './contracts.js';
 import { createProgress } from './runtime.js';
 const partKey = (itemId: string, partId: string) => canonical([itemId, partId]);
-export const jsonCodec: L.Codec = {
+export const jsonCodec: Client.Codec = {
   encode(value) {
     return isJson(value)
       ? ok(new TextEncoder().encode(JSON.stringify(value)))
@@ -18,17 +18,17 @@ export const jsonCodec: L.Codec = {
   },
 };
 export function createWatchHub(
-  capabilities: C.CapabilitySet,
-  initialItems: readonly P.Item[] = [],
+  capabilities: Contracts.CapabilitySet,
+  initialItems: readonly Projection.Item[] = [],
 ) {
   let epoch = crypto.randomUUID(),
     sequence = 0,
     audienceRevision = '0';
   const streamId = crypto.randomUUID();
   const items = new Map(initialItems.map((item) => [item.id, structuredClone(item)])),
-    parts = new Map<string, L.StreamPartSnapshot>(),
+    parts = new Map<string, Client.StreamPartSnapshot>(),
     progress = createProgress();
-  const snapshot = (): L.Snapshot => ({
+  const snapshot = (): Client.Snapshot => ({
     epoch,
     streamId,
     throughSequence: sequence,
@@ -40,15 +40,18 @@ export function createWatchHub(
   });
   const emit = (
     type: string,
-    payload: C.Json,
-    persistence: L.EventEnvelope['persistence'] = 'state-backed',
+    payload: Contracts.Json,
+    persistence: Client.EventEnvelope['persistence'] = 'state-backed',
   ) => {
     if (sequence >= Number.MAX_SAFE_INTEGER) {
       epoch = crypto.randomUUID();
       sequence = 0;
-      progress.publish('frame', { kind: 'reset', snapshot: snapshot() } as unknown as C.Json);
+      progress.publish('frame', {
+        kind: 'reset',
+        snapshot: snapshot(),
+      } as unknown as Contracts.Json);
     }
-    const event: L.EventEnvelope = {
+    const event: Client.EventEnvelope = {
       protocolVersion: 1,
       epoch,
       streamId,
@@ -59,21 +62,21 @@ export function createWatchHub(
       persistence,
       payload,
     };
-    progress.publish('frame', { kind: 'event', event } as unknown as C.Json);
+    progress.publish('frame', { kind: 'event', event } as unknown as Contracts.Json);
   };
   return {
     snapshot,
     close: () => progress.end(),
-    upsert(item: P.Item) {
+    upsert(item: Projection.Item) {
       if (!isJson(item)) throw new TypeError('Public item must be JSON');
       items.set(item.id, structuredClone(item));
-      emit('part.item/upsert', item as unknown as C.Json);
+      emit('part.item/upsert', item as unknown as Contracts.Json);
     },
     remove(id: string) {
       items.delete(id);
       emit('part.item/remove', { id });
     },
-    delta(delta: L.TextDelta) {
+    delta(delta: Client.TextDelta) {
       if (
         !Number.isSafeInteger(delta.offset) ||
         delta.offset < 0 ||
@@ -88,24 +91,29 @@ export function createWatchHub(
         (!current && delta.offset !== 0)
       )
         return fail('stream.offset', 'Invalid generation or offset', 'conflict');
-      const value: L.StreamPartSnapshot = {
+      const value: Client.StreamPartSnapshot = {
         ...delta,
         text: (current?.text ?? '') + delta.text,
         offset: delta.offset + delta.text.length,
         completed: false,
       };
       parts.set(key, value);
-      emit('part.text/delta', delta as unknown as C.Json, 'delta');
+      emit('part.text/delta', delta as unknown as Contracts.Json, 'delta');
       return ok(undefined);
     },
-    reset(nextItems: readonly P.Item[], nextAudienceRevision: string) {
+    reset(nextItems: readonly Projection.Item[], nextAudienceRevision: string) {
       items.clear();
       parts.clear();
       for (const item of nextItems) items.set(item.id, structuredClone(item));
       audienceRevision = nextAudienceRevision;
-      progress.publish('frame', { kind: 'reset', snapshot: snapshot() } as unknown as C.Json);
+      progress.publish('frame', {
+        kind: 'reset',
+        snapshot: snapshot(),
+      } as unknown as Contracts.Json);
     },
-    async watch(context: C.InvocationContext): Promise<C.Result<L.WatchSession>> {
+    async watch(
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Client.WatchSession>> {
       if (context.signal.aborted)
         return fail('watch.cancelled', 'Observation cancelled', 'cancelled');
       const iterator = progress.observe({ signal: context.signal })[Symbol.asyncIterator](),
@@ -123,7 +131,7 @@ export function createWatchHub(
                   recovery: 'snapshot',
                   reason: 'Slow observer exceeded buffer',
                 };
-              else yield next.value.payload as unknown as L.StreamFrame;
+              else yield next.value.payload as unknown as Client.StreamFrame;
             }
           },
         },
@@ -136,14 +144,14 @@ export function createWatchHub(
 }
 /** Trusted host context is supplied out-of-band and never decoded from a request. */
 export function createLocalPort(
-  endpoint: L.Endpoint,
-  hostContext: () => C.InvocationContext,
-  options: { codecLoopback?: boolean; codec?: L.Codec } = {},
-): L.Port {
+  endpoint: Client.Endpoint,
+  hostContext: () => Contracts.InvocationContext,
+  options: { codecLoopback?: boolean; codec?: Client.Codec } = {},
+): Client.Port {
   const codec = options.codec ?? jsonCodec;
-  const roundtrip = <T>(value: T): C.Result<T> => {
+  const roundtrip = <T>(value: T): Contracts.Result<T> => {
     if (!options.codecLoopback) return ok(value);
-    const bytes = codec.encode(value as C.Json);
+    const bytes = codec.encode(value as Contracts.Json);
     if (!bytes.ok) return bytes;
     const decoded = codec.decode(bytes.value);
     return decoded.ok ? ok(decoded.value as T) : decoded;
@@ -212,7 +220,7 @@ export function createLocalPort(
         input: null,
         ...(target ? { target } : {}),
       });
-      return result as C.Result<C.CapabilitySet>;
+      return result as Contracts.Result<Contracts.CapabilitySet>;
     },
     async watch(request, options) {
       const encoded = roundtrip(request);
@@ -248,16 +256,18 @@ export function createLocalPort(
   };
 }
 export function createController(
-  port: L.Port,
-): L.Controller & { getPart(itemId: string, partId: string): L.StreamPartSnapshot | undefined } {
-  let state: L.State = { connection: 'offline', itemIds: [], pendingCommands: [] },
+  port: Client.Port,
+): Client.Controller & {
+  getPart(itemId: string, partId: string): Client.StreamPartSnapshot | undefined;
+} {
+  let state: Client.State = { connection: 'offline', itemIds: [], pendingCommands: [] },
     sequence = 0,
     streamId = '',
-    session: L.WatchSession | undefined,
+    session: Client.WatchSession | undefined,
     generation = 0,
     disposed = false;
-  const items = new Map<string, P.Item>(),
-    parts = new Map<string, L.StreamPartSnapshot>(),
+  const items = new Map<string, Projection.Item>(),
+    parts = new Map<string, Client.StreamPartSnapshot>(),
     listeners = new Set<() => void>();
   const notify = () => {
     for (const listener of listeners) {
@@ -268,7 +278,7 @@ export function createController(
       }
     }
   };
-  const reset = (snapshot: L.Snapshot) => {
+  const reset = (snapshot: Client.Snapshot) => {
     items.clear();
     parts.clear();
     for (const item of snapshot.items) items.set(item.id, freeze(structuredClone(item)));
@@ -284,8 +294,8 @@ export function createController(
     };
     notify();
   };
-  const controller: L.Controller & {
-    getPart(itemId: string, partId: string): L.StreamPartSnapshot | undefined;
+  const controller: Client.Controller & {
+    getPart(itemId: string, partId: string): Client.StreamPartSnapshot | undefined;
   } = {
     port,
     getState: () =>
@@ -352,7 +362,7 @@ export function createController(
               else {
                 sequence = event.sequence;
                 if (event.type === 'part.item/upsert') {
-                  const item = event.payload as unknown as P.Item;
+                  const item = event.payload as unknown as Projection.Item;
                   items.set(item.id, freeze(structuredClone(item)));
                   state = { ...state, itemIds: [...items.keys()] };
                 }
@@ -361,7 +371,7 @@ export function createController(
                   state = { ...state, itemIds: [...items.keys()] };
                 }
                 if (event.type === 'part.text/delta') {
-                  const delta = event.payload as unknown as L.TextDelta,
+                  const delta = event.payload as unknown as Client.TextDelta,
                     key = partKey(delta.itemId, delta.partId),
                     old = parts.get(key);
                   if (

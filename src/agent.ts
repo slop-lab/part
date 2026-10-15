@@ -1,12 +1,12 @@
 import type {
-  Contracts as C,
-  Composition as P,
-  Convenience as V,
-  Context as X,
-  Model as M,
-  Driver as D,
-  Tools as T,
-  Runtime as R,
+  Contracts,
+  Composition,
+  Convenience,
+  Context,
+  Model,
+  Driver,
+  Tools,
+  Runtime,
 } from './reference.js';
 import { ok, fail, localContext, emptyCleanup } from './contracts.js';
 import { createPlanner, createScopeManager } from './composition.js';
@@ -26,40 +26,40 @@ import { createBasicDriver } from './driver-basic.js';
 import type { BasicInput } from './driver-basic.js';
 import { installDriver, createRunService } from './runs.js';
 import { createSuspensions } from './waits.js';
-export const contextPoint: P.ExtensionPoint<X.Compiler> = {
+export const contextPoint: Composition.ExtensionPoint<Context.Compiler> = {
   id: 'part/context',
   owner: 'part/context',
   contractVersion: 1,
   kind: 'service',
   scope: 'runtime',
 };
-export const modelPoint: P.ExtensionPoint<M.Gateway> = {
+export const modelPoint: Composition.ExtensionPoint<Model.Gateway> = {
   id: 'part/model',
   owner: 'part/model',
   contractVersion: 1,
   kind: 'service',
   scope: 'runtime',
 };
-export const toolsPoint: P.ExtensionPoint<T.Dispatcher> = {
+export const toolsPoint: Composition.ExtensionPoint<Tools.Dispatcher> = {
   id: 'part/tools',
   owner: 'part/tools',
   contractVersion: 1,
   kind: 'service',
   scope: 'runtime',
 };
-export interface AgentOptions extends V.BaseOptions {
-  readonly toolSchemas?: Readonly<Record<string, C.Json>>;
-  readonly executors?: readonly T.Executor[];
-  readonly middleware?: readonly T.Middleware[];
-  readonly boundary?: R.InvocationBoundary;
-  readonly principal?: C.InvocationContext['principal'];
+export interface AgentOptions extends Convenience.BaseOptions {
+  readonly toolSchemas?: Readonly<Record<string, Contracts.Json>>;
+  readonly executors?: readonly Tools.Executor[];
+  readonly middleware?: readonly Tools.Middleware[];
+  readonly boundary?: Runtime.InvocationBoundary;
+  readonly principal?: Contracts.InvocationContext['principal'];
   readonly costEstimator?: CostEstimator;
-  readonly inspectRequest?: (view: M.RequestInspection) => void;
+  readonly inspectRequest?: (view: Model.RequestInspection) => void;
 }
-export function expandAgent(options: AgentOptions & { driver?: D.Factory<unknown, unknown> }) {
+export function expandAgent(options: AgentOptions & { driver?: Driver.Factory<unknown, unknown> }) {
   const operations = createOperations(),
     waits = createSuspensions();
-  const compiler: X.Compiler = {
+  const compiler: Context.Compiler = {
     async compile(request, context) {
       const lowerers = context.services.get(lowerersKey),
         transforms = context.services.get(transformsKey);
@@ -68,8 +68,9 @@ export function expandAgent(options: AgentOptions & { driver?: D.Factory<unknown
       const compiled = createContextCompiler({
         lowerers: [...lowerers.value.values()],
         transforms: transforms.value,
-        compositionRevision: (context as C.InvocationContext & { compositionRevision?: string })
-          .compositionRevision,
+        compositionRevision: (
+          context as Contracts.InvocationContext & { compositionRevision?: string }
+        ).compositionRevision,
       });
       return compiled.ok ? compiled.value.compile(request, context) : compiled;
     },
@@ -95,7 +96,7 @@ export function expandAgent(options: AgentOptions & { driver?: D.Factory<unknown
     capabilities: options.model.profile.capabilities,
   });
   if (!dispatcher.ok) return dispatcher;
-  const advertisements: M.ToolAdvertisement[] = [];
+  const advertisements: Model.ToolAdvertisement[] = [];
   for (const definition of dispatcher.value.registry.list(localContext())) {
     const inputSchema = options.toolSchemas?.[definition.id];
     if (!inputSchema)
@@ -115,7 +116,7 @@ export function expandAgent(options: AgentOptions & { driver?: D.Factory<unknown
       tools: advertisements,
       modelCapabilities: options.model.profile.capabilities,
     });
-  const base: P.ComponentFactory = {
+  const base: Composition.ComponentFactory = {
     descriptor: {
       id: 'part/base',
       version: '0.1.0-alpha.2',
@@ -147,11 +148,11 @@ export function expandAgent(options: AgentOptions & { driver?: D.Factory<unknown
         [modelPoint, gateway.value, 'part/base-model'],
         [toolsPoint, dispatcher.value, 'part/base-tools'],
       ] as const) {
-        const declared = registry.declare(point as P.ExtensionPoint<unknown>);
+        const declared = registry.declare(point as Composition.ExtensionPoint<unknown>);
         if (!declared.ok) return declared;
         const contributed = registry.contribute({
           id,
-          point: point as P.ExtensionPoint<unknown>,
+          point: point as Composition.ExtensionPoint<unknown>,
           value,
         });
         if (!contributed.ok) return contributed;
@@ -167,7 +168,7 @@ export function expandAgent(options: AgentOptions & { driver?: D.Factory<unknown
       });
     },
   };
-  const specification: P.CompositionSpec = {
+  const specification: Composition.CompositionSpec = {
     components: [base, ...(options.components ?? [])],
     config: {},
   };
@@ -175,13 +176,13 @@ export function expandAgent(options: AgentOptions & { driver?: D.Factory<unknown
 }
 export function createAgent(
   options: AgentOptions & { driver?: never },
-): C.Result<V.Agent<BasicInput, M.Response>>;
+): Contracts.Result<Convenience.Agent<BasicInput, Model.Response>>;
 export function createAgent<I, O>(
-  options: AgentOptions & { driver: D.Factory<I, O> },
-): C.Result<V.Agent<I, O>>;
+  options: AgentOptions & { driver: Driver.Factory<I, O> },
+): Contracts.Result<Convenience.Agent<I, O>>;
 export function createAgent(
-  options: AgentOptions & { driver?: D.Factory<unknown, unknown> },
-): C.Result<V.Agent<unknown, unknown>> {
+  options: AgentOptions & { driver?: Driver.Factory<unknown, unknown> },
+): Contracts.Result<Convenience.Agent<unknown, unknown>> {
   options = {
     ...options,
     ...(options.limits ? { limits: Object.freeze(structuredClone(options.limits)) } : {}),
@@ -195,18 +196,20 @@ export function createAgent(
   if (!resolved.ok) return resolved;
   const scope = { kind: 'runtime', id: crypto.randomUUID() },
     scopeCancellation = new AbortController(),
-    active = new Set<R.ExecutionHandle<unknown>>(),
-    starting = new Set<Promise<C.Result<R.ExecutionHandle<unknown>>>>();
-  let opened: Promise<C.Result<P.ScopeLease>> | undefined,
+    active = new Set<Runtime.ExecutionHandle<unknown>>(),
+    starting = new Set<Promise<Contracts.Result<Runtime.ExecutionHandle<unknown>>>>();
+  let opened: Promise<Contracts.Result<Composition.ScopeLease>> | undefined,
     disposed = false,
-    disposing: Promise<C.CleanupReport> | undefined;
+    disposing: Promise<Contracts.CleanupReport> | undefined;
   const context = localContext({
     scope,
     signal: scopeCancellation.signal,
     ...(options.principal ? { principal: options.principal } : {}),
   });
   const manager = createScopeManager({ context });
-  const start = async (input: unknown): Promise<C.Result<R.ExecutionHandle<unknown>>> => {
+  const start = async (
+    input: unknown,
+  ): Promise<Contracts.Result<Runtime.ExecutionHandle<unknown>>> => {
     if (disposed) return fail('agent.disposed', 'Agent is disposed', 'conflict');
     let fixedInput: unknown;
     try {

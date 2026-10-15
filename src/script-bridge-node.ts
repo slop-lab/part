@@ -1,19 +1,19 @@
 import { createServer } from 'node:http';
 import { once } from 'node:events';
-import type { Contracts as C, Scripts as S } from './reference.js';
+import type { Contracts, Scripts } from './reference.js';
 import type { ManagedBridge } from './script-bridge.js';
 import { ok, fail, isJsonObject } from './contracts.js';
 export interface ScriptBridgeEnvironment {
   environment(
     grantId: string,
-    context: C.InvocationContext,
+    context: Contracts.InvocationContext,
     audience?: string,
-  ): C.Result<Readonly<Record<string, string>>>;
+  ): Contracts.Result<Readonly<Record<string, string>>>;
 }
 /** Explicit loopback listener; the public grant ID cannot authenticate a request. */
 export async function startScriptBridge(
   bridge: ManagedBridge,
-): Promise<C.Result<ScriptBridgeEnvironment & { close(): Promise<void> }>> {
+): Promise<Contracts.Result<ScriptBridgeEnvironment & { close(): Promise<void> }>> {
   const server = createServer(async (request, response) => {
     const send = (status: number, value: unknown) => {
       response.writeHead(status, { 'content-type': 'application/json' });
@@ -51,7 +51,10 @@ export async function startScriptBridge(
         send(403, authenticated);
         return;
       }
-      send(200, await bridge.invoke(input as unknown as S.BridgeRequest, authenticated.value));
+      send(
+        200,
+        await bridge.invoke(input as unknown as Scripts.BridgeRequest, authenticated.value),
+      );
     } catch {
       send(400, fail('bridge.request', 'Invalid bridge request'));
     }
@@ -95,9 +98,9 @@ export async function startScriptBridge(
 }
 /** Child helper: caller supplies a stable ID and reconciles the same request after uncertain delivery. */
 export async function invokeScriptBridge(
-  request: Omit<S.BridgeRequest, 'grantId'>,
+  request: Omit<Scripts.BridgeRequest, 'grantId'>,
   environment: Readonly<Record<string, string | undefined>>,
-): Promise<C.Result<C.CommandReceipt>> {
+): Promise<Contracts.Result<Contracts.CommandReceipt>> {
   try {
     const url = new URL(environment.PART_BRIDGE_URL ?? '');
     if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1')
@@ -114,7 +117,7 @@ export async function invokeScriptBridge(
     });
     const receipt = await response.json();
     return response.ok
-      ? ok(receipt as C.CommandReceipt)
+      ? ok(receipt as Contracts.CommandReceipt)
       : fail('bridge.denied', 'Bridge call rejected', 'permission');
   } catch {
     return fail(

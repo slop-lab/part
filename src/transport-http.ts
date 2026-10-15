@@ -1,4 +1,4 @@
-import type { Contracts as C, Client as L } from './reference.js';
+import type { Contracts, Client } from './reference.js';
 import { ok, fail, isJsonObject } from './contracts.js';
 import { jsonCodec } from './client.js';
 import { commandSchema, querySchema } from './control.js';
@@ -9,8 +9,8 @@ export function createHttpPort(
     headers?: () => Readonly<Record<string, string>>;
     maxFrameBytes?: number;
   } = {},
-): L.Port {
-  const send = async (path: string, value: C.Json, signal?: AbortSignal) => {
+): Client.Port {
+  const send = async (path: string, value: Contracts.Json, signal?: AbortSignal) => {
     const encoded = jsonCodec.encode(value);
     if (!encoded.ok) return encoded;
     const response = await (options.fetch ?? fetch)(
@@ -25,7 +25,7 @@ export function createHttpPort(
     );
     return ok(response);
   };
-  const read = async <T>(response: Response): Promise<C.Result<T>> => {
+  const read = async <T>(response: Response): Promise<Contracts.Result<T>> => {
     if (!response.ok)
       return fail(
         'http.status',
@@ -33,7 +33,7 @@ export function createHttpPort(
         response.status === 403 ? 'permission' : 'unavailable',
       );
     const decoded = jsonCodec.decode(new Uint8Array(await response.arrayBuffer()));
-    return decoded as C.Result<T>;
+    return decoded as Contracts.Result<T>;
   };
   return {
     async command(request, opt) {
@@ -44,10 +44,10 @@ export function createHttpPort(
           error: fail('http.not-sent', 'Command cancelled or invalid').error,
         };
       try {
-        const response = await send('commands', request as unknown as C.Json, opt?.signal);
+        const response = await send('commands', request as unknown as Contracts.Json, opt?.signal);
         if (!response.ok)
           return { kind: 'not-sent', commandId: request.commandId, error: response.error };
-        const receipt = await read<C.CommandReceipt>(response.value);
+        const receipt = await read<Contracts.CommandReceipt>(response.value);
         return receipt.ok
           ? { kind: 'receipt', receipt: receipt.value }
           : {
@@ -69,9 +69,9 @@ export function createHttpPort(
     async query(request, opt) {
       if (!querySchema.validate(request).ok) return fail('http.query', 'Invalid query');
       try {
-        const response = await send('queries', request as unknown as C.Json, opt?.signal);
+        const response = await send('queries', request as unknown as Contracts.Json, opt?.signal);
         if (!response.ok) return response;
-        const decoded = await read<C.Result<C.Json>>(response.value);
+        const decoded = await read<Contracts.Result<Contracts.Json>>(response.value);
         return decoded.ok ? decoded.value : decoded;
       } catch {
         return fail('http.query', 'Query unavailable', 'unavailable');
@@ -84,13 +84,13 @@ export function createHttpPort(
         input: null,
         ...(target ? { target } : {}),
       });
-      return response as C.Result<C.CapabilitySet>;
+      return response as Contracts.Result<Contracts.CapabilitySet>;
     },
     async watch(request, opt) {
       const abort = new AbortController(),
         signal = opt?.signal ? AbortSignal.any([abort.signal, opt.signal]) : abort.signal;
       try {
-        const sent = await send('events', request as unknown as C.Json, signal);
+        const sent = await send('events', request as unknown as Contracts.Json, signal);
         if (!sent.ok) return sent;
         if (!sent.value.ok || !sent.value.body)
           return fail('http.watch', 'Event endpoint unavailable', 'unavailable');
@@ -98,7 +98,7 @@ export function createHttpPort(
           utf8 = new TextDecoder('utf-8', { fatal: true });
         let buffered = '',
           ended = false;
-        const nextFrame = async (): Promise<C.Result<C.Json | undefined>> => {
+        const nextFrame = async (): Promise<Contracts.Result<Contracts.Json | undefined>> => {
           while (true) {
             const boundary = buffered.indexOf('\n\n');
             if (boundary >= 0) {
@@ -129,7 +129,7 @@ export function createHttpPort(
           await reader.cancel();
           return fail('http.bootstrap', 'Missing event bootstrap');
         }
-        const bootstrap = first.value.snapshot as unknown as L.Snapshot;
+        const bootstrap = first.value.snapshot as unknown as Client.Snapshot;
         return ok({
           bootstrap,
           async close() {
@@ -152,7 +152,7 @@ export function createHttpPort(
                     return;
                   }
                   if (frame.value === undefined) return;
-                  yield frame.value as unknown as L.StreamFrame;
+                  yield frame.value as unknown as Client.StreamFrame;
                 }
               } finally {
                 try {

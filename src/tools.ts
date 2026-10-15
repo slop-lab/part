@@ -1,15 +1,18 @@
-import type { Contracts as C, Tools as T, Runtime as R } from './reference.js';
+import type { Contracts, Tools, Runtime } from './reference.js';
 import { ok, fail, digest, isJson, freeze } from './contracts.js';
 import { createOperations, createBoundary, managedAttempt } from './runtime.js';
 import type { Operations } from './runtime.js';
 import { reserve } from './model.js';
 
 interface LocalBinding {
-  definition: T.Definition<unknown, unknown>;
-  execute(input: unknown, context: T.ExecutionContext): Promise<C.Result<T.ResultContent>>;
+  definition: Tools.Definition<unknown, unknown>;
+  execute(
+    input: unknown,
+    context: Tools.ExecutionContext,
+  ): Promise<Contracts.Result<Tools.ResultContent>>;
 }
 const installed = new WeakMap<object, LocalBinding>();
-export function installTool<I, O>(binding: T.FunctionBinding<I, O>): T.InstalledTool {
+export function installTool<I, O>(binding: Tools.FunctionBinding<I, O>): Tools.InstalledTool {
   const tool = Object.freeze({
     id: binding.definition.id,
     version: binding.definition.version,
@@ -19,7 +22,7 @@ export function installTool<I, O>(binding: T.FunctionBinding<I, O>): T.Installed
     definition: Object.freeze({
       ...binding.definition,
       requiredCapabilities: Object.freeze([...binding.definition.requiredCapabilities]),
-    }) as T.Definition<unknown, unknown>,
+    }) as Tools.Definition<unknown, unknown>,
     async execute(input, context) {
       const validated = binding.definition.input.validate(input);
       return validated.ok
@@ -31,12 +34,12 @@ export function installTool<I, O>(binding: T.FunctionBinding<I, O>): T.Installed
 }
 export function functionTool<I, O>(options: {
   id: string;
-  input: C.Schema<I>;
-  output: C.Schema<O>;
-  execute(input: I, context: T.ExecutionContext): Promise<O> | O;
+  input: Contracts.Schema<I>;
+  output: Contracts.Schema<O>;
+  execute(input: I, context: Tools.ExecutionContext): Promise<O> | O;
   description?: string;
-  effects?: T.Definition<I, O>['effects'];
-}): T.InstalledTool {
+  effects?: Tools.Definition<I, O>['effects'];
+}): Tools.InstalledTool {
   return installTool({
     definition: {
       id: options.id,
@@ -56,22 +59,22 @@ export function functionTool<I, O>(options: {
     },
   });
 }
-export interface ToolDispatcher extends T.Dispatcher {
-  readonly registry: T.Registry;
+export interface ToolDispatcher extends Tools.Dispatcher {
+  readonly registry: Tools.Registry;
 }
 export function createToolDispatcher(options: {
-  tools: readonly T.InstalledTool[];
-  middleware?: readonly T.Middleware[];
-  executors?: readonly T.Executor[];
-  boundary?: R.InvocationBoundary;
+  tools: readonly Tools.InstalledTool[];
+  middleware?: readonly Tools.Middleware[];
+  executors?: readonly Tools.Executor[];
+  boundary?: Runtime.InvocationBoundary;
   operations?: Operations;
-  waits?: R.SuspensionPort;
-  capabilities?: C.CapabilitySet;
+  waits?: Runtime.SuspensionPort;
+  capabilities?: Contracts.CapabilitySet;
   compositionRevision?: string;
   maxHops?: number;
-}): C.Result<ToolDispatcher> {
+}): Contracts.Result<ToolDispatcher> {
   const bindings = new Map<string, LocalBinding>(),
-    executors = new Map<string, T.Executor>();
+    executors = new Map<string, Tools.Executor>();
   for (const tool of options.tools) {
     const binding =
       typeof tool.localBinding === 'object' && tool.localBinding !== null
@@ -96,7 +99,7 @@ export function createToolDispatcher(options: {
     return fail('middleware.duplicate', 'Duplicate middleware ID');
   const operations = options.operations ?? createOperations(),
     boundary = options.boundary ?? createBoundary();
-  const resolve: T.Registry['resolve'] = (id, version) => {
+  const resolve: Tools.Registry['resolve'] = (id, version) => {
     const definition = bindings.get(id)?.definition;
     return !definition
       ? fail('tool.missing', id, 'unsupported')
@@ -104,14 +107,14 @@ export function createToolDispatcher(options: {
         ? fail('tool.version', id, 'conflict')
         : ok(definition);
   };
-  const registry: T.Registry = {
+  const registry: Tools.Registry = {
     resolve,
     list: () => [...bindings.values()].map((b) => b.definition),
   };
   const failed = (
-    error: C.Failure,
-    effect: C.EffectState = 'not-attempted',
-  ): R.ManagedOutcome<T.ResultContent> => ({
+    error: Contracts.Failure,
+    effect: Contracts.EffectState = 'not-attempted',
+  ): Runtime.ManagedOutcome<Tools.ResultContent> => ({
     phase: 'failed',
     error,
     effect,
@@ -119,11 +122,11 @@ export function createToolDispatcher(options: {
     unsettledChildren: [],
   });
   const validate = async (
-    call: T.Call,
+    call: Tools.Call,
     hops: string[],
     executorOverride?: string,
     compositionRevision?: string,
-  ): Promise<C.Result<T.CallPlan>> => {
+  ): Promise<Contracts.Result<Tools.CallPlan>> => {
     const resolved = resolve(call.toolId, call.expectedToolVersion);
     if (!resolved.ok) return resolved;
     const definition = resolved.value,
@@ -165,7 +168,8 @@ export function createToolDispatcher(options: {
         { ...call },
         [],
         undefined,
-        (context as C.InvocationContext & { compositionRevision?: string }).compositionRevision,
+        (context as Contracts.InvocationContext & { compositionRevision?: string })
+          .compositionRevision,
       );
       if (!initial.ok) return initial;
       const timeout = initial.value.definition.timeoutMs;
@@ -184,7 +188,7 @@ export function createToolDispatcher(options: {
           const dispatchBudget = reserve(c, 'maxToolDispatches');
           if (!dispatchBudget.ok) return failed(dispatchBudget.error);
           let plan = initial.value,
-            substitute: T.ResultContent | undefined,
+            substitute: Tools.ResultContent | undefined,
             changes = 0;
           const approved = new Map<string, string>();
           for (let i = 0; i < middleware.length;) {
@@ -196,7 +200,7 @@ export function createToolDispatcher(options: {
                 unsettledChildren: [],
               };
             const policy = middleware[i]!;
-            let decision: C.Result<T.Decision>;
+            let decision: Contracts.Result<Tools.Decision>;
             if (approved.get(policy.id) === plan.digest) {
               i++;
               continue;
@@ -230,7 +234,7 @@ export function createToolDispatcher(options: {
                 });
               const ticket = await options.waits.open(result.ticket, c);
               if (!ticket.ok) return failed(ticket.error);
-              c.progress.publish('part.tool/wait', ticket.value as unknown as C.Json);
+              c.progress.publish('part.tool/wait', ticket.value as unknown as Contracts.Json);
               const response = await c.wait(
                 options.waits.wait(ticket.value, result.ticket.responseSchema, c),
               );
@@ -264,7 +268,7 @@ export function createToolDispatcher(options: {
                 message: 'Tool rewrite limit exceeded',
                 retry: 'never',
               });
-            const rewritten: T.Call = {
+            const rewritten: Tools.Call = {
               ...plan.call,
               arguments: result.arguments,
               ...(result.kind === 'redirect' && result.toolId
@@ -289,13 +293,13 @@ export function createToolDispatcher(options: {
             substitute = undefined;
             i = 0;
           }
-          const executionContext: T.ExecutionContext = {
+          const executionContext: Tools.ExecutionContext = {
             ...c,
             operationId: c.scope.id,
             attemptId: crypto.randomUUID(),
             progress: c.progress,
           };
-          const effectPlan: R.EffectPlan = {
+          const effectPlan: Runtime.EffectPlan = {
             operationId: c.scope.id,
             attemptId: executionContext.attemptId,
             target: plan.definition.id,
@@ -309,7 +313,7 @@ export function createToolDispatcher(options: {
             boundary,
             effectPlan,
             async (permit) => {
-              let attempted: R.AttemptOutcome<T.ResultContent>;
+              let attempted: Runtime.AttemptOutcome<Tools.ResultContent>;
               if (substitute)
                 attempted = { kind: 'returned', value: substitute, effect: 'not-applied' };
               else if (plan.executorId === 'part/function') {

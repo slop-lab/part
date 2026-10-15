@@ -1,9 +1,9 @@
-import type { Contracts as C, Control as A, Client as L } from './reference.js';
+import type { Contracts, Control, Client } from './reference.js';
 import { ok, fail, schema, isJsonObject, isJson, canonical } from './contracts.js';
 
-const fields = (value: Record<string, C.Json>, allowed: string[]) =>
+const fields = (value: Record<string, Contracts.Json>, allowed: string[]) =>
   Object.keys(value).every((key) => allowed.includes(key));
-const entityValid = (value: unknown): value is C.EntityRef =>
+const entityValid = (value: unknown): value is Contracts.EntityRef =>
   isJsonObject(value) &&
   fields(value, ['owner', 'kind', 'id']) &&
   typeof value.owner === 'string' &&
@@ -20,9 +20,9 @@ const preconditionsValid = (value: unknown): boolean =>
       entityValid(v.ref) &&
       typeof v.expected === 'string',
   );
-export const commandSchema = schema<C.CommandRequest>(
+export const commandSchema = schema<Contracts.CommandRequest>(
   'part/command',
-  (value): value is C.CommandRequest =>
+  (value): value is Contracts.CommandRequest =>
     isJsonObject(value) &&
     fields(value, [
       'protocolVersion',
@@ -47,9 +47,9 @@ export const commandSchema = schema<C.CommandRequest>(
     (value.preconditions === undefined || preconditionsValid(value.preconditions)) &&
     (value.idempotencyKey === undefined || typeof value.idempotencyKey === 'string'),
 );
-export const querySchema = schema<C.QueryRequest>(
+export const querySchema = schema<Contracts.QueryRequest>(
   'part/query',
-  (value): value is C.QueryRequest =>
+  (value): value is Contracts.QueryRequest =>
     isJsonObject(value) &&
     fields(value, ['queryId', 'version', 'input', 'target']) &&
     typeof value.queryId === 'string' &&
@@ -67,14 +67,14 @@ export interface InstalledQuery {
   readonly id: string;
   readonly binding: unknown;
 }
-const actions = new WeakMap<object, A.ActionBinding<unknown, unknown>>(),
-  queries = new WeakMap<object, L.QueryBinding<unknown, unknown>>();
-export function installAction<I, O>(binding: A.ActionBinding<I, O>): InstalledAction {
+const actions = new WeakMap<object, Control.ActionBinding<unknown, unknown>>(),
+  queries = new WeakMap<object, Client.QueryBinding<unknown, unknown>>();
+export function installAction<I, O>(binding: Control.ActionBinding<I, O>): InstalledAction {
   const token = {};
   actions.set(token, {
     ...binding,
-    input: binding.input as C.Schema<unknown>,
-    output: binding.output as C.Schema<unknown>,
+    input: binding.input as Contracts.Schema<unknown>,
+    output: binding.output as Contracts.Schema<unknown>,
     async execute(request, context) {
       const checked = binding.input.validate(request.input);
       if (!checked.ok)
@@ -82,18 +82,18 @@ export function installAction<I, O>(binding: A.ActionBinding<I, O>): InstalledAc
           kind: 'rejected',
           commandId: request.commandId,
           error: fail('action.input', 'Input validation failed').error,
-        } as C.CommandReceipt;
+        } as Contracts.CommandReceipt;
       return binding.execute({ ...request, input: checked.value }, context);
     },
   });
   return Object.freeze({ id: binding.id, binding: token });
 }
-export function installQuery<I, O>(binding: L.QueryBinding<I, O>): InstalledQuery {
+export function installQuery<I, O>(binding: Client.QueryBinding<I, O>): InstalledQuery {
   const token = {};
   queries.set(token, {
     ...binding,
-    input: binding.input as C.Schema<unknown>,
-    output: binding.output as C.Schema<unknown>,
+    input: binding.input as Contracts.Schema<unknown>,
+    output: binding.output as Contracts.Schema<unknown>,
     async read(input, context) {
       const checked = binding.input.validate(input);
       return checked.ok
@@ -109,13 +109,16 @@ export function createControl(
     queries?: readonly InstalledQuery[];
     dedupeLimit?: number;
   } = {},
-): C.Result<
-  A.ActionGateway & {
-    query(request: C.QueryRequest, context: C.InvocationContext): Promise<C.Result<C.Json>>;
+): Contracts.Result<
+  Control.ActionGateway & {
+    query(
+      request: Contracts.QueryRequest,
+      context: Contracts.InvocationContext,
+    ): Promise<Contracts.Result<Contracts.Json>>;
   }
 > {
-  const actionMap = new Map<string, A.ActionBinding<unknown, unknown>>(),
-    queryMap = new Map<string, L.QueryBinding<unknown, unknown>>();
+  const actionMap = new Map<string, Control.ActionBinding<unknown, unknown>>(),
+    queryMap = new Map<string, Client.QueryBinding<unknown, unknown>>();
   for (const installed of options.actions ?? []) {
     const binding =
       installed.binding && typeof installed.binding === 'object'
@@ -136,7 +139,7 @@ export function createControl(
   }
   const receipts = new Map<
     string,
-    { digest: string; result: Promise<C.CommandReceipt>; settled: boolean }
+    { digest: string; result: Promise<Contracts.CommandReceipt>; settled: boolean }
   >();
   return ok({
     async describe(target, context) {
@@ -149,7 +152,7 @@ export function createControl(
     },
     async invoke(request, context) {
       const commandId = typeof request?.commandId === 'string' ? request.commandId : 'invalid';
-      const rejected = (error: C.Failure): C.CommandReceipt => ({
+      const rejected = (error: Contracts.Failure): Contracts.CommandReceipt => ({
         kind: 'rejected',
         commandId,
         error,
@@ -201,7 +204,7 @@ export function createControl(
           ...request,
           ...(request.idempotencyKey ? { commandId: 'deduplicated' } : {}),
         },
-        requestDigest = canonical(normalized as unknown as C.Json);
+        requestDigest = canonical(normalized as unknown as Contracts.Json);
       const cached = receipts.get(key);
       if (cached)
         return cached.digest === requestDigest
@@ -219,13 +222,13 @@ export function createControl(
           message: 'Command dedupe capacity exhausted; create a new control scope',
           retry: 'never',
         });
-      let resolve!: (receipt: C.CommandReceipt) => void;
-      const result = new Promise<C.CommandReceipt>((r) => {
+      let resolve!: (receipt: Contracts.CommandReceipt) => void;
+      const result = new Promise<Contracts.CommandReceipt>((r) => {
         resolve = r;
       });
       const entry = { digest: requestDigest, result, settled: false };
       receipts.set(key, entry);
-      let receipt: C.CommandReceipt;
+      let receipt: Contracts.CommandReceipt;
       try {
         const executed = await binding.execute({ ...request, input: input.value }, context);
         if (executed.kind === 'completed') {
@@ -245,7 +248,7 @@ export function createControl(
                   effect: executed.effect,
                   commit: executed.commit,
                 };
-        } else receipt = executed as C.CommandReceipt;
+        } else receipt = executed as Contracts.CommandReceipt;
         if (!isJson(receipt))
           receipt = {
             kind: 'failed',

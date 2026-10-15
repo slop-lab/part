@@ -1,13 +1,13 @@
 import { mkdir, open, rename, readFile, rm, stat } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
-import type { Storage as D } from './reference.js';
+import type { Storage } from './reference.js';
 import { createArtifactStore } from './artifacts.js';
 import { isJsonObject } from './contracts.js';
 /** A bounded reference backend. One fsynced atomic record owns metadata and bytes. */
 export async function openFileArtifacts(
   root: string,
   options: { id?: string; maxBytes?: number } = {},
-): Promise<D.ArtifactStore> {
+): Promise<Storage.ArtifactStore> {
   root = resolve(root);
   await mkdir(root, { recursive: true, mode: 0o700 });
   const maximum = options.maxBytes ?? 16 * 1024 * 1024;

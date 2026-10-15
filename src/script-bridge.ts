@@ -1,4 +1,4 @@
-import type { Contracts as C, Scripts as S, Runtime as R } from './reference.js';
+import type { Contracts, Scripts, Runtime } from './reference.js';
 import { ok, fail, canonical, freeze, isJson, isJsonObject } from './contracts.js';
 import { createBudget, budgetKey } from './runtime.js';
 import { numericLimits } from './budgets.js';
@@ -6,16 +6,22 @@ import { costServices } from './costs.js';
 import { scheduleDeadline } from './deadline.js';
 export interface BridgeMethod {
   readonly profileRequired?: boolean;
-  invoke(params: C.Json, context: C.InvocationContext): Promise<C.CommandReceipt>;
+  invoke(
+    params: Contracts.Json,
+    context: Contracts.InvocationContext,
+  ): Promise<Contracts.CommandReceipt>;
 }
-export interface ManagedBridge extends S.BridgeHost {
+export interface ManagedBridge extends Scripts.BridgeHost {
   authenticate(
     grantId: string,
     credential: string,
     audience: string,
-  ): C.Result<C.InvocationContext>;
-  grant(grantId: string, context: C.InvocationContext): C.Result<S.BridgeGrant>;
-  credential(grantId: string, context: C.InvocationContext): C.Result<string>;
+  ): Contracts.Result<Contracts.InvocationContext>;
+  grant(
+    grantId: string,
+    context: Contracts.InvocationContext,
+  ): Contracts.Result<Scripts.BridgeGrant>;
+  credential(grantId: string, context: Contracts.InvocationContext): Contracts.Result<string>;
   close(): void;
 }
 /** Trusted methods are supplied by the host, never loaded from a script request. */
@@ -27,21 +33,21 @@ export function createScriptBridge(
   const grants = new Map<
     string,
     {
-      grant: S.BridgeGrant;
-      context: C.InvocationContext;
+      grant: Scripts.BridgeGrant;
+      context: Contracts.InvocationContext;
       credential: string;
       controller: AbortController;
       release(): void;
-      receipts: Map<string, { fingerprint: string; result: Promise<C.CommandReceipt> }>;
+      receipts: Map<string, { fingerprint: string; result: Promise<Contracts.CommandReceipt> }>;
     }
   >();
   let closed = false;
-  const denied = (id: string, code: string, message: string): C.CommandReceipt => ({
+  const denied = (id: string, code: string, message: string): Contracts.CommandReceipt => ({
     kind: 'rejected',
     commandId: id,
     error: fail(code, message, 'permission').error,
   });
-  const same = (a: C.InvocationContext, b: C.InvocationContext) =>
+  const same = (a: Contracts.InvocationContext, b: Contracts.InvocationContext) =>
     canonical(a.principal) === canonical(b.principal);
   const live = (id: string) => {
     const entry = grants.get(id);
@@ -79,7 +85,7 @@ export function createScriptBridge(
       if (times.some(Number.isNaN) || Math.min(...times) <= Date.now())
         return fail('bridge.expiry', 'Invalid or expired grant');
       const expiry = new Date(Math.min(...times)).toISOString();
-      const fixed = structuredClone(policy) as Omit<S.BridgeGrant, 'id'>;
+      const fixed = structuredClone(policy) as Omit<Scripts.BridgeGrant, 'id'>;
       const grant = freeze({
         ...fixed,
         id: crypto.randomUUID(),
@@ -89,8 +95,8 @@ export function createScriptBridge(
       const controller = new AbortController(),
         local = createBudget(limits),
         upstream = context.services.get(budgetKey),
-        pairs = new WeakMap<R.BudgetReservation, R.BudgetReservation>();
-      const port: R.BudgetPort = {
+        pairs = new WeakMap<Runtime.BudgetReservation, Runtime.BudgetReservation>();
+      const port: Runtime.BudgetPort = {
         reserve(dimension, quantity) {
           const child = local.reserve(dimension, quantity);
           if (!child.ok || !upstream.ok) return child;
@@ -110,7 +116,7 @@ export function createScriptBridge(
           return parent && upstream.ok ? upstream.value.settle(parent, actual) : child;
         },
       };
-      const services: C.ServiceAccess = {
+      const services: Contracts.ServiceAccess = {
         get(key) {
           return key.id === budgetKey.id ? ok(port as never) : context.services.get(key);
         },

@@ -1,13 +1,7 @@
-import type {
-  Contracts as C,
-  Driver as D,
-  Model as M,
-  Context as X,
-  Runtime as R,
-} from './reference.js';
+import type { Contracts, Driver, Model, Context, Runtime } from './reference.js';
 import { ok, fail, schema, isJson, isJsonObject, emptyCleanup } from './contracts.js';
 import { messageItem } from './context.js';
-export type BasicInput = string | readonly X.SemanticItem[];
+export type BasicInput = string | readonly Context.SemanticItem[];
 export const basicInputSchema = schema<BasicInput>(
   'part/basic-input',
   (v): v is BasicInput =>
@@ -24,9 +18,9 @@ export const basicInputSchema = schema<BasicInput>(
           isJsonObject(item.provenance),
       )),
 );
-export const modelResponseSchema = schema<M.Response>(
+export const modelResponseSchema = schema<Model.Response>(
   'part/model-response',
-  (v): v is M.Response =>
+  (v): v is Model.Response =>
     isJsonObject(v) &&
     Array.isArray(v.content) &&
     Array.isArray(v.toolCalls) &&
@@ -43,11 +37,11 @@ export const modelResponseSchema = schema<M.Response>(
 );
 export function createBasicDriver(options: {
   profileId: string;
-  tools?: readonly M.ToolAdvertisement[];
-  modelCapabilities?: C.CapabilitySet;
+  tools?: readonly Model.ToolAdvertisement[];
+  modelCapabilities?: Contracts.CapabilitySet;
   maxTurns?: number;
-  inspectContext?: (context: X.CompiledContext) => void;
-}): D.Factory<BasicInput, M.Response> {
+  inspectContext?: (context: Context.CompiledContext) => void;
+}): Driver.Factory<BasicInput, Model.Response> {
   const advertisements = structuredClone(options.tools ?? []),
     capabilities = structuredClone(
       options.modelCapabilities ?? { revision: 'memory', entries: [] },
@@ -65,9 +59,9 @@ export function createBasicDriver(options: {
     create(services) {
       return {
         async execute(input, context) {
-          let effect: C.EffectState = 'not-attempted';
-          const commit: C.CommitEvidence[] = [];
-          const failure = (error: C.Failure): R.ManagedOutcome<M.Response> => ({
+          let effect: Contracts.EffectState = 'not-attempted';
+          const commit: Contracts.CommitEvidence[] = [];
+          const failure = (error: Contracts.Failure): Runtime.ManagedOutcome<Model.Response> => ({
             phase: 'failed',
             error,
             effect,
@@ -81,7 +75,7 @@ export function createBasicDriver(options: {
               message: 'Basic driver requires model and context services',
               retry: 'never',
             });
-          const items: X.SemanticItem[] =
+          const items: Context.SemanticItem[] =
             typeof input === 'string'
               ? [await messageItem('user', [{ kind: 'text', text: input }])]
               : structuredClone([...input]);
@@ -165,7 +159,7 @@ export function createBasicDriver(options: {
               commit.push(...result.commit);
               effect = combineEffects(effect, result.effect);
               if (result.phase !== 'completed') return { ...result, effect, commit };
-              const content: M.ContentPart[] = [...result.result.content];
+              const content: Model.ContentPart[] = [...result.result.content];
               if (result.result.value !== undefined) {
                 if (!isJson(result.result.value))
                   return failure({
@@ -199,17 +193,21 @@ export function createBasicDriver(options: {
     },
   };
 }
-export function combineEffects(a: C.EffectState, b: C.EffectState): C.EffectState {
+export function combineEffects(
+  a: Contracts.EffectState,
+  b: Contracts.EffectState,
+): Contracts.EffectState {
   if (a === 'unknown' || b === 'unknown') return 'unknown';
   if (a === 'partially-applied' || b === 'partially-applied') return 'partially-applied';
   if (a === 'applied' || b === 'applied') return 'applied';
   return a === 'not-attempted' ? b : a;
 }
 async function relay(
-  handle: R.ExecutionHandle<unknown>,
-  context: C.InvocationContext,
+  handle: Runtime.ExecutionHandle<unknown>,
+  context: Contracts.InvocationContext,
 ): Promise<void> {
-  const progress = (context as C.InvocationContext & { progress?: R.ProgressSink }).progress;
+  const progress = (context as Contracts.InvocationContext & { progress?: Runtime.ProgressSink })
+    .progress;
   if (!progress) return;
   for await (const update of handle.observe()) {
     if (update.kind === 'data') progress.publish(update.type, update.payload);
@@ -218,10 +216,13 @@ async function relay(
 }
 /** A second control strategy: completion requires validation after model stop. */
 export function createValidatingDriver<I, O>(
-  base: D.Factory<I, M.Response>,
-  output: C.Schema<O>,
-  validate: (response: M.Response, context: C.InvocationContext) => Promise<C.Result<O>>,
-): D.Factory<I, O> {
+  base: Driver.Factory<I, Model.Response>,
+  output: Contracts.Schema<O>,
+  validate: (
+    response: Model.Response,
+    context: Contracts.InvocationContext,
+  ) => Promise<Contracts.Result<O>>,
+): Driver.Factory<I, O> {
   return {
     ...base,
     id: `${base.id}/validated`,

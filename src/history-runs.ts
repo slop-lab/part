@@ -1,35 +1,29 @@
-import type {
-  Contracts as C,
-  Runtime as R,
-  History as H,
-  Model as M,
-  Context as X,
-} from './reference.js';
+import type { Contracts, Runtime, History, Model, Context } from './reference.js';
 import type { HistoryService } from './history.js';
 import { ok, fail, canonical, isJson } from './contracts.js';
 import { semanticItem, messageItem, provenance } from './context.js';
 export interface RunHistoryLease {
   readonly input: unknown;
   finish(
-    outcome: R.ManagedOutcome<unknown>,
-    context: C.InvocationContext,
-  ): Promise<C.Result<readonly C.CommitEvidence[]>>;
+    outcome: Runtime.ManagedOutcome<unknown>,
+    context: Contracts.InvocationContext,
+  ): Promise<Contracts.Result<readonly Contracts.CommitEvidence[]>>;
   release(): void;
 }
 export interface RunHistoryAttachment {
   prepare(
-    selection: NonNullable<R.RunRequest<unknown>['history']>,
+    selection: NonNullable<Runtime.RunRequest<unknown>['history']>,
     input: unknown,
-    context: C.InvocationContext,
-  ): Promise<C.Result<RunHistoryLease>>;
+    context: Contracts.InvocationContext,
+  ): Promise<Contracts.Result<RunHistoryLease>>;
 }
 export function createHistoryAttachment(options: {
   history: HistoryService;
-  input(records: readonly H.Record[], input: unknown): Promise<C.Result<unknown>>;
+  input(records: readonly History.Record[], input: unknown): Promise<Contracts.Result<unknown>>;
   records(
     input: unknown,
-    outcome: R.ManagedOutcome<unknown>,
-  ): Promise<C.Result<readonly H.Record[]>>;
+    outcome: Runtime.ManagedOutcome<unknown>,
+  ): Promise<Contracts.Result<readonly History.Record[]>>;
 }): RunHistoryAttachment {
   const writers = new Set<string>();
   return {
@@ -106,11 +100,11 @@ export function createHistoryAttachment(options: {
 }
 /** Chat history is opt-in and translates immutable records through public semantic items. */
 export function createChatHistoryAttachment(history: HistoryService): RunHistoryAttachment {
-  const record = (item: X.SemanticItem): H.Record => ({
+  const record = (item: Context.SemanticItem): History.Record => ({
     id: crypto.randomUUID(),
     type: item.type,
     schemaVersion: item.schemaVersion,
-    payload: item.payload as C.Json,
+    payload: item.payload as Contracts.Json,
     provenance: item.provenance,
     visibility: { model: true, conversation: true, inspector: true, export: true },
     createdAt: new Date().toISOString(),
@@ -136,11 +130,11 @@ export function createChatHistoryAttachment(history: HistoryService): RunHistory
         typeof input === 'string'
           ? [await messageItem('user', [{ kind: 'text', text: input }])]
           : Array.isArray(input)
-            ? (input as X.SemanticItem[])
+            ? (input as Context.SemanticItem[])
             : [];
       const records = items.map(record);
       if (outcome.phase === 'completed') {
-        const response = outcome.result as M.Response;
+        const response = outcome.result as Model.Response;
         if (!isJson(response) || !Array.isArray(response.content))
           return fail('history.response', 'Chat response is not model content');
         records.push(record(await messageItem('assistant', response.content)));

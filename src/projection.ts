@@ -1,17 +1,17 @@
-import type { Contracts as C, Projection as P } from './reference.js';
+import type { Contracts, Projection } from './reference.js';
 import { ok, fail, isJson, freeze } from './contracts.js';
 export function createProjectionService(options: {
   authorize(
-    target: C.EntityRef,
-    audience: P.Audience,
-    context: C.InvocationContext,
+    target: Contracts.EntityRef,
+    audience: Projection.Audience,
+    context: Contracts.InvocationContext,
   ): Promise<boolean> | boolean;
   load(
-    target: C.EntityRef,
-    context: C.InvocationContext,
-  ): Promise<C.Result<{ type: string; schemaVersion: number; value: unknown }>>;
-  projectors: ReadonlyMap<string, P.Projector<unknown>>;
-}): P.Service {
+    target: Contracts.EntityRef,
+    context: Contracts.InvocationContext,
+  ): Promise<Contracts.Result<{ type: string; schemaVersion: number; value: unknown }>>;
+  projectors: ReadonlyMap<string, Projection.Projector<unknown>>;
+}): Projection.Service {
   return {
     async read(target, audience, context) {
       if (!(await options.authorize(target, audience, context)))

@@ -1,7 +1,7 @@
-import type { Scripts as S } from './reference.js';
+import type { Scripts } from './reference.js';
 import { isJsonObject, isJson } from './contracts.js';
 /** Structural validation can run during workflow preparation without launching a process. */
-export function isScriptRequest(value: unknown): value is S.Request {
+export function isScriptRequest(value: unknown): value is Scripts.Request {
   if (
     !isJsonObject(value) ||
     Object.keys(value).some(

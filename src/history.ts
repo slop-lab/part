@@ -1,34 +1,37 @@
-import type { Contracts as C, History as H, Storage as S } from './reference.js';
+import type { Contracts, History, Storage } from './reference.js';
 import { ok, fail, isJson, isJsonObject } from './contracts.js';
 import { createMemoryStore } from './storage-memory.js';
 import { provenance } from './context.js';
 interface SessionData {
-  metadata: C.Json;
-  principal: C.InvocationContext['principal'];
+  metadata: Contracts.Json;
+  principal: Contracts.InvocationContext['principal'];
 }
 interface BranchData {
   sessionId: string;
   head?: string;
 }
-export interface HistoryService extends H.Service {
+export interface HistoryService extends History.Service {
   readonly owner: string;
   readonly durability: 'memory' | 'durable';
-  getBranch(id: string, context: C.InvocationContext): Promise<C.Result<H.Branch>>;
+  getBranch(
+    id: string,
+    context: Contracts.InvocationContext,
+  ): Promise<Contracts.Result<History.Branch>>;
 }
 export function createHistory(
-  options: { store?: S.StateJournalStore; namespace?: string } = {},
+  options: { store?: Storage.StateJournalStore; namespace?: string } = {},
 ): HistoryService {
   const store = options.store ?? createMemoryStore(),
     namespace = options.namespace ?? 'part/history';
-  const address = (kind: string, id: string): S.StateAddress => ({
+  const address = (kind: string, id: string): Storage.StateAddress => ({
     namespace,
     scope: { kind: 'history', id: namespace },
     key: `${kind}/${id}`,
   });
   const authorize = async (
     sessionId: string,
-    context: C.InvocationContext,
-  ): Promise<C.Result<void>> => {
+    context: Contracts.InvocationContext,
+  ): Promise<Contracts.Result<void>> => {
     const session = await store.read(address('session', sessionId), context);
     if (!session.ok) return session;
     if (!session.value) return fail('history.session', 'Session not found');
@@ -40,8 +43,8 @@ export function createHistory(
   };
   const getBranch = async (
     id: string,
-    context: C.InvocationContext,
-  ): Promise<C.Result<H.Branch>> => {
+    context: Contracts.InvocationContext,
+  ): Promise<Contracts.Result<History.Branch>> => {
     const found = await store.read(address('branch', id), context);
     if (!found.ok) return found;
     if (!found.value) return fail('history.branch', 'Branch not found');
@@ -51,15 +54,15 @@ export function createHistory(
     return ok({ id, ...data, revision: found.value.revision });
   };
   const path = async (
-    branch: H.Branch,
+    branch: History.Branch,
     cursor: string | undefined,
-    context: C.InvocationContext,
-  ): Promise<C.Result<C.Page<H.Entry>>> => {
+    context: Contracts.InvocationContext,
+  ): Promise<Contracts.Result<Contracts.Page<History.Entry>>> => {
     const current = await getBranch(branch.id, context);
     if (!current.ok) return current;
     if (current.value.sessionId !== branch.sessionId)
       return fail('history.session', 'Branch session mismatch');
-    const entries: H.Entry[] = [],
+    const entries: History.Entry[] = [],
       seen = new Set<string>();
     let id = branch.head;
     while (id) {
@@ -68,7 +71,10 @@ export function createHistory(
       const found = await store.read(address('entry', id), context);
       if (!found.ok) return found;
       if (!found.value) return fail('history.entry', 'History entry missing');
-      const data = found.value.value.value as unknown as { entry: H.Entry; sessionId: string };
+      const data = found.value.value.value as unknown as {
+        entry: History.Entry;
+        sessionId: string;
+      };
       if (data.sessionId !== branch.sessionId)
         return fail('history.permission', 'Entry belongs to another session', 'permission');
       entries.push(data.entry);
@@ -88,7 +94,7 @@ export function createHistory(
       if (!isJson(metadata)) return fail('history.metadata', 'Invalid session metadata');
       const id = crypto.randomUUID(),
         principal = { ...context.principal };
-      const changes: S.ChangeSet = {
+      const changes: Storage.ChangeSet = {
         id: crypto.randomUUID(),
         mutations: [
           {
@@ -116,8 +122,8 @@ export function createHistory(
         current.value.sessionId !== branch.sessionId
       )
         return fail('history.revision', 'Branch head/revision mismatch', 'conflict');
-      const mutations: S.Mutation[] = [],
-        append: S.JournalEntry[] = [];
+      const mutations: Storage.Mutation[] = [],
+        append: Storage.JournalEntry[] = [];
       const ids = new Set<string>();
       let head = branch.head;
       for (const record of records) {
@@ -130,7 +136,7 @@ export function createHistory(
         )
           return fail('history.record', 'Invalid or duplicate record');
         ids.add(record.id);
-        const entry: H.Entry = {
+        const entry: History.Entry = {
           entryId: crypto.randomUUID(),
           ...(head ? { previous: head } : {}),
           record: structuredClone(record),
@@ -140,14 +146,14 @@ export function createHistory(
           {
             address: address('record', record.id),
             expected: 'absent',
-            next: { schemaVersion: 1, value: record as unknown as C.Json },
+            next: { schemaVersion: 1, value: record as unknown as Contracts.Json },
           },
           {
             address: address('entry', head),
             expected: 'absent',
             next: {
               schemaVersion: 1,
-              value: { sessionId: branch.sessionId, entry: entry as unknown as C.Json },
+              value: { sessionId: branch.sessionId, entry: entry as unknown as Contracts.Json },
             },
           },
         );
@@ -155,7 +161,7 @@ export function createHistory(
           id: entry.entryId,
           type: 'part.history/append',
           version: 1,
-          payload: entry as unknown as C.Json,
+          payload: entry as unknown as Contracts.Json,
           provenance,
         });
       }
