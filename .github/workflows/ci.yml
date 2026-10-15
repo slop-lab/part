@@ -2,10 +2,11 @@ name: Validate part
 on: [push, pull_request]
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         node: [22, 24]
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,8 +20,8 @@ jobs:
       - run: npm run test:consumers
       - run: npm run preview:build
       - run: npx playwright install --with-deps chromium
-        if: matrix.node == 24
+        if: matrix.node == 24 && matrix.os == 'ubuntu-latest'
       - run: node scripts/test-playground-browser.mjs
-        if: matrix.node == 24
+        if: matrix.node == 24 && matrix.os == 'ubuntu-latest'
       - run: npm run measure
       - run: npm run measure:ui

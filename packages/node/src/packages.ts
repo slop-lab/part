@@ -85,7 +85,9 @@ export function createDirectoryPackages(options: { maxBytes?: number } = {}): Pa
         const file = resolve(item.root, path);
         if (
           (await lstat(file)).isSymbolicLink() ||
-          relative(item.root, await realpath(file)) !== path
+          relative(item.root, await realpath(file))
+            .split('\\')
+            .join('/') !== path
         )
           return fail('package.symlink', 'Asset path changed', 'permission');
         const bytes = await readFile(file);

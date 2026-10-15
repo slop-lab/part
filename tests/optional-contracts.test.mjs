@@ -31,47 +31,51 @@ const outcome = (result) => ({
   commit: [],
   unsettledChildren: [],
 });
-test('Versioned result channel separates stdout logs/progress and rejects partial or duplicate result frames', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'part-channel-'));
-  try {
-    const source = `const fs=require('fs'); console.log('diagnostic'); fs.writeSync(3,JSON.stringify({protocolVersion:1,channelId:'result',kind:'progress',payload:{step:1}})+'\\n'); fs.writeSync(3,JSON.stringify({protocolVersion:1,channelId:'result',kind:'result',payload:{ok:true}})+'\\n');`;
-    const run = async (body) => {
-      await writeFile(join(root, 'source.cjs'), body);
-      const scripts = createNodeScripts({ root, interpreters: { node: process.execPath } });
-      return await (
-        await scripts.execute(
-          {
-            requestId: crypto.randomUUID(),
-            executorId: 'part/node-process',
-            source: {
-              relativePath: 'source.cjs',
-              digest: await digest(new TextEncoder().encode(body)),
+test(
+  'Versioned result channel separates stdout logs/progress and rejects partial or duplicate result frames',
+  { skip: process.platform === 'win32' && 'Requires POSIX process groups' },
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), 'part-channel-'));
+    try {
+      const source = `const fs=require('fs'); console.log('diagnostic'); fs.writeSync(3,JSON.stringify({protocolVersion:1,channelId:'result',kind:'progress',payload:{step:1}})+'\\n'); fs.writeSync(3,JSON.stringify({protocolVersion:1,channelId:'result',kind:'result',payload:{ok:true}})+'\\n');`;
+      const run = async (body) => {
+        await writeFile(join(root, 'source.cjs'), body);
+        const scripts = createNodeScripts({ root, interpreters: { node: process.execPath } });
+        return await (
+          await scripts.execute(
+            {
+              requestId: crypto.randomUUID(),
+              executorId: 'part/node-process',
+              source: {
+                relativePath: 'source.cjs',
+                digest: await digest(new TextEncoder().encode(body)),
+              },
+              interpreter: 'node',
+              args: [],
+              effects: 'read',
+              retry: 'never',
+              capture: { kind: 'channel', channelId: 'result', protocolVersion: 1, maxBytes: 1024 },
             },
-            interpreter: 'node',
-            args: [],
-            effects: 'read',
-            retry: 'never',
-            capture: { kind: 'channel', channelId: 'result', protocolVersion: 1, maxBytes: 1024 },
-          },
-          context,
-        )
-      ).value.done;
-    };
-    assert.deepEqual((await run(source)).result.captured.value, { ok: true });
-    assert.equal(
-      (
-        await run(
-          source +
-            `require('fs').writeSync(3,JSON.stringify({protocolVersion:1,channelId:'result',kind:'result',payload:null})+'\\n');`,
-        )
-      ).phase,
-      'failed',
-    );
-    assert.equal((await run(`require('fs').writeSync(3,'{"kind":"result"}');`)).phase, 'failed');
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
-});
+            context,
+          )
+        ).value.done;
+      };
+      assert.deepEqual((await run(source)).result.captured.value, { ok: true });
+      assert.equal(
+        (
+          await run(
+            source +
+              `require('fs').writeSync(3,JSON.stringify({protocolVersion:1,channelId:'result',kind:'result',payload:null})+'\\n');`,
+          )
+        ).phase,
+        'failed',
+      );
+      assert.equal((await run(`require('fs').writeSync(3,'{"kind":"result"}');`)).phase, 'failed');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);
 test('Namespace migration publishes atomically and failed transformations leave old bytes unreadable as the new schema', async () => {
   const store = createMemoryStore();
   const address = { namespace: 'test/data', scope: { kind: 'runtime', id: 'test' }, key: 'one' };
@@ -532,58 +536,68 @@ test('DOM components, ordered slots, inspector and artifact viewers use only pub
   window.happyDOM.cancelAsync();
 });
 
-test('Script source/workspace resolvers pin packaged bytes and capture only declared workspace JSON', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'part-resolved-script-'));
-  try {
-    const source = new TextEncoder().encode(
-      'require("fs").writeFileSync("output.json",JSON.stringify({cwd:process.cwd()}));',
-    );
-    const scripts = createNodeScripts({
-      root,
-      interpreters: { node: process.execPath },
-      source: async () => ok(source),
-      workspace: async (ref) =>
-        ref.id === 'allowed' ? ok(root) : fail('test.workspace', 'Workspace denied', 'permission'),
-    });
-    const request = {
-      requestId: 'one',
-      executorId: 'part/node-process',
-      source: { packageId: 'installed', relativePath: 'script.cjs', digest: await digest(source) },
-      interpreter: 'node',
-      args: [],
-      workspace: { owner: 'test', kind: 'workspace', id: 'allowed' },
-      capture: {
-        kind: 'file',
-        relativePath: 'output.json',
-        mediaType: 'application/json',
-        maxBytes: 1024,
-      },
-      effects: 'write',
-      retry: 'never',
-    };
-    const outcome = await (await scripts.execute(request, context)).value.done;
-    assert.equal(outcome.phase, 'completed');
-    assert.equal(outcome.result.captured.value.cwd, root);
-    assert.equal(
-      (
-        await scripts.execute(
-          { ...request, workspace: { ...request.workspace, id: 'denied' } },
-          context,
-        )
-      ).ok,
-      false,
-    );
-    assert.equal(
-      (
-        await scripts.execute(
-          { ...request, source: { ...request.source, digest: '0'.repeat(64) } },
-          context,
-        )
-      ).ok,
-      false,
-    );
-    assert.equal((await scripts.execute(null, context)).ok, false);
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
-});
+test(
+  'Script source/workspace resolvers pin packaged bytes and capture only declared workspace JSON',
+  { skip: process.platform === 'win32' && 'Requires POSIX process groups' },
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), 'part-resolved-script-'));
+    try {
+      const source = new TextEncoder().encode(
+        'require("fs").writeFileSync("output.json",JSON.stringify({cwd:process.cwd()}));',
+      );
+      const scripts = createNodeScripts({
+        root,
+        interpreters: { node: process.execPath },
+        source: async () => ok(source),
+        workspace: async (ref) =>
+          ref.id === 'allowed'
+            ? ok(root)
+            : fail('test.workspace', 'Workspace denied', 'permission'),
+      });
+      const request = {
+        requestId: 'one',
+        executorId: 'part/node-process',
+        source: {
+          packageId: 'installed',
+          relativePath: 'script.cjs',
+          digest: await digest(source),
+        },
+        interpreter: 'node',
+        args: [],
+        workspace: { owner: 'test', kind: 'workspace', id: 'allowed' },
+        capture: {
+          kind: 'file',
+          relativePath: 'output.json',
+          mediaType: 'application/json',
+          maxBytes: 1024,
+        },
+        effects: 'write',
+        retry: 'never',
+      };
+      const outcome = await (await scripts.execute(request, context)).value.done;
+      assert.equal(outcome.phase, 'completed');
+      assert.equal(outcome.result.captured.value.cwd, root);
+      assert.equal(
+        (
+          await scripts.execute(
+            { ...request, workspace: { ...request.workspace, id: 'denied' } },
+            context,
+          )
+        ).ok,
+        false,
+      );
+      assert.equal(
+        (
+          await scripts.execute(
+            { ...request, source: { ...request.source, digest: '0'.repeat(64) } },
+            context,
+          )
+        ).ok,
+        false,
+      );
+      assert.equal((await scripts.execute(null, context)).ok, false);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);

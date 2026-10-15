@@ -1,3 +1,4 @@
+import { npmSync } from './npm.mjs';
 import { build } from 'esbuild';
 import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -20,11 +21,18 @@ const consumers = {
   browser: ['core', 'browser'],
 };
 function run(command, args, cwd = root) {
-  const result = spawnSync(command, args, {
-    cwd,
-    encoding: 'utf8',
-    env: { ...process.env, npm_config_cache: join(temporary, 'cache') },
-  });
+  const result =
+    command === 'npm'
+      ? npmSync(args, {
+          cwd,
+          encoding: 'utf8',
+          env: { ...process.env, npm_config_cache: join(temporary, 'cache') },
+        })
+      : spawnSync(command, args, {
+          cwd,
+          encoding: 'utf8',
+          env: { ...process.env, npm_config_cache: join(temporary, 'cache') },
+        });
   if (result.error || result.status !== 0)
     throw Error(
       `${command} ${args.join(' ')}\n${result.stdout}\n${result.stderr}\n${result.error ?? ''}`,
@@ -112,11 +120,13 @@ try {
       if (entry.default?.endsWith('.css'))
         readFileSync(join(directory, 'node_modules', pkg.manifest.name, entry.default));
     for (const pkg of installed)
-      for (const command of Object.keys(pkg.manifest.bin ?? {}))
+      for (const [command, path] of Object.entries(pkg.manifest.bin ?? {}))
         if (
-          !run(join(directory, 'node_modules', '.bin', command), ['--help'], directory).includes(
-            command,
-          )
+          !run(
+            process.execPath,
+            [join(directory, 'node_modules', pkg.manifest.name, path), '--help'],
+            directory,
+          ).includes(command)
         )
           throw Error(`Packaged executable ${command} failed`);
     if (name === 'browser') {

@@ -73,7 +73,7 @@ export function createSkills(
       return fail('skill.encoding', 'Invalid UTF-8');
     }
     if (!decoded.ok) return decoded;
-    const parent = snapshot.origin.split('/').at(-1);
+    const parent = snapshot.origin.split(/[\\/]/).at(-1);
     if (parent && parent !== decoded.value.name)
       return fail('skill.name', 'Skill name must match its directory');
     return ok({

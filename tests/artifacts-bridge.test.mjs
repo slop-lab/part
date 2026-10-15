@@ -128,215 +128,231 @@ test('Results pin artifact bytes and deduplicate concurrent processors; bad proc
     false,
   );
 });
-test('Authenticated bridge rejects public IDs, profile widening and changed IDs; script uses real RPC with parent budget', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'part-bridge-'));
-  const upstream = createBudget({ maxModelInvocations: 1 });
-  const owner = localContext({
-    scope: { kind: 'runtime', id: 'owner' },
-    services: {
-      get(key) {
-        return key.id === budgetKey.id ? ok(upstream) : fail('missing', 'Missing service');
-      },
-    },
-  });
-  let calls = 0;
-  const bridge = createScriptBridge({
-    'model.invoke': {
-      profileRequired: true,
-      async invoke(params, context) {
-        calls++;
-        const budget = context.services.get(budgetKey).value.reserve('maxModelInvocations', 1);
-        return budget.ok
-          ? {
-              kind: 'completed',
-              commandId: '',
-              result: { actor: context.principal.subject, value: params.value },
-              effect: 'not-applied',
-              commit: [],
-            }
-          : { kind: 'rejected', commandId: '', error: budget.error };
-      },
-    },
-  });
-  const transport = (await startScriptBridge(bridge)).value;
-  try {
-    const grant = (
-      await bridge.issue(
-        {
-          version: 1,
-          audience: 'bridge.mjs',
-          owner: { owner: 'test', kind: 'run', id: owner.scope.id },
-          allowedMethods: ['model.invoke'],
-          allowedProfiles: ['local'],
-          limits: { maxModelInvocations: 2 },
-          expiresAt: new Date(Date.now() + 60000).toISOString(),
-          enforcement: 'authenticated-channel',
-        },
-        owner,
-      )
-    ).value;
-    const env = transport.environment(grant.id, owner).value;
-    const payload = {
-      id: 'request',
-      grantId: grant.id,
-      method: 'model.invoke',
-      params: { profileId: 'local', value: 42 },
-    };
-    assert.equal(
-      (await fetch(env.PART_BRIDGE_URL, { method: 'POST', body: JSON.stringify(payload) })).status,
-      403,
-    );
-    assert.equal((await bridge.invoke(payload, owner)).kind, 'rejected');
-    const authenticated = bridge.authenticate(
-      grant.id,
-      env.PART_BRIDGE_CREDENTIAL,
-      env.PART_BRIDGE_AUDIENCE,
-    ).value;
-    assert.equal(
-      (await bridge.invoke({ ...payload, params: { profileId: 'foreign' } }, authenticated)).kind,
-      'rejected',
-    );
-    const source = `const env=process.env; const request=${JSON.stringify(payload)}; const result=await fetch(env.PART_BRIDGE_URL,{method:'POST',headers:{authorization:'Bearer '+env.PART_BRIDGE_CREDENTIAL,'x-part-bridge-audience':env.PART_BRIDGE_AUDIENCE},body:JSON.stringify(request)}); console.log(JSON.stringify(await result.json()));`;
-    await writeFile(join(root, 'bridge.mjs'), source);
-    const scripts = createNodeScripts({
-      root,
-      interpreters: { node: process.execPath },
-      bridge: transport,
-    });
-    const handle = (
-      await scripts.execute(
-        {
-          requestId: 'script',
-          executorId: 'part/node-process',
-          source: {
-            relativePath: 'bridge.mjs',
-            digest: await digest(new TextEncoder().encode(source)),
-          },
-          interpreter: 'node',
-          args: [],
-          bridgeGrant: grant.id,
-          capture: { kind: 'stdout-json', maxBytes: 2048 },
-          effects: 'read',
-          retry: 'never',
-        },
-        owner,
-      )
-    ).value;
-    const outcome = await handle.done;
-    assert.equal(outcome.phase, 'completed');
-    assert.equal(outcome.result.captured.value.result.value, 42);
-    assert.equal((await bridge.invoke(payload, authenticated)).kind, 'completed');
-    assert.equal(calls, 1);
-    assert.equal(
-      (
-        await bridge.invoke(
-          { ...payload, params: { profileId: 'local', value: 43 } },
-          authenticated,
-        )
-      ).kind,
-      'rejected',
-    );
-    assert.equal((await bridge.invoke({ ...payload, id: 'next' }, authenticated)).kind, 'rejected');
-    assert.equal(calls, 2);
-    await bridge.revoke(grant.id, owner);
-    assert.equal(
-      bridge.authenticate(grant.id, env.PART_BRIDGE_CREDENTIAL, env.PART_BRIDGE_AUDIENCE).ok,
-      false,
-    );
-  } finally {
-    await transport.close();
-    await rm(root, { recursive: true, force: true });
-  }
-});
-
-test('Script tools share one prepared executor attempt; direct workflow scripts retain their own boundary', async () => {
-  const { createToolDispatcher, installTool } = await import('@slop-lab/part/tools');
-  const { schema } = await import('@slop-lab/part/contracts');
-  const { isScriptRequest } = await import('@slop-lab/part/scripts');
-  const { createBoundary, createOperations } = await import('@slop-lab/part/runtime');
-  const root = await mkdtemp(join(tmpdir(), 'part-script-attempt-'));
-  try {
-    const source = 'console.log(JSON.stringify({done:true}));';
-    await writeFile(join(root, 'source.cjs'), source);
-    let prepares = 0,
-      settles = 0;
-    const boundary = createBoundary({
-      prepare: async () => {
-        prepares++;
-        return ok(undefined);
-      },
-      settle: async () => {
-        settles++;
-        return ok([]);
-      },
-    });
-    const scripts = createNodeScripts({ root, interpreters: { node: process.execPath }, boundary });
-    const request = {
-      requestId: 'one',
-      executorId: 'part/node-process',
-      source: {
-        relativePath: 'source.cjs',
-        digest: await digest(new TextEncoder().encode(source)),
-      },
-      interpreter: 'node',
-      args: [],
-      capture: { kind: 'stdout-json', maxBytes: 1024 },
-      effects: 'read',
-      retry: 'never',
-    };
-    const executor = scripts.executor();
-    const tool = installTool({
-      definition: {
-        id: 'test/script',
-        version: '1',
-        description: 'Explicit script',
-        input: schema('test/script-request', isScriptRequest),
-        output: jsonSchema,
-        executor: executor.id,
-        effects: 'read',
-        cancellation: 'cooperative',
-        retrySafety: 'never',
-        requiredCapabilities: [],
-      },
-      execute: async () => {
-        throw Error('External executor must own the process');
-      },
-    });
-    const dispatcher = createToolDispatcher({
-      tools: [tool],
-      executors: [executor],
-      boundary,
-    }).value;
-    const budget = createBudget({ maxExecutorAttempts: 1 });
-    const caller = localContext({
+test(
+  'Authenticated bridge rejects public IDs, profile widening and changed IDs; script uses real RPC with parent budget',
+  { skip: process.platform === 'win32' && 'Requires POSIX process groups' },
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), 'part-bridge-'));
+    const upstream = createBudget({ maxModelInvocations: 1 });
+    const owner = localContext({
+      scope: { kind: 'runtime', id: 'owner' },
       services: {
-        get: (key) => (key.id === budgetKey.id ? ok(budget) : fail('missing', 'Missing service')),
+        get(key) {
+          return key.id === budgetKey.id ? ok(upstream) : fail('missing', 'Missing service');
+        },
       },
     });
-    const handle = (
-      await dispatcher.dispatch(
-        { logicalCallId: 'one', toolId: tool.id, arguments: request },
-        caller,
-      )
-    ).value;
-    assert.equal((await handle.done).phase, 'completed');
-    assert.equal(prepares, 1);
-    assert.equal(settles, 1);
-    const second = (
-      await dispatcher.dispatch(
-        { logicalCallId: 'two', toolId: tool.id, arguments: request },
-        caller,
-      )
-    ).value;
-    assert.equal((await second.done).phase, 'failed');
-    const direct = (await scripts.execute({ ...request, requestId: 'direct' }, context)).value;
-    assert.equal((await direct.done).phase, 'completed');
-    assert.equal(prepares, 3);
-    assert.equal(settles, 3);
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
-});
+    let calls = 0;
+    const bridge = createScriptBridge({
+      'model.invoke': {
+        profileRequired: true,
+        async invoke(params, context) {
+          calls++;
+          const budget = context.services.get(budgetKey).value.reserve('maxModelInvocations', 1);
+          return budget.ok
+            ? {
+                kind: 'completed',
+                commandId: '',
+                result: { actor: context.principal.subject, value: params.value },
+                effect: 'not-applied',
+                commit: [],
+              }
+            : { kind: 'rejected', commandId: '', error: budget.error };
+        },
+      },
+    });
+    const transport = (await startScriptBridge(bridge)).value;
+    try {
+      const grant = (
+        await bridge.issue(
+          {
+            version: 1,
+            audience: 'bridge.mjs',
+            owner: { owner: 'test', kind: 'run', id: owner.scope.id },
+            allowedMethods: ['model.invoke'],
+            allowedProfiles: ['local'],
+            limits: { maxModelInvocations: 2 },
+            expiresAt: new Date(Date.now() + 60000).toISOString(),
+            enforcement: 'authenticated-channel',
+          },
+          owner,
+        )
+      ).value;
+      const env = transport.environment(grant.id, owner).value;
+      const payload = {
+        id: 'request',
+        grantId: grant.id,
+        method: 'model.invoke',
+        params: { profileId: 'local', value: 42 },
+      };
+      assert.equal(
+        (await fetch(env.PART_BRIDGE_URL, { method: 'POST', body: JSON.stringify(payload) }))
+          .status,
+        403,
+      );
+      assert.equal((await bridge.invoke(payload, owner)).kind, 'rejected');
+      const authenticated = bridge.authenticate(
+        grant.id,
+        env.PART_BRIDGE_CREDENTIAL,
+        env.PART_BRIDGE_AUDIENCE,
+      ).value;
+      assert.equal(
+        (await bridge.invoke({ ...payload, params: { profileId: 'foreign' } }, authenticated)).kind,
+        'rejected',
+      );
+      const source = `const env=process.env; const request=${JSON.stringify(payload)}; const result=await fetch(env.PART_BRIDGE_URL,{method:'POST',headers:{authorization:'Bearer '+env.PART_BRIDGE_CREDENTIAL,'x-part-bridge-audience':env.PART_BRIDGE_AUDIENCE},body:JSON.stringify(request)}); console.log(JSON.stringify(await result.json()));`;
+      await writeFile(join(root, 'bridge.mjs'), source);
+      const scripts = createNodeScripts({
+        root,
+        interpreters: { node: process.execPath },
+        bridge: transport,
+      });
+      const handle = (
+        await scripts.execute(
+          {
+            requestId: 'script',
+            executorId: 'part/node-process',
+            source: {
+              relativePath: 'bridge.mjs',
+              digest: await digest(new TextEncoder().encode(source)),
+            },
+            interpreter: 'node',
+            args: [],
+            bridgeGrant: grant.id,
+            capture: { kind: 'stdout-json', maxBytes: 2048 },
+            effects: 'read',
+            retry: 'never',
+          },
+          owner,
+        )
+      ).value;
+      const outcome = await handle.done;
+      assert.equal(outcome.phase, 'completed');
+      assert.equal(outcome.result.captured.value.result.value, 42);
+      assert.equal((await bridge.invoke(payload, authenticated)).kind, 'completed');
+      assert.equal(calls, 1);
+      assert.equal(
+        (
+          await bridge.invoke(
+            { ...payload, params: { profileId: 'local', value: 43 } },
+            authenticated,
+          )
+        ).kind,
+        'rejected',
+      );
+      assert.equal(
+        (await bridge.invoke({ ...payload, id: 'next' }, authenticated)).kind,
+        'rejected',
+      );
+      assert.equal(calls, 2);
+      await bridge.revoke(grant.id, owner);
+      assert.equal(
+        bridge.authenticate(grant.id, env.PART_BRIDGE_CREDENTIAL, env.PART_BRIDGE_AUDIENCE).ok,
+        false,
+      );
+    } finally {
+      await transport.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'Script tools share one prepared executor attempt; direct workflow scripts retain their own boundary',
+  { skip: process.platform === 'win32' && 'Requires POSIX process groups' },
+  async () => {
+    const { createToolDispatcher, installTool } = await import('@slop-lab/part/tools');
+    const { schema } = await import('@slop-lab/part/contracts');
+    const { isScriptRequest } = await import('@slop-lab/part/scripts');
+    const { createBoundary, createOperations } = await import('@slop-lab/part/runtime');
+    const root = await mkdtemp(join(tmpdir(), 'part-script-attempt-'));
+    try {
+      const source = 'console.log(JSON.stringify({done:true}));';
+      await writeFile(join(root, 'source.cjs'), source);
+      let prepares = 0,
+        settles = 0;
+      const boundary = createBoundary({
+        prepare: async () => {
+          prepares++;
+          return ok(undefined);
+        },
+        settle: async () => {
+          settles++;
+          return ok([]);
+        },
+      });
+      const scripts = createNodeScripts({
+        root,
+        interpreters: { node: process.execPath },
+        boundary,
+      });
+      const request = {
+        requestId: 'one',
+        executorId: 'part/node-process',
+        source: {
+          relativePath: 'source.cjs',
+          digest: await digest(new TextEncoder().encode(source)),
+        },
+        interpreter: 'node',
+        args: [],
+        capture: { kind: 'stdout-json', maxBytes: 1024 },
+        effects: 'read',
+        retry: 'never',
+      };
+      const executor = scripts.executor();
+      const tool = installTool({
+        definition: {
+          id: 'test/script',
+          version: '1',
+          description: 'Explicit script',
+          input: schema('test/script-request', isScriptRequest),
+          output: jsonSchema,
+          executor: executor.id,
+          effects: 'read',
+          cancellation: 'cooperative',
+          retrySafety: 'never',
+          requiredCapabilities: [],
+        },
+        execute: async () => {
+          throw Error('External executor must own the process');
+        },
+      });
+      const dispatcher = createToolDispatcher({
+        tools: [tool],
+        executors: [executor],
+        boundary,
+      }).value;
+      const budget = createBudget({ maxExecutorAttempts: 1 });
+      const caller = localContext({
+        services: {
+          get: (key) => (key.id === budgetKey.id ? ok(budget) : fail('missing', 'Missing service')),
+        },
+      });
+      const handle = (
+        await dispatcher.dispatch(
+          { logicalCallId: 'one', toolId: tool.id, arguments: request },
+          caller,
+        )
+      ).value;
+      assert.equal((await handle.done).phase, 'completed');
+      assert.equal(prepares, 1);
+      assert.equal(settles, 1);
+      const second = (
+        await dispatcher.dispatch(
+          { logicalCallId: 'two', toolId: tool.id, arguments: request },
+          caller,
+        )
+      ).value;
+      assert.equal((await second.done).phase, 'failed');
+      const direct = (await scripts.execute({ ...request, requestId: 'direct' }, context)).value;
+      assert.equal((await direct.done).phase, 'completed');
+      assert.equal(prepares, 3);
+      assert.equal(settles, 3);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);
 
 test('Processor timeout rejects acceptance and late normalization cannot revive the submission', async () => {
   const { createOperations } = await import('@slop-lab/part/runtime');

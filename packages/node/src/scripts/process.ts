@@ -4,7 +4,7 @@ import type { OperationContext } from '@slop-lab/part/runtime';
 import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { extname, isAbsolute, join, relative, resolve } from 'node:path';
+import { extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { NodeScriptOptions } from './types.js';
 export async function runScriptProcess(
   options: NodeScriptOptions,
@@ -219,7 +219,7 @@ export async function runScriptProcess(
         if (fixed.capture.kind === 'file') {
           const actual = await realpath(resolve(workspace, fixed.capture.relativePath)),
             local = relative(await realpath(workspace), actual);
-          if (!local || local === '..' || local.startsWith('../') || isAbsolute(local))
+          if (!local || local === '..' || local.startsWith('..' + sep) || isAbsolute(local))
             return {
               kind: 'failed',
               effect,

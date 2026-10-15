@@ -13,7 +13,7 @@ import { createCodeEngine, defineCodeWorkflow } from '@slop-lab/part-plugins/wor
 import { createSuspensions } from '@slop-lab/part/runtime/waits';
 import { localContext, jsonSchema, ok, schema, digest, fail } from '@slop-lab/part/contracts';
 const context = localContext();
-test('SR02/SR03/SR12: skill discovery and activation pin content and never execute bundled scripts', async () => {
+test('SR02/SR03/SR12: skill discovery and activation pin content and never execute bundled scripts', async (t) => {
   const temporary = await mkdtemp(join(tmpdir(), 'part-skill-')),
     root = join(temporary, 'report');
   await mkdir(root);
@@ -49,110 +49,127 @@ test('SR02/SR03/SR12: skill discovery and activation pin content and never execu
     assert.equal((await source.read(packages[0], '../outside', context)).ok, false);
     await writeFile(join(root, 'SKILL.md'), 'changed');
     assert.equal((await skills.list(context)).ok, false);
-    await symlink('/tmp', join(root, 'escape'));
-    assert.equal((await source.discover([root], context)).ok, false);
+    await t.test('rejects symlinks', async (t) => {
+      try {
+        await symlink(temporary, join(root, 'escape'), 'junction');
+      } catch (error) {
+        if (error.code === 'EPERM' || error.code === 'EACCES') {
+          t.skip('Creating symlinks requires permission');
+          return;
+        }
+        throw error;
+      }
+      assert.equal((await source.discover([root], context)).ok, false);
+    });
   } finally {
     await rm(temporary, { recursive: true, force: true });
   }
 });
-test('W15/SR12: awaited script hooks block malformed decisions, consume once and release scope', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'part-hook-'));
-  try {
-    const code = 'process.stdout.write(JSON.stringify({kind:"allow"}));';
-    await writeFile(join(root, 'hook.cjs'), code);
-    const scripts = createNodeScripts({ root, interpreters: { node: process.execPath } }),
-      point = {
-        id: 'before',
-        version: 1,
-        owner: 'test',
-        phase: 'before-effect',
-        input: jsonSchema,
-        output: jsonSchema,
-        allowedDecisions: ['allow', 'deny'],
-        awaited: true,
-      };
-    const hooks = createScriptHooks([point], scripts).value,
-      owner = { owner: 'test', kind: 'run', id: context.scope.id };
-    const binding = {
-      id: 'hook',
-      pointId: 'before',
-      pointVersion: 1,
-      activationOwner: owner,
-      script: {
-        requestId: 'hook-script',
-        executorId: 'part/node-process',
-        source: { relativePath: 'hook.cjs', digest: await digest(new TextEncoder().encode(code)) },
-        interpreter: 'node',
-        args: [],
-        capture: { kind: 'stdout-json', maxBytes: 1024 },
-        effects: 'read',
-        retry: 'never',
-      },
-      failure: 'block',
-      scope: 'run',
-      once: true,
-      reentrancy: 'deny',
-    };
-    assert.equal(
-      (await hooks.bind({ ...binding, failure: 'report-and-continue' }, context)).ok,
-      false,
-    );
-    assert.equal((await hooks.bind(binding, context)).ok, true);
-    assert.equal((await hooks.fire('before', {}, context)).value[0].kind, 'allow');
-    assert.equal((await hooks.fire('before', {}, context)).value.length, 0);
-    hooks.closeOwner(owner);
-    assert.equal(
-      (await hooks.unbind({ owner: 'part/hooks', kind: 'binding', id: 'hook' }, context)).ok,
-      false,
-    );
-    const invalid = 'process.stdout.write(JSON.stringify({kind:"not-allowed"}));';
-    await writeFile(join(root, 'hook.cjs'), invalid);
-    await hooks.bind(
-      {
-        ...binding,
-        id: 'invalid',
-        once: false,
+test(
+  'W15/SR12: awaited script hooks block malformed decisions, consume once and release scope',
+  { skip: process.platform === 'win32' && 'Requires POSIX process groups' },
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), 'part-hook-'));
+    try {
+      const code = 'process.stdout.write(JSON.stringify({kind:"allow"}));';
+      await writeFile(join(root, 'hook.cjs'), code);
+      const scripts = createNodeScripts({ root, interpreters: { node: process.execPath } }),
+        point = {
+          id: 'before',
+          version: 1,
+          owner: 'test',
+          phase: 'before-effect',
+          input: jsonSchema,
+          output: jsonSchema,
+          allowedDecisions: ['allow', 'deny'],
+          awaited: true,
+        };
+      const hooks = createScriptHooks([point], scripts).value,
+        owner = { owner: 'test', kind: 'run', id: context.scope.id };
+      const binding = {
+        id: 'hook',
+        pointId: 'before',
+        pointVersion: 1,
+        activationOwner: owner,
         script: {
-          ...binding.script,
+          requestId: 'hook-script',
+          executorId: 'part/node-process',
           source: {
-            ...binding.script.source,
-            digest: await digest(new TextEncoder().encode(invalid)),
+            relativePath: 'hook.cjs',
+            digest: await digest(new TextEncoder().encode(code)),
+          },
+          interpreter: 'node',
+          args: [],
+          capture: { kind: 'stdout-json', maxBytes: 1024 },
+          effects: 'read',
+          retry: 'never',
+        },
+        failure: 'block',
+        scope: 'run',
+        once: true,
+        reentrancy: 'deny',
+      };
+      assert.equal(
+        (await hooks.bind({ ...binding, failure: 'report-and-continue' }, context)).ok,
+        false,
+      );
+      assert.equal((await hooks.bind(binding, context)).ok, true);
+      assert.equal((await hooks.fire('before', {}, context)).value[0].kind, 'allow');
+      assert.equal((await hooks.fire('before', {}, context)).value.length, 0);
+      hooks.closeOwner(owner);
+      assert.equal(
+        (await hooks.unbind({ owner: 'part/hooks', kind: 'binding', id: 'hook' }, context)).ok,
+        false,
+      );
+      const invalid = 'process.stdout.write(JSON.stringify({kind:"not-allowed"}));';
+      await writeFile(join(root, 'hook.cjs'), invalid);
+      await hooks.bind(
+        {
+          ...binding,
+          id: 'invalid',
+          once: false,
+          script: {
+            ...binding.script,
+            source: {
+              ...binding.script.source,
+              digest: await digest(new TextEncoder().encode(invalid)),
+            },
           },
         },
-      },
-      context,
-    );
-    let writes = 0;
-    const boundary = createBoundary({
-      prepare: async () => {
-        const checked = await hooks.fire('before', {}, context);
-        return checked.ok ? ok() : checked;
-      },
-    });
-    const outcome = await managedAttempt(
-      boundary,
-      {
-        operationId: 'o',
-        attemptId: 'a',
-        target: 'write',
-        executor: 'test',
-        inputDigest: 'i',
-        scopeDigest: 's',
-        compositionRevision: 'r',
-        classification: 'write',
-      },
-      async () => {
-        writes++;
-        return { kind: 'returned', value: null, effect: 'applied' };
-      },
-      context,
-    );
-    assert.equal(outcome.phase, 'failed');
-    assert.equal(writes, 0);
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
-});
+        context,
+      );
+      let writes = 0;
+      const boundary = createBoundary({
+        prepare: async () => {
+          const checked = await hooks.fire('before', {}, context);
+          return checked.ok ? ok() : checked;
+        },
+      });
+      const outcome = await managedAttempt(
+        boundary,
+        {
+          operationId: 'o',
+          attemptId: 'a',
+          target: 'write',
+          executor: 'test',
+          inputDigest: 'i',
+          scopeDigest: 's',
+          compositionRevision: 'r',
+          classification: 'write',
+        },
+        async () => {
+          writes++;
+          return { kind: 'returned', value: null, effect: 'applied' };
+        },
+        context,
+      );
+      assert.equal(outcome.phase, 'failed');
+      assert.equal(writes, 0);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);
 test('W16: a hook cannot recursively invoke the same point through its script service', async () => {
   let hooks;
   const scripts = {

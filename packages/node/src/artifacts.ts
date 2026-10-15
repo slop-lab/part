@@ -29,11 +29,14 @@ export async function openFileArtifacts(
             await file.close();
           }
           await rename(pending, target);
-          const directory = await open(root, 'r');
-          try {
-            await directory.sync();
-          } finally {
-            await directory.close();
+          // Windows does not support opening directories for fsync. The record itself is synced.
+          if (process.platform !== 'win32') {
+            const directory = await open(root, 'r');
+            try {
+              await directory.sync();
+            } finally {
+              await directory.close();
+            }
           }
         } finally {
           await rm(pending, { force: true });

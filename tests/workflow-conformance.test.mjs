@@ -58,186 +58,190 @@ function composition() {
     config: {},
   }).value;
 }
-test('GW03/GW06: actual script -> managed child agent -> typed result -> approval applies pinned data once', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'part-vertical-')),
-    source = 'console.log(JSON.stringify({text:"collected"}));';
-  try {
-    await writeFile(join(root, 'collect.cjs'), source);
-    const operations = createOperations(),
-      model = fakeModel([{ text: 'reviewed' }]),
-      gateway = createModelGateway({
-        profiles: [model.profile],
-        adapters: [model.adapter],
-        transports: [model.transport],
-        auth: { none: model.auth },
+test(
+  'GW03/GW06: actual script -> managed child agent -> typed result -> approval applies pinned data once',
+  { skip: process.platform === 'win32' && 'Requires POSIX process groups' },
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), 'part-vertical-')),
+      source = 'console.log(JSON.stringify({text:"collected"}));';
+    try {
+      await writeFile(join(root, 'collect.cjs'), source);
+      const operations = createOperations(),
+        model = fakeModel([{ text: 'reviewed' }]),
+        gateway = createModelGateway({
+          profiles: [model.profile],
+          adapters: [model.adapter],
+          transports: [model.transport],
+          auth: { none: model.auth },
+          operations,
+        }).value;
+      const runs = createRunService({
+        drivers: [installDriver(createBasicDriver({ profileId: 'fake' }))],
+        services: {
+          model: gateway,
+          context: createContextCompiler().value,
+          operations,
+          services: context.services,
+        },
         operations,
       }).value;
-    const runs = createRunService({
-      drivers: [installDriver(createBasicDriver({ profileId: 'fake' }))],
-      services: {
-        model: gateway,
-        context: createContextCompiler().value,
+      const scripts = createNodeScripts({
+        root,
+        interpreters: { node: process.execPath },
         operations,
-        services: context.services,
-      },
-      operations,
-    }).value;
-    const scripts = createNodeScripts({
-      root,
-      interpreters: { node: process.execPath },
-      operations,
-    });
-    const results = createResults([
-      { id: jsonSchema.ref.id, version: 1, schema: jsonSchema, mediaType: 'application/json' },
-    ]).value;
-    const collect = {
-      requestId: 'collect',
-      executorId: 'part/node-process',
-      source: {
-        relativePath: 'collect.cjs',
-        digest: await digest(new TextEncoder().encode(source)),
-      },
-      interpreter: 'node',
-      args: [],
-      capture: { kind: 'stdout-json', maxBytes: 1024 },
-      effects: 'read',
-      retry: 'never',
-    };
-    const composed = composition();
-    let ticket,
-      applied = 0;
-    const code = await defineCodeWorkflow({
-      id: 'vertical',
-      version: '1',
-      input: jsonSchema,
-      output: jsonSchema,
-      replay: 'none',
-      async execute(input, c) {
-        const captured = await c.script(
-          await callIdentity(c.execution, 'collect', collect),
-          collect,
-        );
-        if (captured.phase !== 'completed') return fail('test.collect', 'Collect failed');
-        const request = {
-          driver: 'part/basic',
-          composition: composed,
-          input: captured.result.captured.value.text,
-        };
-        const review = await c.agent(
-          await callIdentity(c.execution, 'agent', {
-            driver: request.driver,
-            input: request.input,
-            compositionRevision: composed.inspection.revision,
-          }),
-          request,
-        );
-        if (review.phase !== 'completed') return fail('test.agent', 'Agent failed');
-        const submission = {
-          submissionId: 'result',
-          expectedType: jsonSchema.ref,
-          data: { kind: 'inline', value: { text: review.result.content[0].text, input } },
-          producedBy: { owner: c.execution.engine, kind: 'workflow', id: c.execution.id },
-          validationProfile: 'schema',
-        };
-        const accepted = await c.submit(
-          await callIdentity(c.execution, 'result', submission),
-          submission,
-        );
-        if (!accepted.ok) return accepted;
-        const spec = {
-          type: 'test/approve',
-          responseSchema: jsonSchema,
-          presentation: { prompt: 'Approve pinned result?' },
-          bindingDigest: accepted.value.digest,
-        };
-        const opened = await c.wait(
-          await callIdentity(c.execution, 'approve', {
-            type: spec.type,
-            responseSchema: jsonSchema.ref,
-            presentation: spec.presentation,
-            bindingDigest: spec.bindingDigest,
-          }),
-          spec,
-        );
-        if (!opened.ok) return opened;
-        ticket = opened.value;
-        const response = await c.response(ticket);
-        if (!response.ok) return response;
-        if (response.value !== true) return fail('test.denied', 'Approval declined');
-        applied++;
-        return ok(accepted.value.data.value);
-      },
-    });
-    const engine = createCodeEngine([code], {
-      operations,
-      scripts,
-      runs,
-      results,
-      waits: createSuspensions(),
-    }).value;
-    const prepared = (
-      await engine.prepare(
-        {
-          engineId: engine.descriptor.id,
-          definition: {
-            id: code.definition.id,
-            format: 'part.code',
-            formatVersion: '1',
-            digest: code.digest,
-            source: { owner: 'test', native: {} },
-          },
-          profileId: 'default',
-          requiredCapabilities: [],
-          requiredControl: 'runner-enforced',
+      });
+      const results = createResults([
+        { id: jsonSchema.ref.id, version: 1, schema: jsonSchema, mediaType: 'application/json' },
+      ]).value;
+      const collect = {
+        requestId: 'collect',
+        executorId: 'part/node-process',
+        source: {
+          relativePath: 'collect.cjs',
+          digest: await digest(new TextEncoder().encode(source)),
         },
-        context,
-      )
-    ).value;
-    const started = await engine.start(
-      {
-        requestId: 'one',
-        idempotencyKey: 'stable',
-        prepared,
-        input: { revision: 1 },
-        limits: { maxChildRuns: 1, maxModelInvocations: 1 },
-      },
-      context,
-    );
-    await until(() => ticket !== undefined);
-    assert.equal(
-      (
-        await engine.start(
-          { requestId: 'changed', idempotencyKey: 'stable', prepared, input: { revision: 2 } },
+        interpreter: 'node',
+        args: [],
+        capture: { kind: 'stdout-json', maxBytes: 1024 },
+        effects: 'read',
+        retry: 'never',
+      };
+      const composed = composition();
+      let ticket,
+        applied = 0;
+      const code = await defineCodeWorkflow({
+        id: 'vertical',
+        version: '1',
+        input: jsonSchema,
+        output: jsonSchema,
+        replay: 'none',
+        async execute(input, c) {
+          const captured = await c.script(
+            await callIdentity(c.execution, 'collect', collect),
+            collect,
+          );
+          if (captured.phase !== 'completed') return fail('test.collect', 'Collect failed');
+          const request = {
+            driver: 'part/basic',
+            composition: composed,
+            input: captured.result.captured.value.text,
+          };
+          const review = await c.agent(
+            await callIdentity(c.execution, 'agent', {
+              driver: request.driver,
+              input: request.input,
+              compositionRevision: composed.inspection.revision,
+            }),
+            request,
+          );
+          if (review.phase !== 'completed') return fail('test.agent', 'Agent failed');
+          const submission = {
+            submissionId: 'result',
+            expectedType: jsonSchema.ref,
+            data: { kind: 'inline', value: { text: review.result.content[0].text, input } },
+            producedBy: { owner: c.execution.engine, kind: 'workflow', id: c.execution.id },
+            validationProfile: 'schema',
+          };
+          const accepted = await c.submit(
+            await callIdentity(c.execution, 'result', submission),
+            submission,
+          );
+          if (!accepted.ok) return accepted;
+          const spec = {
+            type: 'test/approve',
+            responseSchema: jsonSchema,
+            presentation: { prompt: 'Approve pinned result?' },
+            bindingDigest: accepted.value.digest,
+          };
+          const opened = await c.wait(
+            await callIdentity(c.execution, 'approve', {
+              type: spec.type,
+              responseSchema: jsonSchema.ref,
+              presentation: spec.presentation,
+              bindingDigest: spec.bindingDigest,
+            }),
+            spec,
+          );
+          if (!opened.ok) return opened;
+          ticket = opened.value;
+          const response = await c.response(ticket);
+          if (!response.ok) return response;
+          if (response.value !== true) return fail('test.denied', 'Approval declined');
+          applied++;
+          return ok(accepted.value.data.value);
+        },
+      });
+      const engine = createCodeEngine([code], {
+        operations,
+        scripts,
+        runs,
+        results,
+        waits: createSuspensions(),
+      }).value;
+      const prepared = (
+        await engine.prepare(
+          {
+            engineId: engine.descriptor.id,
+            definition: {
+              id: code.definition.id,
+              format: 'part.code',
+              formatVersion: '1',
+              digest: code.digest,
+              source: { owner: 'test', native: {} },
+            },
+            profileId: 'default',
+            requiredCapabilities: [],
+            requiredControl: 'runner-enforced',
+          },
           context,
         )
-      ).kind,
-      'rejected',
-    );
-    const command = {
-      protocolVersion: 1,
-      commandId: 'approve',
-      actionId: 'part.workflow/respond',
-      actionVersion: 1,
-      input: { ticketId: ticket.id, revision: ticket.revision, response: true },
-    };
-    const receipts = await Promise.all([
-      engine.action(started.ref, command, context),
-      engine.action(started.ref, command, context),
-    ]);
-    assert.equal(receipts[0].kind, 'completed');
-    assert.equal(receipts[1].kind, 'completed');
-    await until(async () =>
-      ['succeeded', 'failed'].includes((await engine.get(started.ref, context)).value.phase),
-    );
-    const snapshot = (await engine.get(started.ref, context)).value;
-    assert.equal(snapshot.phase, 'succeeded');
-    assert.equal(applied, 1);
-    assert.equal(model.requests.length, 1);
-    assert.deepEqual(snapshot.output.data, { text: 'reviewed', input: { revision: 1 } });
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
-});
+      ).value;
+      const started = await engine.start(
+        {
+          requestId: 'one',
+          idempotencyKey: 'stable',
+          prepared,
+          input: { revision: 1 },
+          limits: { maxChildRuns: 1, maxModelInvocations: 1 },
+        },
+        context,
+      );
+      await until(() => ticket !== undefined);
+      assert.equal(
+        (
+          await engine.start(
+            { requestId: 'changed', idempotencyKey: 'stable', prepared, input: { revision: 2 } },
+            context,
+          )
+        ).kind,
+        'rejected',
+      );
+      const command = {
+        protocolVersion: 1,
+        commandId: 'approve',
+        actionId: 'part.workflow/respond',
+        actionVersion: 1,
+        input: { ticketId: ticket.id, revision: ticket.revision, response: true },
+      };
+      const receipts = await Promise.all([
+        engine.action(started.ref, command, context),
+        engine.action(started.ref, command, context),
+      ]);
+      assert.equal(receipts[0].kind, 'completed');
+      assert.equal(receipts[1].kind, 'completed');
+      await until(async () =>
+        ['succeeded', 'failed'].includes((await engine.get(started.ref, context)).value.phase),
+      );
+      const snapshot = (await engine.get(started.ref, context)).value;
+      assert.equal(snapshot.phase, 'succeeded');
+      assert.equal(applied, 1);
+      assert.equal(model.requests.length, 1);
+      assert.deepEqual(snapshot.output.data, { text: 'reviewed', input: { revision: 1 } });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);
 test('GW08: hook timeout/failure policies, matcher, scope and concurrent once admission are explicit', async () => {
   const root = await mkdtemp(join(tmpdir(), 'part-hooks-matrix-'));
   try {

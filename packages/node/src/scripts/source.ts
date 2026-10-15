@@ -1,7 +1,7 @@
 import { digest, fail, ok } from '@slop-lab/part/contracts';
 import type { Contracts, Scripts } from '@slop-lab/part/reference';
 import { readFile, realpath, stat } from 'node:fs/promises';
-import { isAbsolute, relative, resolve } from 'node:path';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 import type { NodeScriptOptions } from './types.js';
 export async function resolveScriptSource(
   options: NodeScriptOptions,
@@ -27,7 +27,7 @@ export async function resolveScriptSource(
       const actual = await realpath(resolve(root, path)),
         base = await realpath(root),
         local = relative(base, actual);
-      if (!local || local === '..' || local.startsWith('../') || isAbsolute(local))
+      if (!local || local === '..' || local.startsWith('..' + sep) || isAbsolute(local))
         return fail('scripts.path', 'Script is outside the configured root', 'permission');
       if ((await stat(actual)).size > (options.maxSourceBytes ?? 16 * 1024 * 1024))
         return fail('scripts.source-size', 'Script exceeds source byte limit');

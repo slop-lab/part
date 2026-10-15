@@ -6,7 +6,9 @@ const root = process.cwd();
 const failures = [];
 function files(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) =>
-    entry.isDirectory() ? files(join(directory, entry.name)) : [join(directory, entry.name)],
+    entry.isDirectory()
+      ? files(join(directory, entry.name))
+      : [join(directory, entry.name).split('\\').join('/')],
   );
 }
 const packages = ['core', 'plugins', 'node', 'browser'].map((directory) => ({
@@ -42,7 +44,10 @@ function resolveDependency(file, specifier, runtime) {
     return specifier;
   }
   if (specifier.startsWith('.')) {
-    const target = relative(root, resolve(dirname(file), specifier)).replace(/\.js$/, '.ts');
+    const target = relative(root, resolve(dirname(file), specifier))
+      .split('\\')
+      .join('/')
+      .replace(/\.js$/, '.ts');
     if (!graph.has(target)) failures.push(`${file}: missing source ${target}`);
     else if (owner(target) !== pkg)
       failures.push(`${file}: cross-package imports must use public exports`);
