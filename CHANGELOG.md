@@ -2,6 +2,11 @@
 
 ## 0.1.0-alpha.2 (unreleased)
 
+- Add an opt-in R4U smoke command with capability discovery and bounded JSON/SSE/tool
+  checks. Record the configured Responses-only route as blocking Chat Completions.
+- Omit streaming-only usage options from non-streaming Chat Completions requests
+  and exclude local environment credentials from Git.
+
 - Add loopback OpenAI-compatible interactive/fixed mock providers, project-bound
   operator tools and the `part-mock-provider` CLI. Export successful interactive
   transcripts as exact ordered fixtures for noninteractive replay.

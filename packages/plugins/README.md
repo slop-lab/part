@@ -12,7 +12,7 @@ import { createPipelineEngine } from '@part/plugins/workflows/pipeline';
 
 Plugins are grouped here rather than given one package each. Execution implementations
 remain explicit and opt-in. Trusted code and memory workflows do not provide durable
-stack recovery. Real-provider smoke is deferred.
+stack recovery. Ollama real-provider smoke remains unverified.
 
 Build in the workspace with `npm run build --workspace @part/plugins`.
 This is a private experimental package; pin its exact version and its core dependency.
@@ -20,5 +20,6 @@ This is a private experimental package; pin its exact version and its core depen
 `@part/plugins/providers/openai-compatible` exports `createOpenAICompatibleAdapter`
 for text/function-tool Chat Completions over JSON or SSE. It works with the local
 Node mock and an explicitly configured compatible endpoint. This profile does not
-implement Responses API, media or provider-hosted tools; no real-provider smoke
-success is claimed.
+implement Responses API, media or provider-hosted tools. The supplied R4U route
+supports Responses only, so its live smoke is blocked by a protocol mismatch.
+See [provider smoke](../../docs/provider-smoke.md).

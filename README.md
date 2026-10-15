@@ -64,8 +64,10 @@ aliases for the former flat imports. The browser stylesheet is
 `@part/browser/styles.css`. Run a single package build with
 `npm run build --workspace @part/browser` (or another workspace name).
 
-Dependent projects can begin local development. Real-provider smoke remains
-explicitly deferred, so formal G-BASE signoff is open. See
+Dependent projects can begin local development. R4U authentication and discovery
+passed, but its configured route supports Responses only; the current Chat Completions
+adapter cannot complete the live smoke. Formal G-BASE signoff remains open. See
+[provider smoke](docs/provider-smoke.md),
 [gate evidence](docs/gates.md), [supported contracts](docs/api.md),
 [implementation coverage](docs/implementation.md), [architecture](docs/architecture.md),
 [the basic example](examples/basic.mjs) and [consumer fixtures](consumers).

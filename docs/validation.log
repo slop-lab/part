@@ -179,3 +179,22 @@ Negative cases: request mismatch/exhaustion/unused exchanges, separate credentia
 JSON/SSE decoder: fragmented Unicode, fragmented function arguments, terminal frames and usage
 npm run pack:local: four tarballs and checksum sidecars updated with the mock API/adapter/CLI
 No upstream model/provider request was made. Real-provider smoke remains deferred; hosted CI was not executed.
+
+R4U live-provider smoke attempt
+Recorded UTC: 2026-10-15T15:25:01Z
+Source revision: 25bbb16
+Credentials: user-supplied .env, ignored by Git; no keys recorded
+GET /v1/models: HTTP 200, 14 models (discovery is not entitlement verification)
+GET /v1/capabilities: HTTP 200; one route, codex profile, backend 8.0.28, protocols [responses], streaming true
+POST /v1/chat/completions: four HTTP 400 responses across gpt-6-luna (two), gpt-5.5 and gpt-6.1-sol
+First rejection used the actual part agent/adapter/fetch transport; three direct diagnostic requests confirmed the structured router error unsupported_capability, Protocol is not supported on this route
+No successful upstream model execution, text/SSE/tool completion or upstream usage verification is established
+Final opt-in smoke command: nonzero at capability preflight, before any inference request; Responses-only route is explicitly unsupported
+Status: blocked by route/adapter protocol mismatch, replacing user-requested deferral; G-BASE stays open
+Fix: omit stream_options for stream:false; deterministic regression added
+npm test: 95 passed, 0 failed
+npm run test:consumers: 7 isolated packed consumers passed
+node scripts/check-architecture.mjs: 4 packages, 123 source modules, 64 public entrypoints
+npm run format:check and git diff --check: passed
+Hosted CI and Ollama live smoke were not executed
+npm run pack:local: four tarballs and SHA-256 sidecars refreshed after the adapter fix (packaging subprocess required sandbox escalation)

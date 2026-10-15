@@ -39,10 +39,11 @@ cover core-only, non-coding, SWE, public TypeScript extensions, workflow, Node-o
 adapters and browser-only UI. They validate every public code/type/CSS entrypoint
 without installing unrelated packages. There is no reverse dependency on SWE.
 
-The actual-provider smoke test remains **explicitly deferred by the user**. This
-is missing external compatibility evidence, not an implementation failure. No real
-provider success or hosted CI execution is claimed. Formal G-BASE signoff therefore
-remains open. G-WORKFLOW has local reference-profile evidence; real external
+The actual-provider smoke was attempted with the supplied R4U credentials.
+Authentication and discovery passed; the route advertises only Responses and rejects
+Chat Completions with `unsupported_capability`. The current adapter cannot complete
+this live smoke. See [reproduction and evidence](provider-smoke.md). No real-provider
+completion success or hosted CI execution is claimed. Formal G-BASE remains open. G-WORKFLOW has local reference-profile evidence; real external
 product compatibility must be certified per adapter/version.
 
 ## Separate later scope
