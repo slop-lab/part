@@ -19,22 +19,38 @@ bodies. Per-case usage is from the final response, not aggregate billing.
 
 ## Current result
 
-The supplied credentials authenticated successfully against the local R4U service:
+**Passed** on 2026-10-15 with `gpt-6-luna` through the user-configured R4U
+Chat Completions route, source revision `55cbf5c`. See the credential-free
+[structured evidence](provider-smoke.evidence.json).
 
-- `GET /v1/models`: HTTP 200, 14 advertised models.
-- `GET /v1/capabilities`: HTTP 200, one route, backend version `8.0.28`, profile
-  `codex`, protocols `["responses"]`, streaming enabled.
-- Four attempted Chat Completions requests (one through the part agent and three
-  direct diagnostic requests) returned HTTP 400. The structured router error was
-  `unsupported_capability`: `Protocol is not supported on this route`.
-- The attempts covered `gpt-6-luna`, `gpt-5.5` and `gpt-6.1-sol`. They do not establish
-  anything about upstream model entitlement or successful provider execution.
-- The final smoke command exits nonzero at capability discovery, before inference.
-  A missing compatible route is a failed precondition, never a passing smoke.
+| Scenario          | Completion requests | Result                                                                                     | Final response usage (input/output) |
+| ----------------- | ------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------- |
+| Text JSON         | 1                   | HTTP 200, `application/json`, `HELLO`                                                      | 308 / 6                             |
+| Text SSE          | 1                   | HTTP 200, `text/event-stream`, `HELLO`                                                     | 308 / 6                             |
+| Function tool SSE | 2                   | Both HTTP 200; `uppercase("hello")` executed once, result returned to model, final `HELLO` | 401 / 6                             |
 
-The provider smoke is **blocked**, replacing the previous user-requested deferral.
-G-BASE remains open. Completion requires a project route supporting Chat Completions
-or a separately implemented and tested Responses adapter. R4U documents these as
-separate protocols; changing only the URL or model does not translate their payloads
-or streaming events. No R4U configuration was modified. Ollama, hosted CI and actual
-browser/device validation remain separate from this attempt.
+All three cases ran through the actual part agent, adapter, bearer authentication
+and fetch transport. Capability discovery accepted `chat`, and model discovery
+returned 14 entries. Final-response token usage was present in every case.
+The four completion requests here exclude the earlier diagnostic attempts below.
+Tool-case usage covers its final response only, not its first tool-call response.
+
+This closes the missing real-provider/custom-endpoint evidence for the selected
+G-BASE reference profile. It does not certify all R4U models, Responses, media,
+provider-hosted tools, upstream billing guarantees or production recovery. Ollama,
+hosted CI and actual browser/device validation remain separate. No R4U configuration
+or credentials were modified by this workspace.
+
+## Earlier attempts and compatibility fix
+
+The first supplied route advertised Responses only and rejected four Chat
+Completions requests across `gpt-6-luna`, `gpt-5.5` and `gpt-6.1-sol` with HTTP 400
+`unsupported_capability`. After the user enabled Chat Completions, the first part
+request reached HTTP 200 but exposed a decoder incompatibility: the router returns
+`tool_calls: null` for a text-only response. A direct diagnostic request confirmed
+that response shape and successful `HELLO` output.
+
+The decoder now treats null tool calls as absent. JSON and SSE regression cases
+accept null while continuing to reject malformed non-null tool calls. After that
+fix the full four-request smoke passed. The original route mismatch is resolved;
+the earlier failed attempts remain in the validation log as historical evidence.

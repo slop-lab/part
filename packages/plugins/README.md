@@ -20,6 +20,6 @@ This is a private experimental package; pin its exact version and its core depen
 `@part/plugins/providers/openai-compatible` exports `createOpenAICompatibleAdapter`
 for text/function-tool Chat Completions over JSON or SSE. It works with the local
 Node mock and an explicitly configured compatible endpoint. This profile does not
-implement Responses API, media or provider-hosted tools. The supplied R4U route
-supports Responses only, so its live smoke is blocked by a protocol mismatch.
+implement Responses API, media or provider-hosted tools. Live R4U smoke with
+`gpt-6-luna` passed JSON/SSE text and a function-tool loop.
 See [provider smoke](../../docs/provider-smoke.md).

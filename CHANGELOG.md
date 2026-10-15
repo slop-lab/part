@@ -2,8 +2,12 @@
 
 ## 0.1.0-alpha.2 (unreleased)
 
+- Accept nullable tool calls in JSON/SSE Chat Completions responses while rejecting
+  malformed non-null values. Verify live R4U text and function-tool flows with
+  `gpt-6-luna`, closing G-BASE for the selected reference profile.
+
 - Add an opt-in R4U smoke command with capability discovery and bounded JSON/SSE/tool
-  checks. Record the configured Responses-only route as blocking Chat Completions.
+  checks. Record protocol mismatches before inference.
 - Omit streaming-only usage options from non-streaming Chat Completions requests
   and exclude local environment credentials from Git.
 

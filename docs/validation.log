@@ -198,3 +198,29 @@ node scripts/check-architecture.mjs: 4 packages, 123 source modules, 64 public e
 npm run format:check and git diff --check: passed
 Hosted CI and Ollama live smoke were not executed
 npm run pack:local: four tarballs and SHA-256 sidecars refreshed after the adapter fix (packaging subprocess required sandbox escalation)
+
+R4U live-provider smoke completed after route update
+Recorded UTC: 2026-10-15T15:31:04.606Z
+Source revision: 55cbf5c
+Reproduction: npm run smoke:provider (build + opt-in .env credentials)
+User enabled Chat Completions; capability preflight accepted chat, model discovery returned 14 models
+Initial resumed part request reached HTTP 200 but failed decoder validation on tool_calls:null; one direct diagnostic response confirmed HELLO with nullable tool calls
+Fix: null tool_calls means no calls in JSON and SSE; malformed non-null values remain rejected
+Focused mock/adapter/CLI regressions: 12 passed, 0 failed
+Final live smoke: model gpt-6-luna, protocol openai.chat.completions, 4 completion requests, all HTTP 200
+text-json: HELLO, application/json, final response usage input 308 / output 6
+text-sse: HELLO, text/event-stream, final response usage input 308 / output 6
+tool-sse: one uppercase(hello) execution, result returned to model, final HELLO, two SSE requests, final response usage input 401 / output 6
+Usage values are per-case final responses, not aggregate billing or first tool-call response usage
+Structured evidence: docs/provider-smoke.evidence.json; no keys, endpoint URLs, upstream error bodies or credential files committed
+npm test: 96 passed, 0 failed
+npm run test:consumers: 7 isolated packed consumers passed
+node scripts/check-architecture.mjs: passed (4 packages, 123 source modules, 64 public entrypoints)
+npm run format:check and git diff --check: passed
+G-BASE: passed for the selected reference profile; dependent projects can start against the pinned local packages
+Hosted CI, Ollama live smoke, actual browser/device audit and durable production recovery remain outside this result
+npm run pack:local: four tarballs and SHA-256 sidecars refreshed
+f80bca43c8c15052aab2549a426e44313fe7d79c6da3575823bb20a65b9b85b9  part-core-0.1.0-alpha.2.tgz
+a6bf29eb2072e775d16240a1b3d38fbdf816ddb5e90199c896587b06401558b4  part-plugins-0.1.0-alpha.2.tgz
+003435bc3f554023b81c18b1cc347bbb88f539869d2b50e2b59c21b54e1e62f5  part-node-0.1.0-alpha.2.tgz
+adf20cd63693653b7a29f1ca9cbd651acef48b01821772063443707cfabb2c16  part-browser-0.1.0-alpha.2.tgz

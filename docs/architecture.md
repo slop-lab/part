@@ -24,7 +24,8 @@ all optional modules are implemented.
 8. Performance baseline: zero active resources and zero runtime dependencies on core
    import. Measured latency and memory are reported per fixture, not universal budgets.
 
-Public APIs are experimental until G-BASE passes. Consumers must pin exact versions.
+Public APIs remain experimental. G-BASE passes for the selected reference profile;
+consumers must pin exact versions.
 Breaking changes require a changelog, migration guidance, and consumer fixture runs.
 
 The repository is an npm workspace with four packages:
@@ -73,9 +74,10 @@ they are historical validation evidence, not a manifest of the current checkout.
 
 The initial provider adapter targets the documented Ollama `/api/chat` NDJSON
 subset: text, thinking, function calls, and usage. Media and foreign native content
-require explicit projection. See https://docs.ollama.com/api/chat . Real provider
-smoke testing is deferred at the user's request; fake fixtures establish only the
-implemented protocol subset.
+require explicit projection. See https://docs.ollama.com/api/chat . Live
+Ollama smoke remains unverified; fake fixtures establish only that adapter's
+implemented protocol subset. The separate OpenAI-compatible Chat Completions adapter
+has live R4U JSON/SSE and function-tool evidence; see [provider smoke](provider-smoke.md).
 
 This environment's Node 26 test subprocess runner reports file-level tests only.
 The project runs `--test-isolation=none` so individual registered tests execute and

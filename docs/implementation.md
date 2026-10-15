@@ -28,7 +28,8 @@ Local provider test support includes an agent-operated loopback Chat Completions
 mock, exact fixed fixtures, operator tools/CLI and transcript-to-fixture conversion.
 The portable OpenAI-compatible adapter is verified against this local profile,
 including a real agent/function-tool loop. See [mock workflows](mock-provider.md).
-This adds local compatibility evidence, not a real-provider smoke result.
+The separate live R4U smoke also passed JSON/SSE text and a real function-tool loop;
+see [provider evidence](provider-smoke.md).
 
 ## Dependent-project readiness
 
@@ -39,11 +40,10 @@ cover core-only, non-coding, SWE, public TypeScript extensions, workflow, Node-o
 adapters and browser-only UI. They validate every public code/type/CSS entrypoint
 without installing unrelated packages. There is no reverse dependency on SWE.
 
-The actual-provider smoke was attempted with the supplied R4U credentials.
-Authentication and discovery passed; the route advertises only Responses and rejects
-Chat Completions with `unsupported_capability`. The current adapter cannot complete
-this live smoke. See [reproduction and evidence](provider-smoke.md). No real-provider
-completion success or hosted CI execution is claimed. Formal G-BASE remains open. G-WORKFLOW has local reference-profile evidence; real external
+The actual-provider/custom-endpoint smoke passed with the supplied R4U configuration
+and `gpt-6-luna`, after Chat Completions was enabled and nullable tool-call decoding
+was corrected. G-BASE passes for this selected reference profile. See
+[reproduction and evidence](provider-smoke.md). Hosted CI was not run. G-WORKFLOW has local reference-profile evidence; real external
 product compatibility must be certified per adapter/version.
 
 ## Separate later scope
