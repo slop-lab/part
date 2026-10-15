@@ -16,19 +16,251 @@
       "types": "./dist/core.d.ts",
       "default": "./dist/core.js"
     },
-    "./*": {
-      "types": "./dist/*.d.ts",
-      "default": "./dist/*.js"
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "default": "./dist/core.js"
+    },
+    "./contracts": {
+      "types": "./dist/foundation/contracts.d.ts",
+      "default": "./dist/foundation/contracts.js"
+    },
+    "./hash": {
+      "types": "./dist/foundation/hash.d.ts",
+      "default": "./dist/foundation/hash.js"
+    },
+    "./deadline": {
+      "types": "./dist/foundation/deadline.d.ts",
+      "default": "./dist/foundation/deadline.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime/index.d.ts",
+      "default": "./dist/runtime/index.js"
+    },
+    "./budgets": {
+      "types": "./dist/runtime/budgets.d.ts",
+      "default": "./dist/runtime/budgets.js"
+    },
+    "./costs": {
+      "types": "./dist/runtime/costs.d.ts",
+      "default": "./dist/runtime/costs.js"
+    },
+    "./runs": {
+      "types": "./dist/runtime/runs.d.ts",
+      "default": "./dist/runtime/runs.js"
+    },
+    "./waits": {
+      "types": "./dist/runtime/waits.d.ts",
+      "default": "./dist/runtime/waits.js"
+    },
+    "./observability": {
+      "types": "./dist/runtime/observability.d.ts",
+      "default": "./dist/runtime/observability.js"
+    },
+    "./composition": {
+      "types": "./dist/composition/index.d.ts",
+      "default": "./dist/composition/index.js"
+    },
+    "./agent": {
+      "types": "./dist/agent/index.d.ts",
+      "default": "./dist/agent/index.js"
+    },
+    "./driver-basic": {
+      "types": "./dist/agent/basic-driver.d.ts",
+      "default": "./dist/agent/basic-driver.js"
+    },
+    "./tools": {
+      "types": "./dist/agent/tools.d.ts",
+      "default": "./dist/agent/tools.js"
+    },
+    "./model": {
+      "types": "./dist/model/gateway.d.ts",
+      "default": "./dist/model/gateway.js"
+    },
+    "./provider-ollama": {
+      "types": "./dist/model/ollama.d.ts",
+      "default": "./dist/model/ollama.js"
+    },
+    "./context": {
+      "types": "./dist/context/index.d.ts",
+      "default": "./dist/context/index.js"
+    },
+    "./history": {
+      "types": "./dist/context/history.d.ts",
+      "default": "./dist/context/history.js"
+    },
+    "./history-runs": {
+      "types": "./dist/context/run-history.d.ts",
+      "default": "./dist/context/run-history.js"
+    },
+    "./projection": {
+      "types": "./dist/context/projection.d.ts",
+      "default": "./dist/context/projection.js"
+    },
+    "./hooks": {
+      "types": "./dist/extensions/hooks.d.ts",
+      "default": "./dist/extensions/hooks.js"
+    },
+    "./skills": {
+      "types": "./dist/extensions/skills.d.ts",
+      "default": "./dist/extensions/skills.js"
+    },
+    "./packages-node": {
+      "types": "./dist/extensions/packages-node.d.ts",
+      "default": "./dist/extensions/packages-node.js"
+    },
+    "./scripts": {
+      "types": "./dist/execution/requests.d.ts",
+      "default": "./dist/execution/requests.js"
+    },
+    "./scripts-node": {
+      "types": "./dist/execution/node.d.ts",
+      "default": "./dist/execution/node.js"
+    },
+    "./script-bridge": {
+      "types": "./dist/execution/bridge.d.ts",
+      "default": "./dist/execution/bridge.js"
+    },
+    "./script-bridge-node": {
+      "types": "./dist/execution/bridge-node.d.ts",
+      "default": "./dist/execution/bridge-node.js"
+    },
+    "./script-bridge-services": {
+      "types": "./dist/execution/bridge-services.d.ts",
+      "default": "./dist/execution/bridge-services.js"
+    },
+    "./workflow-agent-step": {
+      "types": "./dist/workflows/agent-step.d.ts",
+      "default": "./dist/workflows/agent-step.js"
+    },
+    "./workflow-checkpoints": {
+      "types": "./dist/workflows/checkpoints.d.ts",
+      "default": "./dist/workflows/checkpoints.js"
+    },
+    "./workflow-code": {
+      "types": "./dist/workflows/code.d.ts",
+      "default": "./dist/workflows/code.js"
+    },
+    "./workflow-endpoint": {
+      "types": "./dist/workflows/endpoint.d.ts",
+      "default": "./dist/workflows/endpoint.js"
+    },
+    "./workflow-external": {
+      "types": "./dist/workflows/external.d.ts",
+      "default": "./dist/workflows/external.js"
+    },
+    "./workflow-host": {
+      "types": "./dist/workflows/host.d.ts",
+      "default": "./dist/workflows/host.js"
+    },
+    "./workflow-memory": {
+      "types": "./dist/workflows/memory.d.ts",
+      "default": "./dist/workflows/memory.js"
+    },
+    "./workflow-pipeline": {
+      "types": "./dist/workflows/pipeline.d.ts",
+      "default": "./dist/workflows/pipeline.js"
+    },
+    "./workflow-recipe": {
+      "types": "./dist/workflows/recipe.d.ts",
+      "default": "./dist/workflows/recipe.js"
+    },
+    "./host-embedded": {
+      "types": "./dist/host/embedded.d.ts",
+      "default": "./dist/host/embedded.js"
+    },
+    "./host-http": {
+      "types": "./dist/host/http.d.ts",
+      "default": "./dist/host/http.js"
+    },
+    "./host-resources": {
+      "types": "./dist/host/resources.d.ts",
+      "default": "./dist/host/resources.js"
+    },
+    "./host-runtime": {
+      "types": "./dist/host/runtime.d.ts",
+      "default": "./dist/host/runtime.js"
+    },
+    "./storage-memory": {
+      "types": "./dist/storage/memory.d.ts",
+      "default": "./dist/storage/memory.js"
+    },
+    "./storage-migrations": {
+      "types": "./dist/storage/migrations.d.ts",
+      "default": "./dist/storage/migrations.js"
+    },
+    "./storage-runtime": {
+      "types": "./dist/storage/runtime.d.ts",
+      "default": "./dist/storage/runtime.js"
+    },
+    "./storage-sqlite": {
+      "types": "./dist/storage/sqlite.d.ts",
+      "default": "./dist/storage/sqlite.js"
+    },
+    "./artifacts": {
+      "types": "./dist/storage/artifacts.d.ts",
+      "default": "./dist/storage/artifacts.js"
+    },
+    "./artifacts-node": {
+      "types": "./dist/storage/artifacts-node.d.ts",
+      "default": "./dist/storage/artifacts-node.js"
+    },
+    "./results": {
+      "types": "./dist/storage/results.d.ts",
+      "default": "./dist/storage/results.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "default": "./dist/client/index.js"
+    },
+    "./control": {
+      "types": "./dist/client/control.d.ts",
+      "default": "./dist/client/control.js"
+    },
+    "./transport-http": {
+      "types": "./dist/client/http.d.ts",
+      "default": "./dist/client/http.js"
+    },
+    "./ui-dom": {
+      "types": "./dist/ui/dom.d.ts",
+      "default": "./dist/ui/dom.js"
+    },
+    "./ui-headless": {
+      "types": "./dist/ui/headless.d.ts",
+      "default": "./dist/ui/headless.js"
+    },
+    "./ui-inspector": {
+      "types": "./dist/ui/inspector.d.ts",
+      "default": "./dist/ui/inspector.js"
+    },
+    "./ui-markdown": {
+      "types": "./dist/ui/markdown.d.ts",
+      "default": "./dist/ui/markdown.js"
+    },
+    "./ui-registry": {
+      "types": "./dist/ui/registry.d.ts",
+      "default": "./dist/ui/registry.js"
+    },
+    "./ui-workbench": {
+      "types": "./dist/ui/workbench.d.ts",
+      "default": "./dist/ui/workbench.js"
+    },
+    "./ui-workflow": {
+      "types": "./dist/ui/workflow.d.ts",
+      "default": "./dist/ui/workflow.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
     },
     "./reference": {
-      "types": "./dist/reference.d.ts"
+      "types": "./dist/reference/index.d.ts"
     },
     "./ui.css": {
       "default": "./dist/ui.css"
     }
   },
   "scripts": {
-    "build": "tsc && cp src/reference.d.ts src/ui.css dist/",
+    "build": "node scripts/build.mjs",
     "test": "npm run build && node --test --test-isolation=none tests/*.test.mjs",
     "check": "tsc --noEmit",
     "example": "npm run build && node examples/basic.mjs",

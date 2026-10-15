@@ -2,13 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
 import { build } from 'esbuild';
-import { createAgent } from '../dist/agent.js';
-import { fakeModel } from '../dist/testing.js';
-import { createEmbeddedEndpoint } from '../dist/host-embedded.js';
-import { createLocalPort, createWatchHub, createController, jsonCodec } from '../dist/client.js';
-import { createComposer } from '../dist/ui-headless.js';
-import { createChat } from '../dist/ui-dom.js';
-import { localContext } from '../dist/contracts.js';
+import { createAgent } from '../dist/agent/index.js';
+import { fakeModel } from '../dist/testing/index.js';
+import { createEmbeddedEndpoint } from '../dist/host/embedded.js';
+import {
+  createLocalPort,
+  createWatchHub,
+  createController,
+  jsonCodec,
+} from '../dist/client/index.js';
+import { createComposer } from '../dist/ui/headless.js';
+import { createChat } from '../dist/ui/dom.js';
+import { localContext } from '../dist/foundation/contracts.js';
 const context = localContext();
 const command = (text, id = crypto.randomUUID()) => ({
   protocolVersion: 1,
@@ -212,7 +217,7 @@ test('C01/C10: browser entrypoint excludes storage, executor, provider and crede
   const result = await build({
     stdin: {
       contents:
-        "export { createChat } from './src/ui-dom.ts'; export { createController } from './src/client.ts';",
+        "export { createChat } from './src/ui/dom.ts'; export { createController } from './src/client/index.ts';",
       resolveDir: process.cwd(),
     },
     bundle: true,
@@ -222,11 +227,11 @@ test('C01/C10: browser entrypoint excludes storage, executor, provider and crede
   });
   const paths = Object.keys(result.metafile.inputs);
   for (const excluded of [
-    'storage-sqlite',
-    'tools.ts',
-    'provider-ollama',
-    'model.ts',
-    'host-embedded',
+    'storage/sqlite.ts',
+    'agent/tools.ts',
+    'model/ollama.ts',
+    'model/gateway.ts',
+    'host/embedded.ts',
   ])
     assert.equal(
       paths.some((p) => p.includes(excluded)),

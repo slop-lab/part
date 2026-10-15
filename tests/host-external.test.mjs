@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { localContext, ok, fail, jsonSchema } from '../dist/contracts.js';
-import { createOperations, createProgress } from '../dist/runtime.js';
-import { createResourceManager } from '../dist/host-resources.js';
-import { createRuntimeHost } from '../dist/host-runtime.js';
-import { createExternalEngine } from '../dist/workflow-external.js';
-import { provenance } from '../dist/context.js';
+import { localContext, ok, fail, jsonSchema } from '../dist/foundation/contracts.js';
+import { createOperations, createProgress } from '../dist/runtime/index.js';
+import { createResourceManager } from '../dist/host/resources.js';
+import { createRuntimeHost } from '../dist/host/runtime.js';
+import { createExternalEngine } from '../dist/workflows/external.js';
+import { provenance } from '../dist/context/index.js';
 const context = localContext();
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 const terminal = (result) => ({

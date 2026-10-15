@@ -1,15 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { localContext, ok, fail, jsonSchema, stringSchema, canonical } from '../dist/contracts.js';
-import { createPlanner, createScopeManager } from '../dist/composition.js';
+import {
+  localContext,
+  ok,
+  fail,
+  jsonSchema,
+  stringSchema,
+  canonical,
+} from '../dist/foundation/contracts.js';
+import { createPlanner, createScopeManager } from '../dist/composition/index.js';
 import {
   createOperations,
   createBoundary,
   managedAttempt,
   createBudget,
   createProgress,
-} from '../dist/runtime.js';
-import { createSuspensions } from '../dist/waits.js';
+} from '../dist/runtime/index.js';
+import { createSuspensions } from '../dist/runtime/waits.js';
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const completed = (result) => ({
   phase: 'completed',
@@ -310,8 +317,8 @@ test('waits validate authority, revision, schema and deduplicate responses', asy
 });
 
 test('synchronous composition hashing matches native SHA-256', async () => {
-  const { sha256 } = await import('../dist/hash.js');
-  const { digest } = await import('../dist/contracts.js');
+  const { sha256 } = await import('../dist/foundation/hash.js');
+  const { digest } = await import('../dist/foundation/contracts.js');
   for (const text of ['', 'abc', '한국어', 'x'.repeat(1000)]) {
     const bytes = new TextEncoder().encode(text);
     assert.equal(sha256(bytes), await digest(bytes));
@@ -508,7 +515,7 @@ test('Attached work from a separately configured service joins the parent superv
 });
 
 test('Unresolved driver cleanup is abandoned and retains the actual resource reference', async () => {
-  const { createRunService, installDriver } = await import('../dist/runs.js');
+  const { createRunService, installDriver } = await import('../dist/runtime/runs.js');
   const operations = createOperations();
   let disposals = 0;
   const ref = { owner: 'test/driver', kind: 'test/resource', id: 'unclosed' };

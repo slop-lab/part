@@ -1,6 +1,6 @@
 // Independent experimental source implementation of the attempt boundary.
 // This module is not distributed and does not establish new production guarantees.
-import { ok, fail, digest } from '../dist/contracts.js';
+import { ok, fail, digest } from '../dist/foundation/contracts.js';
 export function alternateBoundary() {
   const issued = new Map();
   return {

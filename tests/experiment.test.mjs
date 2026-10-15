@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { alternateBoundary } from '../experiments/alternate-boundary.mjs';
-import { createBoundary, managedAttempt } from '../dist/runtime.js';
-import { localContext } from '../dist/contracts.js';
+import { createBoundary, managedAttempt } from '../dist/runtime/index.js';
+import { localContext } from '../dist/foundation/contracts.js';
 test('C12/G08: independent source boundary variant preserves nominal effect count and single-use settlement', async () => {
   const counts = [];
   for (const create of [createBoundary, alternateBoundary]) {

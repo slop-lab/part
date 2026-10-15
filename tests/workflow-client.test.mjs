@@ -1,15 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
-import { localContext, jsonSchema, ok, fail, digest } from '../dist/contracts.js';
-import { createCodeEngine, defineCodeWorkflow } from '../dist/workflow-code.js';
-import { createPipelineEngine, installStepHandler } from '../dist/workflow-pipeline.js';
-import { createWorkflowHost } from '../dist/workflow-host.js';
-import { createWorkflowEndpoint } from '../dist/workflow-endpoint.js';
-import { createSuspensions } from '../dist/waits.js';
-import { callIdentity } from '../dist/workflow-memory.js';
-import { createLocalPort, createController, jsonCodec } from '../dist/client.js';
-import { createWorkflowView } from '../dist/ui-workflow.js';
+import { localContext, jsonSchema, ok, fail, digest } from '../dist/foundation/contracts.js';
+import { createCodeEngine, defineCodeWorkflow } from '../dist/workflows/code.js';
+import { createPipelineEngine, installStepHandler } from '../dist/workflows/pipeline.js';
+import { createWorkflowHost } from '../dist/workflows/host.js';
+import { createWorkflowEndpoint } from '../dist/workflows/endpoint.js';
+import { createSuspensions } from '../dist/runtime/waits.js';
+import { callIdentity } from '../dist/workflows/memory.js';
+import { createLocalPort, createController, jsonCodec } from '../dist/client/index.js';
+import { createWorkflowView } from '../dist/ui/workflow.js';
 const context = localContext();
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function until(predicate) {

@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAgent, contextPoint } from '../dist/agent.js';
-import { functionTool } from '../dist/tools.js';
-import { fakeModel } from '../dist/testing.js';
-import { schema, stringSchema, ok, fail } from '../dist/contracts.js';
-import { createBasicDriver, createValidatingDriver } from '../dist/driver-basic.js';
-import { createContextCompiler } from '../dist/context.js';
+import { createAgent, contextPoint } from '../dist/agent/index.js';
+import { functionTool } from '../dist/agent/tools.js';
+import { fakeModel } from '../dist/testing/index.js';
+import { schema, stringSchema, ok, fail } from '../dist/foundation/contracts.js';
+import { createBasicDriver, createValidatingDriver } from '../dist/agent/basic-driver.js';
+import { createContextCompiler } from '../dist/context/index.js';
 const input = schema('test/text', (v) => v && typeof v === 'object' && typeof v.text === 'string');
 const toolSchemas = {
   echo: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] },
@@ -126,10 +126,10 @@ test('shared invocation/attempt budgets stop the next effect before execution', 
 });
 
 test('C07: preset and expanded manual composition execute through the same public parts', async () => {
-  const { expandAgent, modelPoint, toolsPoint } = await import('../dist/agent.js');
-  const { createPlanner, createScopeManager } = await import('../dist/composition.js');
-  const { createRunService, installDriver } = await import('../dist/runs.js');
-  const { localContext } = await import('../dist/contracts.js');
+  const { expandAgent, modelPoint, toolsPoint } = await import('../dist/agent/index.js');
+  const { createPlanner, createScopeManager } = await import('../dist/composition/index.js');
+  const { createRunService, installDriver } = await import('../dist/runtime/runs.js');
+  const { localContext } = await import('../dist/foundation/contracts.js');
   const automatic = createAgent({ model: fakeModel([{ text: 'equivalent' }]) }).value;
   const expanded = expandAgent({ model: fakeModel([{ text: 'equivalent' }]) }).value;
   const composition = createPlanner().resolve(expanded.specification).value;
@@ -163,8 +163,8 @@ test('C07: preset and expanded manual composition execute through the same publi
 });
 
 test('C09: context-owned registry accepts a new semantic type without replacing the compiler', async () => {
-  const { lowerersPoint } = await import('../dist/context.js');
-  const { emptyCleanup } = await import('../dist/contracts.js');
+  const { lowerersPoint } = await import('../dist/context/index.js');
+  const { emptyCleanup } = await import('../dist/foundation/contracts.js');
   const lowerer = {
     id: 'third-party/lowerer',
     accepts: { id: 'third-party/item', version: 1 },
@@ -207,7 +207,7 @@ test('C09: context-owned registry accepts a new semantic type without replacing 
         dispose: async () => emptyCleanup(),
       }),
   };
-  const { semanticItem } = await import('../dist/context.js');
+  const { semanticItem } = await import('../dist/context/index.js');
   const model = fakeModel([{ text: 'extension result' }]);
   const agent = createAgent({ model, components: [component] }).value;
   const result = await agent.generate([
@@ -223,7 +223,7 @@ test('C09: context-owned registry accepts a new semantic type without replacing 
 
 test('disposing an agent during admission blocks new driver effects', async () => {
   let calls = 0;
-  const { emptyCleanup } = await import('../dist/contracts.js');
+  const { emptyCleanup } = await import('../dist/foundation/contracts.js');
   const driver = {
     id: 'test/dispose-race',
     version: '1',

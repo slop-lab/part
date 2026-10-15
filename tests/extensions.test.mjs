@@ -8,12 +8,12 @@ import {
   jsonSchema,
   schema,
   digest,
-} from '../dist/contracts.js';
-import { functionTool, createToolDispatcher } from '../dist/tools.js';
-import { createContextCompiler, messageItem, semanticItem } from '../dist/context.js';
-import { createModelGateway, noAuth } from '../dist/model.js';
-import { createOllamaAdapter } from '../dist/provider-ollama.js';
-import { createSuspensions } from '../dist/waits.js';
+} from '../dist/foundation/contracts.js';
+import { functionTool, createToolDispatcher } from '../dist/agent/tools.js';
+import { createContextCompiler, messageItem, semanticItem } from '../dist/context/index.js';
+import { createModelGateway, noAuth } from '../dist/model/gateway.js';
+import { createOllamaAdapter } from '../dist/model/ollama.js';
+import { createSuspensions } from '../dist/runtime/waits.js';
 const context = localContext();
 const decision = (id, decide, resume) => ({
   id,
@@ -339,7 +339,7 @@ test('MT04: inspection digest matches bytes after final request transform', asyn
 });
 
 test('X06: inspector targets confer no authority and unknown projections never expose raw payload', async () => {
-  const { createProjectionService } = await import('../dist/projection.js');
+  const { createProjectionService } = await import('../dist/context/projection.js');
   let reads = 0;
   const projection = createProjectionService({
     authorize: (_target, _audience, c) => c.principal.subject === 'local',

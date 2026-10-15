@@ -1,8 +1,8 @@
 import { performance } from 'node:perf_hooks';
 import { Window } from 'happy-dom';
-import { createWatchHub, createLocalPort, createController } from '../dist/client.js';
-import { createChat } from '../dist/ui-dom.js';
-import { localContext, ok } from '../dist/contracts.js';
+import { createWatchHub, createLocalPort, createController } from '../dist/client/index.js';
+import { createChat } from '../dist/ui/dom.js';
+import { localContext, ok } from '../dist/foundation/contracts.js';
 const window = new Window(),
   context = localContext();
 const items = Array.from({ length: 1000 }, (_, index) => ({

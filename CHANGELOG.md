@@ -2,6 +2,10 @@
 
 ## 0.1.0-alpha.2 (unreleased)
 
+- Replace abbreviated import aliases with descriptive names and group source files
+  by responsibility while preserving existing public package import paths.
+- Split runtime primitives, pipeline compilation/execution and reference namespaces
+  into separate modules; clean build output before compilation.
 - Complete local workflow integration: nested pipelines, authenticated script bridge,
   generic endpoint/UI, native submission reconciliation and stable agent-step attachment.
 - Add artifact stores, result processors/timeouts, recipe validation retry and pinned skills.

@@ -1,7 +1,7 @@
-import type { Contracts, Client, Projection } from '../../src/reference.js';
-import { createController, createLocalPort, createWatchHub } from '../../src/client.js';
-import { localContext, ok, fail } from '../../src/contracts.js';
-import { createChat } from '../../src/ui-dom.js';
+import { createController, createLocalPort, createWatchHub } from '../../src/client/index.js';
+import { fail, localContext, ok } from '../../src/foundation/contracts.js';
+import type { Client, Projection } from '../../src/reference/index.js';
+import { createChat } from '../../src/ui/dom.js';
 const context = localContext(),
   hub = createWatchHub({ revision: 'demo', entries: [] });
 const runs = new Map<string, AbortController>();

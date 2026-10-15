@@ -11,18 +11,18 @@ import {
   stringSchema,
   schema,
   digest,
-} from '../dist/contracts.js';
-import { createOperations, createBoundary } from '../dist/runtime.js';
-import { createNodeScripts } from '../dist/scripts-node.js';
-import { createResults } from '../dist/results.js';
-import { createSuspensions } from '../dist/waits.js';
-import { createCodeEngine, defineCodeWorkflow } from '../dist/workflow-code.js';
-import { createPipelineEngine, installStepHandler } from '../dist/workflow-pipeline.js';
-import { createWorkflowHost } from '../dist/workflow-host.js';
-import { callIdentity } from '../dist/workflow-memory.js';
-import { fakeModel } from '../dist/testing.js';
-import { createModelGateway } from '../dist/model.js';
-import { messageItem, createContextCompiler } from '../dist/context.js';
+} from '../dist/foundation/contracts.js';
+import { createOperations, createBoundary } from '../dist/runtime/index.js';
+import { createNodeScripts } from '../dist/execution/node.js';
+import { createResults } from '../dist/storage/results.js';
+import { createSuspensions } from '../dist/runtime/waits.js';
+import { createCodeEngine, defineCodeWorkflow } from '../dist/workflows/code.js';
+import { createPipelineEngine, installStepHandler } from '../dist/workflows/pipeline.js';
+import { createWorkflowHost } from '../dist/workflows/host.js';
+import { callIdentity } from '../dist/workflows/memory.js';
+import { fakeModel } from '../dist/testing/index.js';
+import { createModelGateway } from '../dist/model/gateway.js';
+import { messageItem, createContextCompiler } from '../dist/context/index.js';
 const context = localContext(),
   delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const ref = (id, format, digest) => ({

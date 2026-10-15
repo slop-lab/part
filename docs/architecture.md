@@ -27,6 +27,26 @@ all optional modules are implemented.
 Public APIs are experimental until G-BASE passes. Consumers must pin exact versions.
 Breaking changes require a changelog, migration guidance, and consumer fixture runs.
 
+Source files are grouped by responsibility:
+
+- `foundation/` contains JSON contracts, hashing and deadline primitives.
+- `runtime/` contains operations, progress, effect boundaries, budgets, runs and waits.
+- `composition/`, `agent/` and `model/` contain composition, drivers/tools and model adapters.
+- `context/` contains semantic context, history and projections.
+- `extensions/` and `execution/` contain hooks/skills/packages and script/bridge execution.
+- `workflows/` contains workflow engines and endpoints. Pipeline handler registration,
+  value resolution, compilation and execution live in separate `pipeline/` modules.
+- `host/`, `storage/` and `client/` contain hosting, persistence and client transport.
+- `ui/` contains optional presentation modules and styles; `testing/` contains fixtures.
+- `reference/` contains the type-only design namespaces, one module per namespace.
+
+Imports use their original descriptive names. Package exports explicitly map the
+existing `part/...` public paths to these source groups, so moving an implementation
+does not change consumer imports. Internal helper paths are not public package exports.
+Builds remove stale output before compiling and copy the public stylesheet explicitly.
+The hashes and paths in `evidence.json` describe the recorded pre-refactor revision;
+they are historical validation evidence, not a manifest of the current checkout.
+
 The initial provider adapter targets the documented Ollama `/api/chat` NDJSON
 subset: text, thinking, function calls, and usage. Media and foreign native content
 require explicit projection. See https://docs.ollama.com/api/chat . Real provider
