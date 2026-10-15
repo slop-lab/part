@@ -1,12 +1,18 @@
 import assert from 'node:assert/strict';
 import { createAgent } from '@part/plugins/agent';
 import { createOpenAICompatibleAdapter } from '@part/plugins/providers/openai-compatible';
+import { createOpenAIResponsesAdapter } from '@part/plugins/providers/openai-responses';
 import { bearerAuth, createFetchTransport } from '@part/core/model';
 import { schema, stringSchema } from '@part/core/contracts';
 import { functionTool } from '@part/core/tools';
 
 // Opt-in only: never run as part of the credential-free test suite.
 async function main() {
+  const protocol = process.argv[2] ?? 'chat';
+  assert.ok(['chat', 'responses'].includes(protocol), 'Expected chat or responses protocol');
+  const adapter =
+    protocol === 'responses' ? createOpenAIResponsesAdapter() : createOpenAICompatibleAdapter();
+  const path = protocol === 'responses' ? 'responses' : 'chat/completions';
   const key = process.env.R4U_API_KEY;
   assert.ok(key && process.env.R4U_BASE_URL, 'R4U_API_KEY and R4U_BASE_URL are required');
   const base = new URL(process.env.R4U_BASE_URL);
@@ -15,7 +21,9 @@ async function main() {
     !base.username && !base.password && !base.search && !base.hash,
     'Use bearer authentication without URL credentials',
   );
-  base.pathname = base.pathname.replace(/\/$/, '').replace(/\/chat\/completions$/, '');
+  base.pathname = base.pathname
+    .replace(/\/$/, '')
+    .replace(/\/(?:chat\/completions|responses)$/, '');
   const headers = {
     authorization: `Bearer ${key}`,
     ...(process.env.R4U_ROUTE ? { 'X-Router4u-Route': process.env.R4U_ROUTE } : {}),
@@ -34,8 +42,8 @@ async function main() {
       : undefined;
   assert.ok(route, 'Set R4U_ROUTE when the project has multiple routes');
   assert.ok(
-    route.protocols?.includes('chat'),
-    'R4U route does not support Chat Completions; the part adapter cannot verify a Responses-only route',
+    route.protocols?.includes(protocol),
+    `R4U route does not support the selected protocol: ${protocol}`,
   );
   const listing = await fetch(`${base}/models`, {
     headers,
@@ -67,15 +75,20 @@ async function main() {
         profile: {
           id: 'r4u-smoke',
           revision: '1',
-          adapterId: 'part/openai-compatible',
+          adapterId: adapter.id,
           transportId: 'part/fetch',
           authStrategyId: 'bearer',
           model,
-          endpoint: `${base}/chat/completions`,
-          defaults: { stream, max_completion_tokens: 256 },
+          endpoint: `${base}/${path}`,
+          defaults: {
+            stream,
+            ...(protocol === 'responses'
+              ? { max_output_tokens: 256 }
+              : { max_completion_tokens: 256 }),
+          },
           capabilities: { revision: '1', entries: [] },
         },
-        adapter: createOpenAICompatibleAdapter(),
+        adapter,
         transport: createFetchTransport({
           allowedOrigins: [base.origin],
           async fetch(url, init) {
@@ -177,7 +190,7 @@ async function main() {
       {
         verifiedAt: new Date().toISOString(),
         model,
-        protocol: 'openai.chat.completions',
+        protocol: protocol === 'responses' ? 'openai.responses' : 'openai.chat.completions',
         discoveredModels: models.length,
         completionRequests: requests,
         cases,

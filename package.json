@@ -21,7 +21,8 @@
     "pack:local": "npm run build && node scripts/pack.mjs",
     "mock:provider": "node packages/node/dist/testing/mock-provider/cli.js",
     "example:mock:fixed": "npm run build && node examples/mock-provider/fixed.mjs",
-    "smoke:provider": "npm run build && node --env-file=.env scripts/smoke-provider.mjs"
+    "smoke:provider": "npm run build && node --env-file=.env scripts/smoke-provider.mjs",
+    "smoke:responses": "npm run build && node --env-file=.env scripts/smoke-provider.mjs responses"
   },
   "engines": {
     "node": ">=22.18"

@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "prompt": "Uppercase hello using the uppercase tool.",
+  "exchanges": [
+    {
+      "request": {
+        "stream": true,
+        "include": ["reasoning.encrypted_content"],
+        "store": false,
+        "model": "fixture-model",
+        "input": [
+          {
+            "role": "user",
+            "content": "Uppercase hello using the uppercase tool."
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "name": "uppercase",
+            "description": "Uppercase text",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": ["text"],
+              "additionalProperties": false
+            },
+            "strict": false
+          }
+        ]
+      },
+      "response": {
+        "id": "resp-1",
+        "object": "response",
+        "status": "completed",
+        "error": null,
+        "incomplete_details": null,
+        "output": [
+          {
+            "id": "rs-1",
+            "type": "reasoning",
+            "summary": [
+              {
+                "type": "summary_text",
+                "text": "Use the tool."
+              }
+            ],
+            "encrypted_content": "opaque-fixture"
+          },
+          {
+            "id": "fc-1",
+            "type": "function_call",
+            "status": "completed",
+            "call_id": "call-1",
+            "name": "uppercase",
+            "arguments": "{\"text\":\"hello\"}"
+          }
+        ],
+        "usage": {
+          "input_tokens": 12,
+          "output_tokens": 3,
+          "total_tokens": 15,
+          "output_tokens_details": {
+            "reasoning_tokens": 1
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "stream": true,
+        "include": ["reasoning.encrypted_content"],
+        "store": false,
+        "model": "fixture-model",
+        "input": [
+          {
+            "role": "user",
+            "content": "Uppercase hello using the uppercase tool."
+          },
+          {
+            "id": "rs-1",
+            "type": "reasoning",
+            "summary": [
+              {
+                "type": "summary_text",
+                "text": "Use the tool."
+              }
+            ],
+            "encrypted_content": "opaque-fixture"
+          },
+          {
+            "type": "function_call",
+            "call_id": "call-1",
+            "name": "uppercase",
+            "arguments": "{\"text\":\"hello\"}"
+          },
+          {
+            "type": "function_call_output",
+            "call_id": "call-1",
+            "output": "\"HELLO\""
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "name": "uppercase",
+            "description": "Uppercase text",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": ["text"],
+              "additionalProperties": false
+            },
+            "strict": false
+          }
+        ]
+      },
+      "response": {
+        "id": "resp-1",
+        "object": "response",
+        "status": "completed",
+        "error": null,
+        "incomplete_details": null,
+        "output": [
+          {
+            "id": "msg-1",
+            "type": "message",
+            "status": "completed",
+            "role": "assistant",
+            "content": [
+              {
+                "type": "output_text",
+                "text": "HELLO",
+                "annotations": []
+              }
+            ]
+          }
+        ],
+        "usage": {
+          "input_tokens": 12,
+          "output_tokens": 3,
+          "total_tokens": 15,
+          "output_tokens_details": {
+            "reasoning_tokens": 1
+          }
+        }
+      }
+    }
+  ]
+}
