@@ -434,3 +434,45 @@ test('Non-streaming OpenAI requests omit stream-only options while SSE requests 
     assert.deepEqual(body.stream_options, stream ? { include_usage: true } : undefined);
   }
 });
+
+test('OpenAI JSON and SSE accept null tool_calls without accepting malformed non-null calls', () => {
+  const adapter = createOpenAICompatibleAdapter();
+  for (const streaming of [false, true]) {
+    for (const toolCalls of [null, { invalid: true }]) {
+      const decoder = adapter.createDecoder({
+        status: 200,
+        headers: { 'content-type': streaming ? 'text/event-stream' : 'application/json' },
+      }).value;
+      const completion = {
+        choices: [
+          {
+            index: 0,
+            [streaming ? 'delta' : 'message']: {
+              role: 'assistant',
+              content: 'HELLO',
+              tool_calls: toolCalls,
+            },
+            finish_reason: 'stop',
+          },
+        ],
+      };
+      const pushed = decoder.push(
+        new TextEncoder().encode(
+          streaming
+            ? `data: ${JSON.stringify(completion)}\n\ndata: [DONE]\n\n`
+            : JSON.stringify(completion),
+        ),
+      );
+      const decoded = decoder.finish();
+      if (toolCalls === null) {
+        assert.equal(pushed.ok, true);
+        assert.equal(decoded.ok, true);
+        assert.deepEqual(decoded.value.toolCalls, []);
+        assert.deepEqual(decoded.value.content, [{ kind: 'text', text: 'HELLO' }]);
+      } else {
+        assert.equal(decoded.ok, false);
+        assert.equal(decoded.error.code, 'part.openai-compatible.tools');
+      }
+    }
+  }
+});

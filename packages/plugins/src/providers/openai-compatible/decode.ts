@@ -71,7 +71,7 @@ export function createChatDecoder(response: {
       text += delta.content;
       events.push({ type: 'text-delta', payload: { text: delta.content } });
     }
-    if (delta.tool_calls !== undefined) {
+    if (delta.tool_calls !== undefined && delta.tool_calls !== null) {
       if (!Array.isArray(delta.tool_calls))
         return fail('openai-compatible.tools', 'Invalid tool calls');
       for (let offset = 0; offset < delta.tool_calls.length; offset++) {
