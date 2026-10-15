@@ -1,3 +1,5 @@
+// @ts-check
+import { expectProperty } from '../fixtures/assertions.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PassThrough, Readable, Writable } from 'node:stream';
@@ -18,7 +20,8 @@ import { emptyCleanup, ok, schema, stringSchema } from '@slop-lab/part/contracts
 
 const textSchema = schema(
   'acp/text',
-  (value) => value && typeof value === 'object' && typeof value.text === 'string',
+  /** @param {unknown} value @returns {value is {text: string}} */ (value) =>
+    value && typeof value === 'object' && 'text' in value && typeof value.text === 'string',
 );
 const parameters = {
   type: 'object',
@@ -27,7 +30,10 @@ const parameters = {
   additionalProperties: false,
 };
 const deferred = () => {
-  let resolve, reject;
+  /** @type {(value?: any) => void} */
+  let resolve;
+  /** @type {(reason?: unknown) => void} */
+  let reject;
   const promise = new Promise((yes, no) => {
     resolve = yes;
     reject = no;
@@ -40,6 +46,7 @@ const newSession = (cx) =>
   cx.request(methods.agent.session.new, { cwd: process.cwd(), mcpServers: [] });
 const prompt = (cx, sessionId, text = 'hello') =>
   cx.request(methods.agent.session.prompt, { sessionId, prompt: [{ type: 'text', text }] });
+/** @param {string[]} executions @param {import('@slop-lab/part/reference').Tools.Definition['effects']} [effects] */
 function toolOptions(executions, effects = 'write') {
   return {
     model: fakeModel([
@@ -62,6 +69,9 @@ function toolOptions(executions, effects = 'write') {
     toolSchemas: { save_note: parameters },
   };
 }
+/** @param {{configureSession?: import('@slop-lab/part-plugins/acp').AcpAgentOptions['configureSession'], permission?: (params: import('@agentclientprotocol/sdk').RequestPermissionRequest, signal: AbortSignal) => import('@agentclientprotocol/sdk').RequestPermissionResponse | Promise<import('@agentclientprotocol/sdk').RequestPermissionResponse>, options?: Partial<import('@slop-lab/part-plugins/acp').AcpAgentOptions>, transport?: Partial<Parameters<typeof startAcpStdio>[0]>}} settings
+ * @param {Function} run
+ */
 async function withSdk(
   {
     configureSession,
@@ -164,7 +174,9 @@ test('Official SDK permission decisions gate writes and produce stable tool call
         else
           await assert.rejects(
             prompt(cx, session.sessionId),
-            (error) => error.code === -32603 && error.data.code === 'part.acp.denied',
+            (error) =>
+              expectProperty(error, 'code') === -32603 &&
+              expectProperty(expectProperty(error, 'data'), 'code') === 'part.acp.denied',
           );
         assert.deepEqual(executions, choice === 'allow-once' ? ['hello'] : []);
         assert.equal(requests.length, 1);
@@ -188,6 +200,7 @@ test('ACP cancellation releases an unanswered permission request; late allow can
     {
       configureSession: () => toolOptions(executions),
       permission(params) {
+        assert.ok(asked.resolve);
         asked.resolve(params);
         return decision.promise;
       },
@@ -197,9 +210,13 @@ test('ACP cancellation releases an unanswered permission request; late allow can
       const session = await newSession(cx);
       const pending = prompt(cx, session.sessionId);
       await asked.promise;
-      await assert.rejects(prompt(cx, session.sessionId), (error) => error.code === -32000);
+      await assert.rejects(
+        prompt(cx, session.sessionId),
+        (error) => expectProperty(error, 'code') === -32000,
+      );
       await cx.notify(methods.agent.session.cancel, { sessionId: session.sessionId });
       assert.equal((await pending).stopReason, 'cancelled');
+      assert.ok(decision.resolve);
       decision.resolve({ outcome: { outcome: 'selected', optionId: 'allow-once' } });
       await setTimeout(10);
       assert.deepEqual(executions, []);
@@ -210,7 +227,7 @@ test('ACP cancellation releases an unanswered permission request; late allow can
 });
 
 test('ACP read tools skip permission by default and all-tools policy requests it', async () => {
-  for (const permissions of ['writes', 'all']) {
+  for (const permissions of /** @type {const} */ (['writes', 'all'])) {
     const executions = [];
     await withSdk(
       { configureSession: () => toolOptions(executions, 'read'), options: { permissions } },
@@ -237,16 +254,16 @@ test('ACP fails unsupported inputs and bounded admission before model execution'
       options: { maxSessions: 1, maxHistoryTurns: 1, maxPromptBytes: 16 },
     },
     async (cx) => {
-      await assert.rejects(newSession(cx), (error) => error.code === -32600);
+      await assert.rejects(newSession(cx), (error) => expectProperty(error, 'code') === -32600);
       const init = await cx.request(methods.agent.initialize, {
         protocolVersion: 2,
         clientCapabilities: {},
       });
       assert.equal(init.protocolVersion, 1);
-      await assert.rejects(initialize(cx), (error) => error.code === -32602);
+      await assert.rejects(initialize(cx), (error) => expectProperty(error, 'code') === -32602);
       await assert.rejects(
         cx.request(methods.agent.session.new, { cwd: 'relative', mcpServers: [] }),
-        (error) => error.code === -32602,
+        (error) => expectProperty(error, 'code') === -32602,
       );
       await assert.rejects(
         cx.request(methods.agent.session.new, {
@@ -254,39 +271,45 @@ test('ACP fails unsupported inputs and bounded admission before model execution'
           mcpServers: [],
           additionalDirectories: ['/other'],
         }),
-        (error) => error.code === -32602,
+        (error) => expectProperty(error, 'code') === -32602,
       );
       await assert.rejects(
         cx.request(methods.agent.session.new, {
           cwd: process.cwd(),
           mcpServers: [{ name: 'uninstalled', command: 'anything', args: [], env: [] }],
         }),
-        (error) => error.code === -32602,
+        (error) => expectProperty(error, 'code') === -32602,
       );
       const session = await newSession(cx);
-      await assert.rejects(newSession(cx), (error) => error.code === -32000);
-      await assert.rejects(prompt(cx, 'unknown'), (error) => error.code === -32602);
+      await assert.rejects(newSession(cx), (error) => expectProperty(error, 'code') === -32000);
+      await assert.rejects(
+        prompt(cx, 'unknown'),
+        (error) => expectProperty(error, 'code') === -32602,
+      );
       await assert.rejects(
         prompt(cx, session.sessionId, 'x'.repeat(17)),
-        (error) => error.code === -32602,
+        (error) => expectProperty(error, 'code') === -32602,
       );
       await assert.rejects(
         cx.request(methods.agent.session.prompt, {
           sessionId: session.sessionId,
           prompt: [{ type: 'image', data: 'eA==', mimeType: 'image/png' }],
         }),
-        (error) => error.code === -32602,
+        (error) => expectProperty(error, 'code') === -32602,
       );
       assert.equal(models[0].requests.length, 0);
       await prompt(cx, session.sessionId, 'valid');
-      await assert.rejects(prompt(cx, session.sessionId), (error) => error.code === -32000);
+      await assert.rejects(
+        prompt(cx, session.sessionId),
+        (error) => expectProperty(error, 'code') === -32000,
+      );
       await assert.rejects(
         cx.request(methods.agent.session.load, {
           sessionId: session.sessionId,
           cwd: process.cwd(),
           mcpServers: [],
         }),
-        (error) => error.code === -32601,
+        (error) => expectProperty(error, 'code') === -32601,
       );
     },
   );
@@ -302,6 +325,7 @@ test('ACP permission timeout fails closed and cancel notifications bypass reques
         configureSession: () => toolOptions(executions),
         transport: { maxConcurrentRequests: 1, requestTimeoutMs: timeout ? 30 : 1000 },
         permission() {
+          assert.ok(asked.resolve);
           asked.resolve();
           return decision.promise;
         },
@@ -312,12 +336,17 @@ test('ACP permission timeout fails closed and cancel notifications bypass reques
           pending = prompt(cx, session.sessionId);
         await asked.promise;
         if (timeout)
-          await assert.rejects(pending, (error) => error.data.code === 'part.acp.permission');
+          await assert.rejects(
+            pending,
+            (error) =>
+              expectProperty(expectProperty(error, 'data'), 'code') === 'part.acp.permission',
+          );
         else {
-          await assert.rejects(newSession(cx), (error) => error.code === -32000);
+          await assert.rejects(newSession(cx), (error) => expectProperty(error, 'code') === -32000);
           await cx.notify(methods.agent.session.cancel, { sessionId: session.sessionId });
           assert.equal((await pending).stopReason, 'cancelled');
         }
+        assert.ok(decision.resolve);
         decision.resolve({ outcome: { outcome: 'cancelled' } });
         assert.deepEqual(executions, []);
       },
@@ -336,6 +365,7 @@ test('Closing ACP during async session setup aborts its host signal and awaits c
       },
     },
     async configureSession(setup) {
+      assert.ok(configured.resolve);
       configured.resolve(setup);
       await release.promise;
       return { model: fakeModel([{ text: 'unused' }]) };
@@ -344,9 +374,10 @@ test('Closing ACP during async session setup aborts its host signal and awaits c
   await agent.handle('initialize', { protocolVersion: 1 });
   const pending = agent.handle('session/new', { cwd: process.cwd(), mcpServers: [] });
   const setup = await configured.promise;
-  const rejected = assert.rejects(pending, (error) => error.code === -32600);
+  const rejected = assert.rejects(pending, (error) => expectProperty(error, 'code') === -32600);
   const closed = agent.close();
   assert.equal(setup.signal.aborted, true);
+  assert.ok(release.resolve);
   release.resolve();
   assert.deepEqual((await closed).unresolved, []);
   await rejected;
@@ -357,10 +388,11 @@ test('ACP request ID reuse during output backpressure preserves the new request 
     writing = deferred(),
     started = deferred(),
     cancelled = deferred();
-  let release;
+  let /** @type {(...args: any[]) => void} */ release;
   const output = new Writable({
     write(_chunk, _encoding, callback) {
       release = callback;
+      assert.ok(writing.resolve);
       writing.resolve();
     },
   });
@@ -370,7 +402,9 @@ test('ACP request ID reuse during output backpressure preserves the new request 
     createHandler: () => ({
       async handle(method, _params, _kind, signal) {
         if (method === 'second') {
+          assert.ok(cancelled.resolve);
           signal.addEventListener('abort', () => cancelled.resolve(), { once: true });
+          assert.ok(started.resolve);
           started.resolve();
           await cancelled.promise;
         }
@@ -537,6 +571,7 @@ test('ACP session close cancels outstanding permission work and releases session
       configureSession: () => toolOptions(executions),
       options: { maxSessions: 1 },
       permission() {
+        assert.ok(asked.resolve);
         asked.resolve();
         return permission.promise;
       },
@@ -553,8 +588,12 @@ test('ACP session close cancels outstanding permission work and releases session
       );
       assert.equal((await pending).stopReason, 'cancelled');
       assert.deepEqual(executions, []);
+      assert.ok(permission.resolve);
       permission.resolve({ outcome: { outcome: 'selected', optionId: 'allow-once' } });
-      await assert.rejects(prompt(cx, session.sessionId), (error) => error.code === -32602);
+      await assert.rejects(
+        prompt(cx, session.sessionId),
+        (error) => expectProperty(error, 'code') === -32602,
+      );
       assert.notEqual((await newSession(cx)).sessionId, session.sessionId);
     },
   );
@@ -614,9 +653,13 @@ test('ACP stdio MCP servers install dispatcher tools, require permission and rep
           } else {
             await assert.rejects(
               prompt(cx, session.sessionId),
-              (error) => error.data.code === 'part.acp.denied',
+              (error) =>
+                expectProperty(expectProperty(error, 'data'), 'code') === 'part.acp.denied',
             );
-            await assert.rejects(readFile(marker), (error) => error.code === 'ENOENT');
+            await assert.rejects(
+              readFile(marker),
+              (error) => expectProperty(error, 'code') === 'ENOENT',
+            );
           }
           assert.equal(requests.length, 1); // Untrusted readOnlyHint never bypasses permission.
           await cx.request(methods.agent.session.close, { sessionId: session.sessionId });
@@ -661,11 +704,13 @@ test('Official SDK request cancellation cancels the permission UI without accept
     {
       configureSession: () => toolOptions(executions),
       permission(_params, signal) {
+        assert.ok(asked.resolve);
         asked.resolve();
         return new Promise((resolve) =>
           signal.addEventListener(
             'abort',
             () => {
+              assert.ok(dismissed.resolve);
               dismissed.resolve();
               resolve({ outcome: { outcome: 'cancelled' } });
             },
@@ -743,7 +788,9 @@ test('ACP retains incomplete cleanup evidence from failed session setup', async 
       cwd: process.cwd(),
       mcpServers: [{ name: 'provided', command: process.execPath, args: [], env: [] }],
     }),
-    (error) => error.code === -32603 && !error.message.includes('private'),
+    (error) =>
+      expectProperty(error, 'code') === -32603 &&
+      !String(expectProperty(error, 'message')).includes('private'),
   );
   assert.deepEqual((await agent.close()).unresolved, unresolved);
 });
@@ -761,6 +808,7 @@ test('ACP tool IDs remain distinct when a provider reuses its call ID across pro
           { text: 'two saved' },
         ]);
         const original = options.model.adapter;
+        // @ts-expect-error Deliberately attempt mutation to verify snapshot isolation.
         options.model.adapter = {
           ...original,
           createDecoder(response) {

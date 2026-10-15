@@ -1,9 +1,13 @@
+// @ts-check
 import { performance } from 'node:perf_hooks';
 import { Window } from 'happy-dom';
 import { createWatchHub, createLocalPort, createController } from '@slop-lab/part/client';
 import { createChat } from '@slop-lab/part-browser/dom';
 import { localContext, ok } from '@slop-lab/part/contracts';
-const window = new Window(),
+const window =
+    /** @type {globalThis.Window & typeof globalThis & { happyDOM: import('happy-dom').Window['happyDOM'] }} */ (
+      /** @type {unknown} */ (new Window())
+    ),
   context = localContext();
 const items = Array.from({ length: 1000 }, (_, index) => ({
   id: `history/${index}`,
@@ -26,6 +30,7 @@ items.push({
   artifacts: [],
 });
 const hub = createWatchHub({ revision: '1', entries: [] }, items);
+/** @type {import('@slop-lab/part/reference').Client.Endpoint} */
 const endpoint = {
   watch: (_request, c) => hub.watch(c),
   query: async () => ok(null),
@@ -57,7 +62,7 @@ const view = createChat({
       render(item) {
         renderedCompleted++;
         const node = window.document.createElement('pre');
-        node.textContent = item.payload.text;
+        node.textContent = String(item.fallback.text);
         return node;
       },
     },

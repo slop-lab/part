@@ -1,3 +1,4 @@
+// @ts-check
 import { spawnSync } from 'node:child_process';
 import { cpSync, readdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';

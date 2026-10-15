@@ -1,3 +1,5 @@
+// @ts-check
+import { expectProperty } from '../../fixtures/assertions.mjs';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -31,7 +33,7 @@ try {
     assert.equal(started.ok, true);
     const outcome = await started.value.done;
     assert.equal(outcome.phase, 'completed');
-    assert.deepEqual(outcome.result.captured.value, { value: 42 });
+    assert.deepEqual(expectProperty(outcome.result.captured, 'value'), { value: 42 });
   }
   const request = { model: 'part-mock', messages: [{ role: 'user', content: 'packaged mock' }] };
   const mock = await startMockProvider({

@@ -1,3 +1,5 @@
+// @ts-check
+import { expectProperty } from '../../fixtures/assertions.mjs';
 import { createAgent } from '@slop-lab/part-plugins/agent';
 import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible';
 import { bearerAuth, createFetchTransport } from '@slop-lab/part/model';
@@ -29,7 +31,11 @@ export function createMockFlow(session) {
         description: 'Convert text to uppercase',
         input: schema(
           'mock/text',
-          (value) => value !== null && typeof value === 'object' && typeof value.text === 'string',
+          /** @param {unknown} value @returns {value is {text: string}} */ (value) =>
+            value !== null &&
+            typeof value === 'object' &&
+            'text' in value &&
+            typeof value.text === 'string',
         ),
         output: stringSchema,
         execute: ({ text }) => {
@@ -48,7 +54,7 @@ export function createMockFlow(session) {
       },
     },
   });
-  if (!agent.ok) throw Error(agent.error.message);
+  if (agent.ok === false) throw Error(expectProperty(agent, 'error').message);
   return {
     async run() {
       const result = await agent.value.generate(prompt);

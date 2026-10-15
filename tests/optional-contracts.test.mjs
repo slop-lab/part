@@ -1,3 +1,5 @@
+// @ts-check
+import { expectProperty, json, stub } from '../fixtures/assertions.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
@@ -25,9 +27,9 @@ import { createRecipeEngine } from '@slop-lab/part-plugins/workflows/recipe';
 const context = localContext();
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 const outcome = (result) => ({
-  phase: 'completed',
+  phase: /** @type {const} */ ('completed'),
   result,
-  effect: 'not-applied',
+  effect: /** @type {const} */ ('not-applied'),
   commit: [],
   unsettledChildren: [],
 });
@@ -41,7 +43,7 @@ test(
       const run = async (body) => {
         await writeFile(join(root, 'source.cjs'), body);
         const scripts = createNodeScripts({ root, interpreters: { node: process.execPath } });
-        return await (
+        return await expectProperty(
           await scripts.execute(
             {
               requestId: crypto.randomUUID(),
@@ -57,10 +59,14 @@ test(
               capture: { kind: 'channel', channelId: 'result', protocolVersion: 1, maxBytes: 1024 },
             },
             context,
-          )
-        ).value.done;
+          ),
+          'value',
+        ).done;
       };
-      assert.deepEqual((await run(source)).result.captured.value, { ok: true });
+      assert.deepEqual(
+        expectProperty(expectProperty(await run(source), 'result').captured, 'value'),
+        { ok: true },
+      );
       assert.equal(
         (
           await run(
@@ -87,7 +93,11 @@ test('Namespace migration publishes atomically and failed transformations leave 
     },
     context,
   );
-  const migrated = schema('test/migrated', (value) => value && typeof value.next === 'number');
+  const migrated = schema(
+    'test/migrated',
+    /** @param {unknown} value @returns {value is {next: number}} */ (value) =>
+      value && typeof expectProperty(value, 'next') === 'number',
+  );
   const bad = createNamespaceMigrations(store, {
     namespace: address.namespace,
     owner: 'test',
@@ -104,7 +114,7 @@ test('Namespace migration publishes atomically and failed transformations leave 
   });
   assert.equal((await bad.read(address, context)).ok, false);
   assert.equal((await bad.migrate([address], context)).ok, false);
-  assert.equal((await store.read(address, context)).value.value.schemaVersion, 1);
+  assert.equal(expectProperty(await store.read(address, context), 'value').value.schemaVersion, 1);
   const good = createNamespaceMigrations(store, {
     namespace: address.namespace,
     owner: 'test',
@@ -115,12 +125,14 @@ test('Namespace migration publishes atomically and failed transformations leave 
         namespace: address.namespace,
         from: 1,
         to: 2,
-        transform: (value) => ok({ next: value.old }),
+        transform: (value) => ok({ next: expectProperty(value, 'old') }),
       },
     ],
   });
   assert.equal((await good.migrate([address], context)).ok, true);
-  assert.deepEqual((await good.read(address, context)).value.value.value, { next: 1 });
+  assert.deepEqual(expectProperty(await good.read(address, context), 'value').value.value, {
+    next: 1,
+  });
 });
 test('Checkpoint storage binds engine/definition, enforces CAS and keeps native scheduling with its owner', async () => {
   const checkpoints = createCheckpointStore(createMemoryStore());
@@ -138,7 +150,7 @@ test('Checkpoint storage binds engine/definition, enforces CAS and keeps native 
   const created = await checkpoints.commit('absent', checkpoint, context);
   assert.equal(created.ok, true);
   const read = await checkpoints.read(ref, context);
-  assert.equal(read.value.revision, created.value.revision);
+  assert.equal(expectProperty(read, 'value').revision, created.value.revision);
   assert.equal((await checkpoints.commit('absent', checkpoint, context)).ok, false);
   assert.equal(
     (
@@ -151,7 +163,10 @@ test('Checkpoint storage binds engine/definition, enforces CAS and keeps native 
   );
 });
 test('Safe Markdown caches completed blocks and renderer/slot registries enforce explicit priorities/order', () => {
-  const window = new Window(),
+  const window =
+      /** @type {globalThis.Window & typeof globalThis & { happyDOM: import('happy-dom').Window['happyDOM'] }} */ (
+        /** @type {unknown} */ (new Window())
+      ),
     view = createMarkdownView(window.document);
   view.update('**Completed**\n\npartial');
   const first = view.element.firstChild;
@@ -170,15 +185,20 @@ test('Safe Markdown caches completed blocks and renderer/slot registries enforce
   };
   assert.equal(createRendererRegistry([[renderer, renderer]]).ok, false);
   assert.equal(
-    createRendererRegistry([[renderer], [{ ...renderer, id: 'builtin' }]]).value.resolve(
-      { type: 'test', schemaVersion: 1 },
-      'chat',
-    ).value.id,
+    expectProperty(
+      expectProperty(
+        createRendererRegistry([[renderer], [{ ...renderer, id: 'builtin' }]]),
+        'value',
+      ).resolve(stub({ type: 'test', schemaVersion: 1 }), 'chat'),
+      'value',
+    ).id,
     'app',
   );
   const slot = (id) => ({ id, slot: 'composer.actions', render: () => null });
   assert.deepEqual(
-    orderSlots([{ ...slot('a'), after: ['b'] }, slot('b')]).value.map((s) => s.id),
+    expectProperty(orderSlots([{ ...slot('a'), after: ['b'] }, slot('b')]), 'value').map(
+      (s) => s.id,
+    ),
     ['b', 'a'],
   );
   assert.equal(
@@ -191,6 +211,7 @@ test('Safe Markdown caches completed blocks and renderer/slot registries enforce
   window.happyDOM.cancelAsync();
 });
 test('Trace metadata strips body/credentials, bounds retention and authorizes manifest access', async () => {
+  /** @type {import('@slop-lab/part/reference').Observability.TracePolicy} */
   const policy = {
     mode: 'metadata',
     destinations: ['memory'],
@@ -199,10 +220,11 @@ test('Trace metadata strips body/credentials, bounds retention and authorizes ma
   };
   const trace = createObservability({ policy, maxEvents: 2 });
   const ref = { owner: 'test', kind: 'run', id: 'one' };
+  /** @type {import('@slop-lab/part/reference').Observability.InvocationManifest} */
   const manifest = {
     execution: ref,
     runtimeVersion: 'test',
-    composition: {},
+    composition: stub({}),
     profileRevisions: {},
     contentDigests: {},
     contextIds: [],
@@ -217,7 +239,7 @@ test('Trace metadata strips body/credentials, bounds retention and authorizes ma
     { type: 'invoke', requestBody: { secret: 'never' }, credentials: 'never' },
     context,
   );
-  assert.deepEqual((await trace.readTrace(ref, undefined, context)).value.items, [
+  assert.deepEqual(expectProperty(await trace.readTrace(ref, undefined, context), 'value').items, [
     { type: 'invoke' },
   ]);
   trace.record(ref, { type: 'two' }, context);
@@ -236,56 +258,65 @@ test('Trace metadata strips body/credentials, bounds retention and authorizes ma
 });
 test('Run history attachment appends immutable messages, rejects stale heads and supplies the next compiled request', async () => {
   const history = createHistory();
-  const session = (await history.createSession({}, context)).value;
+  const session = expectProperty(await history.createSession({}, context), 'value');
   const model = fakeModel([{ text: 'first response' }, { text: 'second response' }]);
   const operations = createOperations(),
-    gateway = createModelGateway({
-      profiles: [model.profile],
-      adapters: [model.adapter],
-      transports: [model.transport],
-      auth: { none: model.auth },
-      operations,
-    }).value;
-  const service = createRunService({
-    drivers: [installDriver(createBasicDriver({ profileId: 'fake' }))],
-    services: {
-      model: gateway,
-      context: createContextCompiler().value,
-      operations,
-      services: context.services,
-    },
-    operations,
-    history: createChatHistoryAttachment(history),
-  }).value;
-  const composition = createPlanner().resolve({
-    components: [
-      {
-        descriptor: {
-          id: 'test/services',
-          version: '1',
-          surfaces: ['local'],
-          scope: 'runtime',
-          requires: [],
-          provides: ['part/model', 'part/context'].map((id) => ({
-            id,
-            contractVersion: 1,
-            status: 'supported',
-            implementedBy: 'test/services',
-            constraints: {},
-          })),
-        },
-        register: () => ok(undefined),
-        create: () =>
-          ok({
-            initialize: async () => ok(undefined),
-            start: async () => ok(undefined),
-            stop: async () => ({ released: [], unresolved: [], errors: [] }),
-            dispose: async () => ({ released: [], unresolved: [], errors: [] }),
-          }),
+    gateway = expectProperty(
+      createModelGateway({
+        profiles: [model.profile],
+        adapters: [model.adapter],
+        transports: [model.transport],
+        auth: { none: model.auth },
+        operations,
+      }),
+      'value',
+    );
+  const service = expectProperty(
+    createRunService({
+      drivers: [installDriver(createBasicDriver({ profileId: 'fake' }))],
+      services: {
+        model: gateway,
+        context: expectProperty(createContextCompiler(), 'value'),
+        operations,
+        services: context.services,
       },
-    ],
-    config: {},
-  }).value;
+      operations,
+      history: createChatHistoryAttachment(history),
+    }),
+    'value',
+  );
+  const composition = expectProperty(
+    createPlanner().resolve({
+      components: [
+        {
+          descriptor: {
+            id: 'test/services',
+            version: '1',
+            surfaces: ['local'],
+            scope: 'runtime',
+            requires: [],
+            provides: ['part/model', 'part/context'].map((id) => ({
+              id,
+              contractVersion: 1,
+              status: 'supported',
+              implementedBy: 'test/services',
+              constraints: {},
+            })),
+          },
+          register: () => ok(undefined),
+          create: () =>
+            ok({
+              initialize: async () => ok(undefined),
+              start: async () => ok(undefined),
+              stop: async () => ({ released: [], unresolved: [], errors: [] }),
+              dispose: async () => ({ released: [], unresolved: [], errors: [] }),
+            }),
+        },
+      ],
+      config: {},
+    }),
+    'value',
+  );
   const request = {
     driver: 'part/basic',
     composition,
@@ -305,7 +336,7 @@ test('Run history attachment appends immutable messages, rejects stale heads and
     false,
   );
   assert.equal((await service.start(request, context)).ok, false);
-  const branch = (await history.getBranch(session.id, context)).value;
+  const branch = expectProperty(await history.getBranch(session.id, context), 'value');
   const second = await service.start(
     {
       ...request,
@@ -314,21 +345,32 @@ test('Run history attachment appends immutable messages, rejects stale heads and
     },
     context,
   );
-  assert.equal((await second.value.done).phase, 'completed');
+  assert.equal((await expectProperty(second, 'value').done).phase, 'completed');
   const messages = JSON.parse(new TextDecoder().decode(model.requests[1].body)).messages;
   assert.deepEqual(
     messages.map((m) => m.content),
     ['first input', 'first response', 'second input'],
   );
   assert.equal(
-    (await history.path((await history.getBranch(session.id, context)).value, undefined, context))
-      .value.items.length,
+    expectProperty(
+      await history.path(
+        expectProperty(await history.getBranch(session.id, context), 'value'),
+        undefined,
+        context,
+      ),
+      'value',
+    ).items.length,
     4,
   );
 });
 test('Recipe retries explicit read-only validation, but never retries failed or uncertain effects', async () => {
   let calls = 0;
-  const output = schema('test/answer', (value) => value?.answer === 42);
+  const output = schema(
+    'test/answer',
+    /** @param {unknown} value @returns {value is {answer: 42}} */ (value) =>
+      value !== null && typeof value === 'object' && 'answer' in value && value.answer === 42,
+  );
+  /** @type {import('@slop-lab/part-plugins/workflows/recipe').RecipeDefinition} */
   const definition = {
     id: 'recipe',
     format: 'part.recipe',
@@ -339,33 +381,36 @@ test('Recipe retries explicit read-only validation, but never retries failed or 
     maxAttempts: 2,
     retry: 'read-only-validation',
   };
-  const composition = { inspection: { revision: '1' } };
+  const composition = stub({ localToken: {}, inspection: { revision: '1' } });
   const operations = createOperations();
-  const engine = createRecipeEngine({
-    definitions: [definition],
-    schemas: [jsonSchema, output],
-    agents: { local: { driver: 'test', composition, effects: 'read' } },
-    services: {
-      operations,
-      runs: {
-        start: (_request, c) =>
-          operations.begin(
-            { kind: 'part/run', childPolicy: 'attached', retryOwner: 'test' },
-            async () => outcome({ answer: ++calls === 1 ? 0 : 42 }),
-            c,
-          ),
+  const engine = expectProperty(
+    createRecipeEngine({
+      definitions: [definition],
+      schemas: [jsonSchema, output],
+      agents: { local: { driver: 'test', composition, effects: 'read' } },
+      services: {
+        operations,
+        runs: stub({
+          start: (_request, c) =>
+            operations.begin(
+              { kind: 'part/run', childPolicy: 'attached', retryOwner: 'test' },
+              async () => outcome({ answer: ++calls === 1 ? 0 : 42 }),
+              c,
+            ),
+        }),
       },
-    },
-  }).value;
-  const prepared = (
+    }),
+    'value',
+  );
+  const prepared = expectProperty(
     await engine.prepare(
       {
         engineId: engine.descriptor.id,
         definition: {
-          id: definition.id,
-          format: definition.format,
+          id: expectProperty(definition, 'id'),
+          format: expectProperty(definition, 'format'),
           formatVersion: '1',
-          digest: await digest(definition),
+          digest: await digest(json(definition)),
           source: { owner: 'test', native: {} },
         },
         profileId: 'default',
@@ -373,16 +418,22 @@ test('Recipe retries explicit read-only validation, but never retries failed or 
         requiredControl: 'runner-enforced',
       },
       context,
-    )
-  ).value;
+    ),
+    'value',
+  );
   const started = await engine.start({ requestId: 'one', prepared, input: {} }, context);
   for (
     let i = 0;
-    i < 200 && (await engine.get(started.ref, context)).value.phase === 'running';
+    i < 200 &&
+    expectProperty(await engine.get(expectProperty(started, 'ref'), context), 'value').phase ===
+      'running';
     i++
   )
     await delay(2);
-  assert.equal((await engine.get(started.ref, context)).value.phase, 'succeeded');
+  assert.equal(
+    expectProperty(await engine.get(expectProperty(started, 'ref'), context), 'value').phase,
+    'succeeded',
+  );
   assert.equal(calls, 2);
 });
 
@@ -390,7 +441,7 @@ test('Estimated cost ceilings reserve before transport, require explicit pricing
   const { createAgent } = await import('@slop-lab/part-plugins/agent');
   const { functionTool } = await import('@slop-lab/part/tools');
   const { costUnits } = await import('@slop-lab/part/runtime/costs');
-  assert.equal(costUnits('0.000001').value, 1);
+  assert.equal(expectProperty(costUnits('0.000001'), 'value'), 1);
   assert.equal(costUnits('0.0000001').ok, false);
   assert.equal(costUnits('-1').ok, false);
   let writes = 0;
@@ -398,39 +449,45 @@ test('Estimated cost ceilings reserve before transport, require explicit pricing
     { toolCalls: [{ name: 'write', arguments: {} }] },
     { text: 'must not send' },
   ]);
-  const agent = createAgent({
-    model,
-    tools: [
-      functionTool({
-        id: 'write',
-        input: jsonSchema,
-        output: jsonSchema,
-        execute: () => {
-          writes++;
-          return null;
-        },
-      }),
-    ],
-    toolSchemas: { write: {} },
-    limits: { estimatedCostCeiling: { amount: '0.25', currency: 'USD' } },
-    costEstimator: {
-      id: 'test/pricing',
-      version: '1',
-      estimate: async () => ok({ amount: '0.15', currency: 'USD' }),
-    },
-  }).value;
+  const agent = expectProperty(
+    createAgent({
+      model,
+      tools: [
+        functionTool({
+          id: 'write',
+          input: jsonSchema,
+          output: jsonSchema,
+          execute: () => {
+            writes++;
+            return null;
+          },
+        }),
+      ],
+      toolSchemas: { write: {} },
+      limits: { estimatedCostCeiling: { amount: '0.25', currency: 'USD' } },
+      costEstimator: {
+        id: 'test/pricing',
+        version: '1',
+        estimate: async () => ok({ amount: '0.15', currency: 'USD' }),
+      },
+    }),
+    'value',
+  );
   const result = await agent.generate('input');
-  assert.equal(result.value.phase, 'failed');
+  assert.equal(expectProperty(result, 'value').phase, 'failed');
   assert.equal(model.requests.length, 1);
   assert.equal(writes, 1);
-  assert.equal(result.value.effect, 'applied');
+  assert.equal(expectProperty(result, 'value').effect, 'applied');
   await agent.dispose();
   const unpriced = fakeModel([{ text: 'must not send' }]);
-  const denied = createAgent({
-    model: unpriced,
-    limits: { estimatedCostCeiling: { amount: '1', currency: 'USD' } },
-  }).value;
-  assert.equal((await denied.generate('input')).value.phase, 'failed');
+  const denied = expectProperty(
+    createAgent({
+      model: unpriced,
+      limits: { estimatedCostCeiling: { amount: '1', currency: 'USD' } },
+    }),
+    'value',
+  );
+  assert.equal(expectProperty(await denied.generate('input'), 'value').phase, 'failed');
   assert.equal(unpriced.requests.length, 0);
   await denied.dispose();
 });
@@ -441,6 +498,7 @@ test('DOM components, ordered slots, inspector and artifact viewers use only pub
   const { createChat } = await import('@slop-lab/part-browser/dom');
   const { createInspector } = await import('@slop-lab/part-browser/inspector');
   const hub = createWatchHub({ revision: '1', entries: [] });
+  /** @type {import('@slop-lab/part/reference').Client.Endpoint} */
   const endpoint = {
     watch: (_request, c) => hub.watch(c),
     query: async () => ok(null),
@@ -453,7 +511,10 @@ test('DOM components, ordered slots, inspector and artifact viewers use only pub
     }),
   };
   const controller = createController(createLocalPort(endpoint, () => context));
-  const window = new Window();
+  const window =
+    /** @type {globalThis.Window & typeof globalThis & { happyDOM: import('happy-dom').Window['happyDOM'] }} */ (
+      /** @type {unknown} */ (new Window())
+    );
   await controller.connect({ surface: 'chat' });
   let custom = 0,
     reads = 0;
@@ -554,6 +615,7 @@ test(
             ? ok(root)
             : fail('test.workspace', 'Workspace denied', 'permission'),
       });
+      /** @type {import('@slop-lab/part/reference').Scripts.Request} */
       const request = {
         requestId: 'one',
         executorId: 'part/node-process',
@@ -574,9 +636,9 @@ test(
         effects: 'write',
         retry: 'never',
       };
-      const outcome = await (await scripts.execute(request, context)).value.done;
+      const outcome = await expectProperty(await scripts.execute(request, context), 'value').done;
       assert.equal(outcome.phase, 'completed');
-      assert.equal(outcome.result.captured.value.cwd, root);
+      assert.equal(expectProperty(expectProperty(outcome.result.captured, 'value'), 'cwd'), root);
       assert.equal(
         (
           await scripts.execute(

@@ -1,3 +1,5 @@
+// @ts-check
+import { expectProperty } from '../fixtures/assertions.mjs';
 import assert from 'node:assert/strict';
 import { createAgent } from '@slop-lab/part-plugins/agent';
 import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible';
@@ -115,7 +117,12 @@ async function main() {
                 description: 'Convert text to uppercase. Use this tool when asked.',
                 input: schema(
                   'smoke/text',
-                  (value) => value !== null && typeof value === 'object' && value.text === 'hello',
+                  /** @param {unknown} value @returns {value is {text: string}} */
+                  (value) =>
+                    value !== null &&
+                    typeof value === 'object' &&
+                    'text' in value &&
+                    value.text === 'hello',
                 ),
                 output: stringSchema,
                 execute: ({ text }) => {
@@ -143,11 +150,14 @@ async function main() {
           : 'Reply with exactly HELLO.',
       );
       // Report only structured codes, never upstream error bodies or credentials.
-      assert.ok(result.ok, `${scenario}: ${result.error?.code ?? 'execution failed'}`);
+      assert.ok(
+        result.ok,
+        `${scenario}: ${expectProperty(result, 'error')?.code ?? 'execution failed'}`,
+      );
       assert.equal(
         result.value.phase,
         'completed',
-        `${scenario}: ${result.value.error?.code ?? result.value.phase}; HTTP ${deliveries.map((entry) => entry.status).join(',')}`,
+        `${scenario}: ${expectProperty(result.value, 'error')?.code ?? result.value.phase}; HTTP ${deliveries.map((entry) => entry.status).join(',')}`,
       );
       const response = result.value.result;
       const text = response.content

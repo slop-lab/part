@@ -1,3 +1,4 @@
+// @ts-check
 import { setTimeout } from 'node:timers/promises';
 import { fakeModel } from '@slop-lab/part-plugins/testing';
 import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible';
@@ -60,7 +61,7 @@ export function createPlaygroundModel({
         ...original,
         async send(request, profile, auth, context) {
           const sent = await original.send(request, profile, auth, context);
-          if (!sent.ok) return sent;
+          if (sent.ok === false) return sent;
           return {
             ...sent,
             value: {
@@ -134,13 +135,13 @@ export function createPlaygroundModel({
     ...configured,
     transport: {
       ...transport,
-      async send(request, ...args) {
+      async send(request, profile, auth, context) {
         trace('request', {
           protocol: request.protocol,
           digest: request.digest,
           body: JSON.parse(new TextDecoder().decode(request.body)),
         });
-        return transport.send(request, ...args);
+        return transport.send(request, profile, auth, context);
       },
     },
   };

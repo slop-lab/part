@@ -18,7 +18,7 @@ through core contracts rather than depending on each other or the plugin bundle.
 
 ```sh
 npm ci
-npm run check
+npm run check # TypeScript, JS/MJS type checks, and package boundaries
 npm test
 npm run test:consumers
 npm run measure
@@ -30,6 +30,11 @@ Try conversation, tools, approval gates, immutable reports, validation failures 
 cancellation, with request/event inspection. Scripted mode needs no key; optional
 R4U Chat Completions and Responses run through a server that keeps credentials out
 of the browser. Use `npm run test:browser` after `npx playwright install chromium`.
+JS/MJS sources use `// @ts-check`; `npm run check:js` builds declarations and checks them
+with `jsconfig.json`. Git enforces LF line endings on every platform. Windows CI runs
+the portable tests and all consumer fixtures; tests requiring the POSIX process host
+are skipped on Windows with an explicit reason.
+
 Seven isolated consumer fixtures cover core-only,
 non-coding, SWE, contracts, workflow, Node and browser installations. Every public
 entrypoint is checked from separately packed packages. Portable declarations do

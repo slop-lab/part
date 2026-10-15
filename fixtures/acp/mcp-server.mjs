@@ -1,3 +1,4 @@
+// @ts-check
 import { createInterface } from 'node:readline';
 import { appendFileSync } from 'node:fs';
 const lines = createInterface({ input: process.stdin });

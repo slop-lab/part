@@ -1,3 +1,5 @@
+// @ts-check
+import { expectProperty } from '../fixtures/assertions.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -21,16 +23,24 @@ for (const kind of ['memory', 'sqlite'])
   test(`DU01/DU02: ${kind} commits state+journal atomically and preserves CAS/dedupe`, async () => {
     const dir = mkdtempSync(join(tmpdir(), 'part-storage-'));
     const store =
-      kind === 'memory' ? createMemoryStore() : openSqliteStore(join(dir, 'state.sqlite')).value;
+      kind === 'memory'
+        ? createMemoryStore()
+        : expectProperty(openSqliteStore(join(dir, 'state.sqlite')), 'value');
     try {
       const committed = await store.commit(change('first'), context);
       assert.equal(committed.ok, true);
-      assert.deepEqual((await store.commit(change('first'), context)).value, committed.value);
+      assert.deepEqual(
+        expectProperty(await store.commit(change('first'), context), 'value'),
+        committed.value,
+      );
       assert.equal((await store.commit(change('first', 'absent', 2), context)).ok, false);
       assert.equal((await store.commit(change('conflict'), context)).ok, false);
-      assert.equal((await store.read(address, context)).value.value.value, 1);
-      assert.equal((await store.journal(undefined, 100, context)).value.items.length, 1);
-      const revision = (await store.read(address, context)).value.revision;
+      assert.equal(expectProperty(await store.read(address, context), 'value').value.value, 1);
+      assert.equal(
+        expectProperty(await store.journal(undefined, 100, context), 'value').items.length,
+        1,
+      );
+      const revision = expectProperty(await store.read(address, context), 'value').revision;
       const raced = await Promise.all([
         store.commit(change('a', revision, 2), context),
         store.commit(change('b', revision, 3), context),
@@ -38,9 +48,12 @@ for (const kind of ['memory', 'sqlite'])
       assert.equal(raced.filter((r) => r.ok).length, 1);
       if (kind === 'sqlite') {
         store.close();
-        const reopened = openSqliteStore(join(dir, 'state.sqlite')).value;
-        assert.equal((await reopened.journal(undefined, 100, context)).value.items.length, 2);
-        assert.equal((await reopened.read(address, context)).value.value.value, 2);
+        const reopened = expectProperty(openSqliteStore(join(dir, 'state.sqlite')), 'value');
+        assert.equal(
+          expectProperty(await reopened.journal(undefined, 100, context), 'value').items.length,
+          2,
+        );
+        assert.equal(expectProperty(await reopened.read(address, context), 'value').value.value, 2);
         reopened.close();
       }
     } finally {
@@ -50,8 +63,8 @@ for (const kind of ['memory', 'sqlite'])
   });
 test('G06: immutable history, stale append rejection and forks preserve source paths', async () => {
   const history = createHistory(),
-    session = (await history.createSession({}, context)).value;
-  const branch = (await history.getBranch(session.id, context)).value;
+    session = expectProperty(await history.createSession({}, context), 'value');
+  const branch = expectProperty(await history.getBranch(session.id, context), 'value');
   const record = {
     id: 'r1',
     type: 'text',
@@ -65,12 +78,20 @@ test('G06: immutable history, stale append rejection and forks preserve source p
   assert.equal(appended.ok, true);
   record.payload.text = 'mutated';
   assert.equal(
-    (await history.path(appended.value, undefined, context)).value.items[0].record.payload.text,
+    expectProperty(
+      expectProperty(await history.path(appended.value, undefined, context), 'value').items[0]
+        .record.payload,
+      'text',
+    ),
     'original',
   );
   assert.equal((await history.append(branch, [], context)).ok, false);
   const fork = await history.fork(appended.value, appended.value.head, context);
-  assert.equal((await history.path(fork.value, undefined, context)).value.items.length, 1);
+  assert.equal(
+    expectProperty(await history.path(expectProperty(fork, 'value'), undefined, context), 'value')
+      .items.length,
+    1,
+  );
   assert.equal(
     (
       await history.getBranch(
@@ -84,6 +105,7 @@ test('G06: immutable history, stale append rejection and forks preserve source p
 test('DU04/G11: committed intents recover as unknown/abandoned without repeating effects', async () => {
   const store = createMemoryStore(),
     boundary = createStoredBoundary(store),
+    /** @type {import('@slop-lab/part/reference').Runtime.EffectPlan} */
     plan = {
       operationId: 'o',
       attemptId: 'a',
@@ -96,13 +118,13 @@ test('DU04/G11: committed intents recover as unknown/abandoned without repeating
     };
   await boundary.prepare(plan, context); // Simulated crash after intent and before settle/publication.
   const recovery = await createExecutionRecovery(store).recover(context);
-  assert.equal(recovery.value.abandoned.length, 1);
-  assert.equal(recovery.value.reconciliationRequired.length, 1);
+  assert.equal(expectProperty(recovery, 'value').abandoned.length, 1);
+  assert.equal(expectProperty(recovery, 'value').reconciliationRequired.length, 1);
   const persisted = await store.read(
     { namespace: 'part/execution', scope: { kind: 'operation', id: 'o' }, key: 'a' },
     context,
   );
-  assert.equal(persisted.value.value.value.effect, 'unknown');
+  assert.equal(expectProperty(expectProperty(persisted, 'value').value.value, 'effect'), 'unknown');
   let count = 0;
   const completed = await managedAttempt(
     boundary,

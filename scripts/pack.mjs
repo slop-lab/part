@@ -1,3 +1,4 @@
+// @ts-check
 import { createHash } from 'node:crypto';
 import { npmSync } from './npm.mjs';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -5,8 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 const destination = resolve('artifacts');
 mkdirSync(destination, { recursive: true });
-const result = spawnSync(
-  'npm',
+const result = npmSync(
   [
     'pack',
     '--workspaces',

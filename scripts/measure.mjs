@@ -1,3 +1,4 @@
+// @ts-check
 import { performance } from 'node:perf_hooks';
 const before = process.getActiveResourcesInfo(),
   memory = process.memoryUsage().heapUsed,

@@ -1,3 +1,4 @@
+// @ts-check
 import { readFile } from 'node:fs/promises';
 import { readMockSession } from '@slop-lab/part-node/testing/mock-provider';
 import { createMockFlow } from './flow.mjs';

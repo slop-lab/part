@@ -1,3 +1,4 @@
+// @ts-check
 import { createAgent } from '@slop-lab/part-plugins/agent';
 import { createWatchHub } from '@slop-lab/part/client';
 import { messageItem } from '@slop-lab/part/context';
@@ -10,9 +11,10 @@ import { createPlaygroundModel, providerOptions } from './models.mjs';
 
 const textInput = schema(
   'playground/text',
-  (value) =>
+  /** @param {unknown} value @returns {value is {text: string}} */ (value) =>
     value &&
     typeof value === 'object' &&
+    'text' in value &&
     typeof value.text === 'string' &&
     value.text.length <= 4000,
 );
@@ -41,7 +43,7 @@ const descriptor = (id) => ({
 });
 
 export function createPlaygroundSession({
-  environment = {},
+  environment = /** @type {NodeJS.ProcessEnv} */ ({}),
   delayScale = 1,
   context = localContext(),
 } = {}) {
@@ -190,11 +192,11 @@ export function createPlaygroundSession({
               },
               execution,
             );
-            if (!writer.ok) throw Error('Artifact writer unavailable');
+            if (writer.ok === false) throw Error('Artifact writer unavailable');
             const written = await writer.value.write(new TextEncoder().encode(content));
-            if (!written.ok) throw Error('Artifact write failed');
+            if (written.ok === false) throw Error('Artifact write failed');
             const published = await writer.value.finalize();
-            if (!published.ok) throw Error('Artifact finalization failed');
+            if (published.ok === false) throw Error('Artifact finalization failed');
             const artifact = published.value;
             reports.set(artifact.ref.id, artifact);
             project(
@@ -242,28 +244,32 @@ export function createPlaygroundSession({
             version: '1',
             async decide(plan, caller) {
               if (plan.call.toolId !== 'save_note') return ok({ kind: 'allow' });
+              const argumentsResult = textInput.validate(plan.validatedArguments);
+              if (argumentsResult.ok === false)
+                return fail('playground.arguments', 'Invalid note arguments');
+              const note = argumentsResult.value;
               const ticket = await waits.open(
                 {
                   type: 'playground/note-approval',
                   responseSchema: decisionSchema,
-                  presentation: { text: plan.validatedArguments.text },
+                  presentation: { text: note.text },
                   bindingDigest: plan.digest,
                 },
                 caller,
               );
-              if (!ticket.ok) return ticket;
+              if (ticket.ok === false) return ticket;
               run.approval = ticket.value;
               run.phase = 'waiting';
               trace('approval-open', {
                 ticket: ticket.value.id,
-                text: plan.validatedArguments.text,
+                text: note.text,
               });
               project(
                 `${run.id}/approval`,
                 'playground/approval',
                 'Approve note write',
-                plan.validatedArguments.text,
-                { phase: 'waiting', text: plan.validatedArguments.text },
+                note.text,
+                { phase: 'waiting', text: note.text },
                 {
                   source: ref,
                   actions: [descriptor('playground/approve'), descriptor('playground/reject')],
@@ -281,7 +287,7 @@ export function createPlaygroundSession({
                 { phase: response.ok ? (response.value ? 'approved' : 'rejected') : 'cancelled' },
               );
               update();
-              if (!response.ok) return response;
+              if (response.ok === false) return response;
               trace('approval-result', { approved: response.value });
               return ok(
                 response.value
@@ -297,7 +303,7 @@ export function createPlaygroundSession({
         ],
         inspectRequest: (view) => trace('inspection', view),
       });
-      if (!created.ok) throw Error('Agent composition failed');
+      if (created.ok === false) throw Error('Agent composition failed');
       agent = created.value;
       run.agent = agent;
       const key = `${input.provider}/${input.model ?? ''}`;
@@ -310,7 +316,7 @@ export function createPlaygroundSession({
         await messageItem('user', [{ kind: 'text', text: input.prompt }]),
       ];
       const started = await agent.start(items);
-      if (!started.ok) throw Error('Run admission failed');
+      if (started.ok === false) throw Error('Run admission failed');
       run.handle = started.value;
       run.phase = 'running';
       project(`${run.id}/user`, 'part/message', 'You', input.prompt, { text: input.prompt });
@@ -399,7 +405,7 @@ export function createPlaygroundSession({
       const metadata = reports.get(id);
       if (!metadata) return null;
       const read = await artifacts.read(metadata.ref, undefined, context);
-      if (!read.ok) return null;
+      if (read.ok === false) return null;
       const chunks = [];
       for await (const chunk of read.value) chunks.push(chunk);
       return {

@@ -1,3 +1,4 @@
+// @ts-check
 import { npmSync } from './npm.mjs';
 import { build } from 'esbuild';
 import { spawnSync } from 'node:child_process';
@@ -9,6 +10,7 @@ const root = process.cwd();
 const temporary = mkdtempSync(join(tmpdir(), 'part-consumers-'));
 const packages = ['core', 'plugins', 'node', 'browser'].map((directory) => ({
   directory,
+  tarball: '',
   manifest: JSON.parse(readFileSync(`packages/${directory}/package.json`, 'utf8')),
 }));
 const consumers = {
@@ -41,6 +43,7 @@ function run(command, args, cwd = root) {
 }
 const publicPath = (pkg, name) => pkg.manifest.name + (name === '.' ? '' : '/' + name.slice(2));
 try {
+  cpSync(join(root, 'fixtures'), join(temporary, 'fixtures'), { recursive: true });
   for (const pkg of packages) {
     const packed = JSON.parse(
       run(
@@ -52,7 +55,7 @@ try {
     pkg.tarball = join(temporary, packed[0].filename);
   }
   for (const [name, selected] of Object.entries(consumers)) {
-    const directory = join(temporary, name);
+    const directory = join(temporary, 'consumers', name);
     const installed = packages.filter((pkg) => selected.includes(pkg.directory));
     cpSync(join(root, 'consumers', name), directory, { recursive: true });
     writeFileSync(

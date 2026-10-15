@@ -1,3 +1,5 @@
+// @ts-check
+import { stub, expectProperty, json } from '../fixtures/assertions.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
@@ -28,35 +30,38 @@ async function until(predicate) {
   throw Error('Condition did not arrive');
 }
 function composition() {
-  return createPlanner().resolve({
-    components: [
-      {
-        descriptor: {
-          id: 'test/services',
-          version: '1',
-          surfaces: ['local'],
-          scope: 'runtime',
-          requires: [],
-          provides: ['part/model', 'part/context'].map((id) => ({
-            id,
-            contractVersion: 1,
-            status: 'supported',
-            implementedBy: 'test/services',
-            constraints: {},
-          })),
+  return expectProperty(
+    createPlanner().resolve({
+      components: [
+        {
+          descriptor: {
+            id: 'test/services',
+            version: '1',
+            surfaces: ['local'],
+            scope: 'runtime',
+            requires: [],
+            provides: ['part/model', 'part/context'].map((id) => ({
+              id,
+              contractVersion: 1,
+              status: 'supported',
+              implementedBy: 'test/services',
+              constraints: {},
+            })),
+          },
+          register: () => ok(undefined),
+          create: () =>
+            ok({
+              initialize: async () => ok(undefined),
+              start: async () => ok(undefined),
+              stop: async () => ({ released: [], unresolved: [], errors: [] }),
+              dispose: async () => ({ released: [], unresolved: [], errors: [] }),
+            }),
         },
-        register: () => ok(undefined),
-        create: () =>
-          ok({
-            initialize: async () => ok(undefined),
-            start: async () => ok(undefined),
-            stop: async () => ({ released: [], unresolved: [], errors: [] }),
-            dispose: async () => ({ released: [], unresolved: [], errors: [] }),
-          }),
-      },
-    ],
-    config: {},
-  }).value;
+      ],
+      config: {},
+    }),
+    'value',
+  );
 }
 test(
   'GW03/GW06: actual script -> managed child agent -> typed result -> approval applies pinned data once',
@@ -68,31 +73,41 @@ test(
       await writeFile(join(root, 'collect.cjs'), source);
       const operations = createOperations(),
         model = fakeModel([{ text: 'reviewed' }]),
-        gateway = createModelGateway({
-          profiles: [model.profile],
-          adapters: [model.adapter],
-          transports: [model.transport],
-          auth: { none: model.auth },
+        gateway = expectProperty(
+          createModelGateway({
+            profiles: [model.profile],
+            adapters: [model.adapter],
+            transports: [model.transport],
+            auth: { none: model.auth },
+            operations,
+          }),
+          'value',
+        );
+      const runs = expectProperty(
+        createRunService({
+          drivers: [installDriver(createBasicDriver({ profileId: 'fake' }))],
+          services: {
+            model: gateway,
+            context: expectProperty(createContextCompiler(), 'value'),
+            operations,
+            services: context.services,
+          },
           operations,
-        }).value;
-      const runs = createRunService({
-        drivers: [installDriver(createBasicDriver({ profileId: 'fake' }))],
-        services: {
-          model: gateway,
-          context: createContextCompiler().value,
-          operations,
-          services: context.services,
-        },
-        operations,
-      }).value;
+        }),
+        'value',
+      );
       const scripts = createNodeScripts({
         root,
         interpreters: { node: process.execPath },
         operations,
       });
-      const results = createResults([
-        { id: jsonSchema.ref.id, version: 1, schema: jsonSchema, mediaType: 'application/json' },
-      ]).value;
+      const results = expectProperty(
+        createResults([
+          { id: jsonSchema.ref.id, version: 1, schema: jsonSchema, mediaType: 'application/json' },
+        ]),
+        'value',
+      );
+      /** @type {import('@slop-lab/part/reference').Scripts.Request} */
       const collect = {
         requestId: 'collect',
         executorId: 'part/node-process',
@@ -107,8 +122,9 @@ test(
         retry: 'never',
       };
       const composed = composition();
-      let ticket,
-        applied = 0;
+      /** @type {import('@slop-lab/part/reference').Runtime.WaitTicket} */
+      let ticket;
+      let applied = 0;
       const code = await defineCodeWorkflow({
         id: 'vertical',
         version: '1',
@@ -117,14 +133,14 @@ test(
         replay: 'none',
         async execute(input, c) {
           const captured = await c.script(
-            await callIdentity(c.execution, 'collect', collect),
+            await callIdentity(c.execution, 'collect', json(collect)),
             collect,
           );
           if (captured.phase !== 'completed') return fail('test.collect', 'Collect failed');
           const request = {
             driver: 'part/basic',
             composition: composed,
-            input: captured.result.captured.value.text,
+            input: expectProperty(expectProperty(captured.result.captured, 'value'), 'text'),
           };
           const review = await c.agent(
             await callIdentity(c.execution, 'agent', {
@@ -135,18 +151,25 @@ test(
             request,
           );
           if (review.phase !== 'completed') return fail('test.agent', 'Agent failed');
+          /** @type {import('@slop-lab/part/reference').Results.Submission} */
           const submission = {
             submissionId: 'result',
             expectedType: jsonSchema.ref,
-            data: { kind: 'inline', value: { text: review.result.content[0].text, input } },
+            data: {
+              kind: 'inline',
+              value: {
+                text: expectProperty(expectProperty(review.result, 'content')[0], 'text'),
+                input,
+              },
+            },
             producedBy: { owner: c.execution.engine, kind: 'workflow', id: c.execution.id },
             validationProfile: 'schema',
           };
           const accepted = await c.submit(
-            await callIdentity(c.execution, 'result', submission),
+            await callIdentity(c.execution, 'result', json(submission)),
             submission,
           );
-          if (!accepted.ok) return accepted;
+          if (accepted.ok === false) return accepted;
           const spec = {
             type: 'test/approve',
             responseSchema: jsonSchema,
@@ -154,31 +177,38 @@ test(
             bindingDigest: accepted.value.digest,
           };
           const opened = await c.wait(
-            await callIdentity(c.execution, 'approve', {
-              type: spec.type,
-              responseSchema: jsonSchema.ref,
-              presentation: spec.presentation,
-              bindingDigest: spec.bindingDigest,
-            }),
+            await callIdentity(
+              c.execution,
+              'approve',
+              json({
+                type: spec.type,
+                responseSchema: jsonSchema.ref,
+                presentation: spec.presentation,
+                bindingDigest: spec.bindingDigest,
+              }),
+            ),
             spec,
           );
-          if (!opened.ok) return opened;
+          if (opened.ok === false) return opened;
           ticket = opened.value;
           const response = await c.response(ticket);
-          if (!response.ok) return response;
+          if (response.ok === false) return response;
           if (response.value !== true) return fail('test.denied', 'Approval declined');
           applied++;
-          return ok(accepted.value.data.value);
+          return ok(expectProperty(accepted.value.data, 'value'));
         },
       });
-      const engine = createCodeEngine([code], {
-        operations,
-        scripts,
-        runs,
-        results,
-        waits: createSuspensions(),
-      }).value;
-      const prepared = (
+      const engine = expectProperty(
+        createCodeEngine([code], {
+          operations,
+          scripts,
+          runs,
+          results,
+          waits: createSuspensions(),
+        }),
+        'value',
+      );
+      const prepared = expectProperty(
         await engine.prepare(
           {
             engineId: engine.descriptor.id,
@@ -194,8 +224,9 @@ test(
             requiredControl: 'runner-enforced',
           },
           context,
-        )
-      ).value;
+        ),
+        'value',
+      );
       const started = await engine.start(
         {
           requestId: 'one',
@@ -216,6 +247,7 @@ test(
         ).kind,
         'rejected',
       );
+      assert.ok(ticket);
       const command = {
         protocolVersion: 1,
         commandId: 'approve',
@@ -224,19 +256,27 @@ test(
         input: { ticketId: ticket.id, revision: ticket.revision, response: true },
       };
       const receipts = await Promise.all([
-        engine.action(started.ref, command, context),
-        engine.action(started.ref, command, context),
+        engine.action(expectProperty(started, 'ref'), command, context),
+        engine.action(expectProperty(started, 'ref'), command, context),
       ]);
       assert.equal(receipts[0].kind, 'completed');
       assert.equal(receipts[1].kind, 'completed');
       await until(async () =>
-        ['succeeded', 'failed'].includes((await engine.get(started.ref, context)).value.phase),
+        ['succeeded', 'failed'].includes(
+          expectProperty(await engine.get(expectProperty(started, 'ref'), context), 'value').phase,
+        ),
       );
-      const snapshot = (await engine.get(started.ref, context)).value;
+      const snapshot = expectProperty(
+        await engine.get(expectProperty(started, 'ref'), context),
+        'value',
+      );
       assert.equal(snapshot.phase, 'succeeded');
       assert.equal(applied, 1);
       assert.equal(model.requests.length, 1);
-      assert.deepEqual(snapshot.output.data, { text: 'reviewed', input: { revision: 1 } });
+      assert.deepEqual(expectProperty(snapshot.output, 'data'), {
+        text: 'reviewed',
+        input: { revision: 1 },
+      });
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -248,6 +288,7 @@ test('GW08: hook timeout/failure policies, matcher, scope and concurrent once ad
     const source = 'setTimeout(()=>console.log(JSON.stringify({kind:"allow"})),1000);';
     await writeFile(join(root, 'slow.cjs'), source);
     const scripts = createNodeScripts({ root, interpreters: { node: process.execPath } });
+    /** @type {import('@slop-lab/part/reference').Hooks.Point<unknown, unknown>} */
     const point = {
       id: 'test/observe',
       version: 1,
@@ -259,10 +300,14 @@ test('GW08: hook timeout/failure policies, matcher, scope and concurrent once ad
       awaited: true,
     };
     const reports = [];
-    const hooks = createScriptHooks([point], scripts, {
-      match: (matcher, input) => ok(input === matcher),
-      report: (_binding, error) => reports.push(error),
-    }).value;
+    const hooks = expectProperty(
+      createScriptHooks([point], scripts, {
+        match: (matcher, input) => ok(input === matcher),
+        report: (_binding, error) => reports.push(error),
+      }),
+      'value',
+    );
+    /** @type {import('@slop-lab/part/reference').Hooks.Binding} */
     const binding = {
       id: 'timeout',
       pointId: point.id,
@@ -289,10 +334,10 @@ test('GW08: hook timeout/failure policies, matcher, scope and concurrent once ad
       match: 'match',
     };
     await hooks.bind(binding, context);
-    assert.equal((await hooks.fire(point.id, 'skip', context)).value.length, 0);
+    assert.equal(expectProperty(await hooks.fire(point.id, 'skip', context), 'value').length, 0);
     assert.equal((await hooks.fire(point.id, 'match', context)).ok, true);
     assert.equal(reports.length, 1);
-    assert.equal((await hooks.fire(point.id, 'match', context)).value.length, 0);
+    assert.equal(expectProperty(await hooks.fire(point.id, 'match', context), 'value').length, 0);
     let executed = 0;
     const counting = {
       async execute() {
@@ -309,7 +354,7 @@ test('GW08: hook timeout/failure policies, matcher, scope and concurrent once ad
         });
       },
     };
-    const once = createScriptHooks([point], counting).value;
+    const once = expectProperty(createScriptHooks([point], stub(counting)), 'value');
     await once.bind({ ...binding, id: 'once', match: undefined, failure: 'block' }, context);
     const responses = await Promise.all([
       once.fire(point.id, null, context),
@@ -320,7 +365,7 @@ test('GW08: hook timeout/failure policies, matcher, scope and concurrent once ad
       responses.every((response) => response.ok),
       true,
     );
-    const closed = createScriptHooks([point], scripts).value;
+    const closed = expectProperty(createScriptHooks([point], scripts), 'value');
     await closed.bind({ ...binding, id: 'fail', match: undefined, failure: 'fail-run' }, context);
     assert.equal((await closed.fire(point.id, null, context)).ok, false);
   } finally {
@@ -334,25 +379,29 @@ test('GW09: bridge expiry/revocation propagate cancellation and never widen pare
   const owner = localContext({
     scope: { kind: 'runtime', id: 'bridge-owner' },
     signal: controller.signal,
-    services: {
+    services: stub({
       get: (key) => (key.id === budgetKey.id ? ok(upstream) : fail('missing', 'Missing service')),
-    },
+    }),
   });
+  /** @type {import('@slop-lab/part/reference').Runtime.ExecutionHandle<any>} */
   let child;
   const bridge = createScriptBridge({
     'run.start': {
       profileRequired: true,
       async invoke(_params, c) {
-        const reserve = c.services.get(budgetKey).value.reserve('maxChildRuns', 1);
+        const reserve = expectProperty(c.services.get(budgetKey), 'value').reserve(
+          'maxChildRuns',
+          1,
+        );
         return reserve.ok
           ? { kind: 'completed', commandId: '', result: null, effect: 'not-applicable', commit: [] }
-          : { kind: 'rejected', commandId: '', error: reserve.error };
+          : { kind: 'rejected', commandId: '', error: expectProperty(reserve, 'error') };
       },
     },
     'model.invoke': {
       profileRequired: true,
       async invoke(_params, c) {
-        child = (
+        child = expectProperty(
           await operations.begin(
             { kind: 'part/model', childPolicy: 'attached', retryOwner: 'test' },
             async (inner) => {
@@ -362,12 +411,14 @@ test('GW09: bridge expiry/revocation propagate cancellation and never widen pare
               return { phase: 'cancelled', effect: 'unknown', commit: [], unsettledChildren: [] };
             },
             c,
-          )
-        ).value;
+          ),
+          'value',
+        );
         return { kind: 'accepted', commandId: '', operation: child.ref, commit: [] };
       },
     },
   });
+  /** @type {Omit<import('@slop-lab/part/reference').Scripts.BridgeGrant, "id">} */
   const policy = {
     version: 1,
     audience: 'test',
@@ -378,7 +429,7 @@ test('GW09: bridge expiry/revocation propagate cancellation and never widen pare
     expiresAt: new Date(Date.now() + 1000).toISOString(),
     enforcement: 'trusted-code-only',
   };
-  const grant = (await bridge.issue(policy, owner)).value;
+  const grant = expectProperty(await bridge.issue(policy, owner), 'value');
   assert.equal(
     (
       await bridge.invoke(
@@ -399,10 +450,12 @@ test('GW09: bridge expiry/revocation propagate cancellation and never widen pare
   );
   await delay(1);
   await bridge.revoke(grant.id, owner);
+  assert.ok(child);
   assert.equal((await child.done).phase, 'cancelled');
-  const expired = (
-    await bridge.issue({ ...policy, expiresAt: new Date(Date.now() + 5).toISOString() }, owner)
-  ).value;
+  const expired = expectProperty(
+    await bridge.issue({ ...policy, expiresAt: new Date(Date.now() + 5).toISOString() }, owner),
+    'value',
+  );
   await delay(10);
   assert.equal(
     (
@@ -436,44 +489,55 @@ test('Pinned pipeline skill binding contributes explicit user instructions and r
       `---\nname: ${name}\ndescription: Explicit pipeline fixture\n---\nUse the pinned review instructions.`,
     );
     const source = createDirectoryPackages(),
-      snapshots = (await source.discover([skillRoot], context)).value,
+      snapshots = expectProperty(await source.discover([skillRoot], context), 'value'),
       skills = createSkills(source, snapshots);
-    const descriptor = (await skills.list(context)).value[0];
-    let activated,
-      release = 0;
+    const descriptor = expectProperty(await skills.list(context), 'value')[0];
+    /** @type {import('@slop-lab/part/reference').Skills.Activation} */
+    let activated;
+    let release = 0;
     const tracked = {
       list: skills.list,
       async activate(...args) {
-        const result = await skills.activate(...args);
+        const result = await skills.activate(args[0], args[1]);
         if (result.ok) activated = result.value;
         return result;
       },
       async deactivate(...args) {
         release++;
-        return skills.deactivate(...args);
+        return skills.deactivate(args[0], args[1]);
       },
     };
     const operations = createOperations(),
       model = fakeModel([{ text: 'skill reviewed' }]),
-      gateway = createModelGateway({
-        profiles: [model.profile],
-        adapters: [model.adapter],
-        transports: [model.transport],
-        auth: { none: model.auth },
+      gateway = expectProperty(
+        createModelGateway({
+          profiles: [model.profile],
+          adapters: [model.adapter],
+          transports: [model.transport],
+          auth: { none: model.auth },
+          operations,
+        }),
+        'value',
+      );
+    const runs = expectProperty(
+      createRunService({
+        drivers: [installDriver(createBasicDriver({ profileId: 'fake' }))],
+        services: {
+          operations,
+          services: context.services,
+          model: gateway,
+          context: expectProperty(
+            createContextCompiler({ lowerers: [messageLowerer, skillLowerer()] }),
+            'value',
+          ),
+        },
         operations,
-      }).value;
-    const runs = createRunService({
-      drivers: [installDriver(createBasicDriver({ profileId: 'fake' }))],
-      services: {
-        operations,
-        services: context.services,
-        model: gateway,
-        context: createContextCompiler({ lowerers: [messageLowerer, skillLowerer()] }).value,
-      },
-      operations,
-    }).value;
+      }),
+      'value',
+    );
     const input = [await messageItem('user', [{ kind: 'text', text: 'Review this' }])],
       profile = { driver: 'part/basic', composition: composition() };
+    /** @type {Parameters<typeof createPipelineEngine>[0]['definitions'][number]} */
     const definition = {
       id: 'skill-pipeline',
       format: 'part.pipeline',
@@ -492,26 +556,36 @@ test('Pinned pipeline skill binding contributes explicit user instructions and r
       ],
       result: { step: 'agent', pointer: '' },
     };
-    const engine = createPipelineEngine({
-      definitions: [definition],
-      schemas: [jsonSchema],
-      services: { operations, runs },
-      agents: { local: profile },
-      skills: {
-        service: tracked,
-        bind: (input, activations) =>
-          ok([...input, ...activations.flatMap((activation) => activation.contextItems)]),
-      },
-    }).value;
-    const prepared = (
+    const engine = expectProperty(
+      createPipelineEngine({
+        definitions: [definition],
+        schemas: [jsonSchema],
+        services: { operations, runs },
+        agents: { local: profile },
+        skills: {
+          service: tracked,
+          bind: (input, activations) =>
+            ok(
+              json([
+                .../** @type {import('@slop-lab/part/reference').Context.SemanticItem[]} */ (
+                  /** @type {unknown} */ (input)
+                ),
+                ...activations.flatMap((activation) => activation.contextItems),
+              ]),
+            ),
+        },
+      }),
+      'value',
+    );
+    const prepared = expectProperty(
       await engine.prepare(
         {
           engineId: engine.descriptor.id,
           definition: {
-            id: definition.id,
-            format: definition.format,
+            id: expectProperty(definition, 'id'),
+            format: expectProperty(definition, 'format'),
             formatVersion: '1',
-            digest: await digest(definition),
+            digest: await digest(json(definition)),
             source: { owner: 'test', native: {} },
           },
           profileId: 'default',
@@ -519,14 +593,21 @@ test('Pinned pipeline skill binding contributes explicit user instructions and r
           requiredCapabilities: [],
         },
         context,
-      )
-    ).value;
-    const started = await engine.start({ requestId: 'one', prepared, input }, context);
-    await until(async () =>
-      ['succeeded', 'failed'].includes((await engine.get(started.ref, context)).value.phase),
+      ),
+      'value',
     );
-    assert.equal((await engine.get(started.ref, context)).value.phase, 'succeeded');
+    const started = await engine.start({ requestId: 'one', prepared, input: json(input) }, context);
+    await until(async () =>
+      ['succeeded', 'failed'].includes(
+        expectProperty(await engine.get(expectProperty(started, 'ref'), context), 'value').phase,
+      ),
+    );
+    assert.equal(
+      expectProperty(await engine.get(expectProperty(started, 'ref'), context), 'value').phase,
+      'succeeded',
+    );
     assert.equal(release, 1);
+    assert.ok(activated);
     assert.equal((await skills.deactivate(activated.id, context)).ok, false);
     const messages = JSON.parse(new TextDecoder().decode(model.requests[0].body)).messages;
     assert.ok(
@@ -545,17 +626,20 @@ test('Bridge service adapter executes the configured gateway and exposes only it
   const { messageItem } = await import('@slop-lab/part/context');
   const operations = createOperations(),
     model = fakeModel([{ text: 'bridge response' }]),
-    gateway = createModelGateway({
-      profiles: [model.profile],
-      adapters: [model.adapter],
-      transports: [model.transport],
-      auth: { none: model.auth },
-      operations,
-    }).value;
+    gateway = expectProperty(
+      createModelGateway({
+        profiles: [model.profile],
+        adapters: [model.adapter],
+        transports: [model.transport],
+        auth: { none: model.auth },
+        operations,
+      }),
+      'value',
+    );
   const owner = localContext({ scope: { kind: 'runtime', id: 'bridge-root' } });
   const item = await messageItem('user', [{ kind: 'text', text: 'input' }]);
-  const compiled = (
-    await createContextCompiler().value.compile(
+  const compiled = expectProperty(
+    await expectProperty(createContextCompiler(), 'value').compile(
       {
         input: [item],
         sources: [item.source],
@@ -563,11 +647,12 @@ test('Bridge service adapter executes the configured gateway and exposes only it
         toolsDigest: 'none',
       },
       owner,
-    )
-  ).value;
+    ),
+    'value',
+  );
   const bridge = createScriptBridge(createBridgeMethods({ model: gateway }));
   try {
-    const grant = (
+    const grant = expectProperty(
       await bridge.issue(
         {
           version: 1,
@@ -580,19 +665,22 @@ test('Bridge service adapter executes the configured gateway and exposes only it
           enforcement: 'trusted-code-only',
         },
         owner,
-      )
-    ).value;
+      ),
+      'value',
+    );
+    /** @type {import('@slop-lab/part/reference').Scripts.BridgeRequest} */
     const request = {
       id: 'invoke',
       grantId: grant.id,
       method: 'model.invoke',
-      params: {
+      params: json({
         profileId: 'fake',
         invocation: { profileId: 'foreign', context: compiled, tools: [], options: {} },
-      },
+      }),
     };
     const receipt = await bridge.invoke(request, owner);
     assert.equal(receipt.kind, 'accepted');
+    /** @type {import('@slop-lab/part/reference').Contracts.CommandReceipt<any>} */
     let read;
     await until(async () => {
       read = await bridge.invoke(
@@ -604,12 +692,13 @@ test('Bridge service adapter executes the configured gateway and exposes only it
         },
         owner,
       );
-      return read.result?.outcome !== undefined;
+      return Object.hasOwn(expectProperty(read, 'result'), 'outcome');
     });
-    assert.equal(read.result.outcome.result.content[0].text, 'bridge response');
+    assert.ok(read);
+    assert.equal(expectProperty(read, 'result').outcome.result.content[0].text, 'bridge response');
     assert.equal(model.requests.length, 1);
     const foreign = localContext({ scope: { kind: 'runtime', id: 'different-root' } });
-    const other = (
+    const other = expectProperty(
       await bridge.issue(
         {
           version: 1,
@@ -622,8 +711,9 @@ test('Bridge service adapter executes the configured gateway and exposes only it
           enforcement: 'trusted-code-only',
         },
         foreign,
-      )
-    ).value;
+      ),
+      'value',
+    );
     const denied = await bridge.invoke(
       { id: 'foreign', grantId: other.id, method: 'run.get', params: { id: receipt.operation.id } },
       foreign,
@@ -638,31 +728,40 @@ test('W12: native logical step keys attach the same managed agent run and reject
   const { createAgentStepBinding } = await import('@slop-lab/part-plugins/workflows/agent-step');
   const operations = createOperations(),
     model = fakeModel([{ text: 'attached once' }]),
-    gateway = createModelGateway({
-      profiles: [model.profile],
-      adapters: [model.adapter],
-      transports: [model.transport],
-      auth: { none: model.auth },
+    gateway = expectProperty(
+      createModelGateway({
+        profiles: [model.profile],
+        adapters: [model.adapter],
+        transports: [model.transport],
+        auth: { none: model.auth },
+        operations,
+      }),
+      'value',
+    );
+  const runs = expectProperty(
+    createRunService({
+      drivers: [installDriver(createBasicDriver({ profileId: 'fake' }))],
+      services: {
+        operations,
+        services: context.services,
+        model: gateway,
+        context: expectProperty(createContextCompiler(), 'value'),
+      },
       operations,
-    }).value;
-  const runs = createRunService({
-    drivers: [installDriver(createBasicDriver({ profileId: 'fake' }))],
-    services: {
-      operations,
-      services: context.services,
-      model: gateway,
-      context: createContextCompiler().value,
-    },
-    operations,
-  }).value;
+    }),
+    'value',
+  );
   const binding = createAgentStepBinding(runs);
   const request = { driver: 'part/basic', composition: composition(), input: 'logical input' };
   const [one, two] = await Promise.all([
     binding.startOrAttach('native/job/step', request, context),
     binding.startOrAttach('native/job/step', request, context),
   ]);
-  assert.deepEqual(one.value, two.value);
-  assert.equal((await binding.result(one.value, context)).value.phase, 'completed');
+  assert.deepEqual(expectProperty(one, 'value'), expectProperty(two, 'value'));
+  assert.equal(
+    expectProperty(await binding.result(expectProperty(one, 'value'), context), 'value').phase,
+    'completed',
+  );
   assert.equal(model.requests.length, 1);
   assert.equal(
     (await binding.startOrAttach('native/job/step', { ...request, input: 'changed' }, context)).ok,

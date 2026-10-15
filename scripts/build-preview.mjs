@@ -1,3 +1,4 @@
+// @ts-check
 import { build } from 'esbuild';
 import { readFileSync, mkdirSync, writeFileSync, copyFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';

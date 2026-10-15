@@ -1,3 +1,5 @@
+// @ts-check
+import { stub, expectProperty } from '../fixtures/assertions.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -18,6 +20,7 @@ import {
 } from '@slop-lab/part/runtime';
 import { createSuspensions } from '@slop-lab/part/runtime/waits';
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+/** @template T @param {T} result @returns {import('@slop-lab/part/reference').Runtime.ManagedOutcome<T>} */
 const completed = (result) => ({
   phase: 'completed',
   result,
@@ -25,8 +28,10 @@ const completed = (result) => ({
   unsettledChildren: [],
   commit: [],
 });
+/** @type {import('@slop-lab/part/reference').Runtime.OperationSpec} */
 const spec = { kind: 'test', retryOwner: 'test', childPolicy: 'attached' };
 const context = localContext();
+/** @type {import('@slop-lab/part/reference').Runtime.EffectPlan} */
 const plan = {
   operationId: 'o',
   attemptId: 'a',
@@ -37,6 +42,7 @@ const plan = {
   compositionRevision: 'r',
   classification: 'write',
 };
+/** @type {import('@slop-lab/part/reference').Composition.ExtensionPoint<number>} */
 const point = {
   id: 'test/registry',
   owner: 'test',
@@ -44,13 +50,14 @@ const point = {
   kind: 'registry',
   scope: 'runtime',
 };
+/** @returns {import('@slop-lab/part/reference').Composition.ComponentFactory} */
 const component = (id, register, requires = [], provides = [], lifecycle = {}) => ({
   descriptor: { id, version: '1', scope: 'runtime', surfaces: ['test'], requires, provides },
   register,
   create: () =>
     ok({
-      initialize: async () => ok(),
-      start: async () => ok(),
+      initialize: async () => ok(undefined),
+      start: async () => ok(undefined),
       stop: async () => ({ released: [], unresolved: [], errors: [] }),
       dispose: async () => ({ released: [], unresolved: [], errors: [] }),
       ...lifecycle,
@@ -61,7 +68,7 @@ test('X08: codecs reject lossy wire values, sparse arrays, custom array properti
   const cyclic = {};
   cyclic.self = cyclic;
   const custom = [];
-  custom.secret = 'lost';
+  Object.assign(custom, { secret: 'lost' });
   for (const value of [
     undefined,
     NaN,
@@ -74,9 +81,10 @@ test('X08: codecs reject lossy wire values, sparse arrays, custom array properti
     cyclic,
     new AbortController().signal,
   ])
+    // @ts-expect-error Invalid JSON values must be rejected by the codec.
     assert.equal(jsonSchema.codec.encode(value).ok, false);
   const data = { z: [1, null], a: true };
-  assert.deepEqual(jsonSchema.codec.decode(data).value, data);
+  assert.deepEqual(expectProperty(jsonSchema.codec.decode(data), 'value'), data);
   assert.equal(canonical(data), '{"a":true,"z":[1,null]}');
 });
 test('C03-C05: missing dependencies, duplicate keys, replacement, deterministic ordering and cycles', () => {
@@ -84,7 +92,9 @@ test('C03-C05: missing dependencies, duplicate keys, replacement, deterministic 
   assert.equal(
     planner.resolve({
       components: [
-        component('a', () => ok(), [{ id: 'missing', contractVersion: 1, optional: false }]),
+        component('a', () => ok(undefined), [
+          { id: 'missing', contractVersion: 1, optional: false },
+        ]),
       ],
       config: {},
     }).ok,
@@ -94,7 +104,7 @@ test('C03-C05: missing dependencies, duplicate keys, replacement, deterministic 
     r.declare(point);
     r.contribute({ id: 'z', point: { ...point }, key: 'z', value: 1 });
     r.contribute({ id: 'a', point, key: 'a', value: 2, after: ['z'] });
-    return ok();
+    return ok(undefined);
   };
   const resolved = planner.resolve({ components: [component('a', register)], config: {} });
   assert.equal(resolved.ok, true);
@@ -151,13 +161,13 @@ test('C06: initialization failure disposes created modules in reverse order', as
       return { released: [], unresolved: [], errors: [] };
     };
   const components = ['a', 'b', 'c'].map((id) =>
-    component(id, () => ok(), [], [], {
-      initialize: async () => (id === 'c' ? fail('fixture', 'Failure') : ok()),
+    component(id, () => ok(undefined), [], [], {
+      initialize: async () => (id === 'c' ? fail('fixture', 'Failure') : ok(undefined)),
       stop: cleanup(`stop-${id}`),
       dispose: cleanup(`dispose-${id}`),
     }),
   );
-  const composition = createPlanner().resolve({ components, config: {} }).value;
+  const composition = expectProperty(createPlanner().resolve({ components, config: {} }), 'value');
   const opened = await createScopeManager().open({ kind: 'runtime', id: 'r' }, composition);
   assert.equal(opened.ok, false);
   assert.deepEqual(log, ['dispose-c', 'stop-b', 'dispose-b', 'stop-a', 'dispose-a']);
@@ -174,15 +184,15 @@ test('E01-E02: execution proceeds without subscribers and closing observation do
     },
     context,
   );
-  const iterator = created.value.observe()[Symbol.asyncIterator]();
+  const iterator = expectProperty(created, 'value').observe()[Symbol.asyncIterator]();
   await iterator.return();
-  assert.equal((await created.value.done).result, 42);
+  assert.equal(expectProperty(await expectProperty(created, 'value').done, 'result'), 42);
   assert.equal(count, 1);
-  assert.equal(created.value.snapshot().cancel.state, 'not-requested');
+  assert.equal(expectProperty(created, 'value').snapshot().cancel.state, 'not-requested');
 });
 test('E04/E09: unacknowledged cancellation remains abandoned when late results arrive', async () => {
   const operations = createOperations({ cancellationGraceMs: 5 });
-  let release;
+  let /** @type {(...args: any[]) => void} */ release;
   const created = await operations.begin(
     spec,
     () =>
@@ -192,12 +202,12 @@ test('E04/E09: unacknowledged cancellation remains abandoned when late results a
     context,
   );
   await delay(0);
-  await created.value.requestCancel('test');
-  assert.equal((await created.value.done).phase, 'abandoned');
-  assert.equal(created.value.snapshot().cancel.state, 'partial');
+  await expectProperty(created, 'value').requestCancel('test');
+  assert.equal((await expectProperty(created, 'value').done).phase, 'abandoned');
+  assert.equal(expectProperty(created, 'value').snapshot().cancel.state, 'partial');
   release(completed(1));
   await delay(0);
-  assert.equal(created.value.snapshot().phase, 'abandoned');
+  assert.equal(expectProperty(created, 'value').snapshot().phase, 'abandoned');
 });
 test('E06: successful parents cannot leave uncooperative attached children', async () => {
   const operations = createOperations({ cancellationGraceMs: 5 });
@@ -214,12 +224,12 @@ test('E06: successful parents cannot leave uncooperative attached children', asy
     },
     context,
   );
-  assert.equal((await parent.value.done).phase, 'abandoned');
-  assert.equal((await parent.value.done).unsettledChildren.length, 1);
+  assert.equal((await expectProperty(parent, 'value').done).phase, 'abandoned');
+  assert.equal((await expectProperty(parent, 'value').done).unsettledChildren.length, 1);
 });
 test('E07/E08/E10: prepare blocks execution and settle failure preserves applied effects', async () => {
   let count = 0,
-    release;
+    /** @type {(...args: any[]) => void} */ release;
   const boundary = createBoundary({
     prepare: () =>
       new Promise((resolve) => {
@@ -238,7 +248,7 @@ test('E07/E08/E10: prepare blocks execution and settle failure preserves applied
   );
   await delay(0);
   assert.equal(count, 0);
-  release(ok());
+  release(ok(undefined));
   const result = await pending;
   assert.equal(count, 1);
   assert.equal(result.phase, 'failed');
@@ -285,7 +295,7 @@ test('bounded observation signals gaps to slow consumers', async () => {
 });
 test('waits validate authority, revision, schema and deduplicate responses', async () => {
   const waits = createSuspensions(),
-    ticket = (
+    ticket = expectProperty(
       await waits.open(
         {
           type: 'question',
@@ -294,8 +304,9 @@ test('waits validate authority, revision, schema and deduplicate responses', asy
           bindingDigest: 'fixed',
         },
         context,
-      )
-    ).value;
+      ),
+      'value',
+    );
   assert.equal(
     (
       await waits.respond(
@@ -310,7 +321,7 @@ test('waits validate authority, revision, schema and deduplicate responses', asy
   assert.equal((await waits.respond(ticket, 1, 'a', context)).ok, false);
   const pending = waits.wait(ticket, stringSchema, context);
   assert.equal((await waits.respond(ticket, 'yes', 'a', context)).ok, true);
-  assert.equal((await pending).value, 'yes');
+  assert.equal(expectProperty(await pending, 'value'), 'yes');
   assert.equal((await waits.respond(ticket, 'yes', 'a', context)).ok, true);
   assert.equal((await waits.respond(ticket, 'no', 'a', context)).ok, false);
   assert.equal((await waits.respond(ticket, 'yes', 'b', context)).ok, false);
@@ -328,7 +339,7 @@ test('synchronous composition hashing matches native SHA-256', async () => {
 test('E03: cancellation during awaited prepare prevents the next executor attempt', async () => {
   const controller = new AbortController(),
     c = localContext({ signal: controller.signal });
-  let release,
+  let /** @type {(...args: any[]) => void} */ release,
     count = 0;
   const boundary = createBoundary({
     prepare: () =>
@@ -347,7 +358,7 @@ test('E03: cancellation during awaited prepare prevents the next executor attemp
   );
   await delay(0);
   controller.abort();
-  release(ok());
+  release(ok(undefined));
   const outcome = await pending;
   assert.equal(count, 0);
   assert.equal(outcome.effect, 'not-attempted');
@@ -355,9 +366,9 @@ test('E03: cancellation during awaited prepare prevents the next executor attemp
 test('E05: attached operations inherit deadlines and share concurrent reservations', async () => {
   const operations = createOperations(),
     budget = createBudget({ maxConcurrentOperations: 1 }),
-    c = localContext({ services: { get: () => ok(budget) } });
+    c = localContext({ services: stub({ get: () => ok(budget) }) });
   let entered = 0;
-  const first = (
+  const first = expectProperty(
     await operations.begin(
       spec,
       async () => {
@@ -366,8 +377,9 @@ test('E05: attached operations inherit deadlines and share concurrent reservatio
         return completed(1);
       },
       c,
-    )
-  ).value;
+    ),
+    'value',
+  );
   const second = await operations.begin(
     spec,
     async () => {
@@ -380,12 +392,12 @@ test('E05: attached operations inherit deadlines and share concurrent reservatio
   await first.done;
   assert.equal(entered, 1);
   const third = await operations.begin(spec, async () => completed(3), c);
-  assert.equal((await third.value.done).result, 3);
+  assert.equal(expectProperty(await expectProperty(third, 'value').done, 'result'), 3);
 });
 
 test('long wait expiry does not overflow into immediate expiration', async () => {
   const waits = createSuspensions();
-  const ticket = (
+  const ticket = expectProperty(
     await waits.open(
       {
         type: 'long',
@@ -395,14 +407,16 @@ test('long wait expiry does not overflow into immediate expiration', async () =>
         expiresAt: '2099-01-01T00:00:00Z',
       },
       context,
-    )
-  ).value;
+    ),
+    'value',
+  );
   await delay(5);
-  assert.equal(waits.get(ticket.id).value.state, 'open');
+  assert.equal(expectProperty(waits.get(ticket.id), 'value').state, 'open');
   waits.cancel(ticket.id);
 });
 
 test('factory replacement preserves dependent service construction and exposes cleanup evidence', async () => {
+  /** @type {import('@slop-lab/part/reference').Composition.ExtensionPoint<number>} */
   const servicePoint = {
       id: 'test/service',
       owner: 'test',
@@ -446,25 +460,35 @@ test('factory replacement preserves dependent service construction and exposes c
     ],
   });
   assert.equal(resolved.ok, true);
-  const lease = (
-    await createScopeManager().open({ kind: 'runtime', id: 'factory-scope' }, resolved.value)
-  ).value;
-  assert.equal(lease.services.get(dependentPoint).value, 42);
+  const lease = expectProperty(
+    await createScopeManager().open({ kind: 'runtime', id: 'factory-scope' }, resolved.value),
+    'value',
+  );
+  assert.equal(expectProperty(lease.services.get(dependentPoint), 'value'), 42);
   await lease.close();
   const unresolved = { owner: 'test', kind: 'resource', id: 'unresolved' };
-  const failed = component('failed', () => ok(), [], [], {
+  const failed = component('failed', () => ok(undefined), [], [], {
     initialize: async () => fail('init', 'Failed'),
     dispose: async () => ({ released: [], unresolved: [unresolved], errors: [] }),
   });
-  const composition = createPlanner().resolve({ components: [failed], config: {} }).value;
+  const composition = expectProperty(
+    createPlanner().resolve({ components: [failed], config: {} }),
+    'value',
+  );
   const failure = await createScopeManager().open({ kind: 'runtime', id: 'failed' }, composition);
-  assert.deepEqual(failure.error.details.cleanup.unresolved, [unresolved]);
+  assert.deepEqual(
+    expectProperty(
+      expectProperty(expectProperty(failure, 'error').details, 'cleanup'),
+      'unresolved',
+    ),
+    [unresolved],
+  );
 });
 
 test('E05: a child cannot widen its parent deadline', async () => {
   const operations = createOperations(),
     deadline = new Date(Date.now() + 1000).toISOString();
-  const parent = (
+  const parent = expectProperty(
     await operations.begin(
       spec,
       async (c) => {
@@ -476,28 +500,31 @@ test('E05: a child cannot widen its parent deadline', async () => {
           },
           { ...c, deadline: new Date(Date.now() + 5000).toISOString() },
         );
-        return completed((await child.value.done).result);
+        return completed(expectProperty(await expectProperty(child, 'value').done, 'result'));
       },
       localContext({ deadline }),
-    )
-  ).value;
+    ),
+    'value',
+  );
   assert.equal((await parent.done).phase, 'completed');
 });
 
 test('Attached work from a separately configured service joins the parent supervisor', async () => {
   const owner = createOperations({ cancellationGraceMs: 5 }),
     separate = createOperations({ cancellationGraceMs: 100 });
+  /** @type {import('@slop-lab/part/reference').Runtime.ExecutionHandle<any>} */
   let child;
   const parent = await owner.begin(
     { kind: 'test/parent', childPolicy: 'attached', retryOwner: 'test' },
     async (context) => {
-      child = (
+      child = expectProperty(
         await separate.begin(
           { kind: 'test/child', childPolicy: 'attached', retryOwner: 'test' },
           async () => new Promise(() => {}),
           context,
-        )
-      ).value;
+        ),
+        'value',
+      );
       return {
         phase: 'completed',
         result: 'must not succeed',
@@ -508,9 +535,11 @@ test('Attached work from a separately configured service joins the parent superv
     },
     localContext(),
   );
-  const outcome = await parent.value.done;
+  const outcome = await expectProperty(parent, 'value').done;
   assert.equal(outcome.phase, 'abandoned');
+  assert.ok(child);
   assert.equal(outcome.unsettledChildren[0].id, child.ref.id);
+  assert.ok(child);
   assert.equal(owner.get(child.ref).ok, true);
 });
 
@@ -535,14 +564,22 @@ test('Unresolved driver cleanup is abandoned and retains the actual resource ref
       },
     }),
   });
-  const service = createRunService({
-    drivers: [driver],
-    operations,
-    services: { operations, services: context.services },
-  }).value;
-  const composition = createPlanner().resolve({ components: [], config: {} }).value;
-  const handle = (await service.start({ driver: driver.id, composition, input: null }, context))
-    .value;
+  const service = expectProperty(
+    createRunService({
+      drivers: [driver],
+      operations,
+      services: { operations, services: context.services },
+    }),
+    'value',
+  );
+  const composition = expectProperty(
+    createPlanner().resolve({ components: [], config: {} }),
+    'value',
+  );
+  const handle = expectProperty(
+    await service.start({ driver: driver.id, composition, input: null }, context),
+    'value',
+  );
   const result = await handle.done;
   assert.equal(result.phase, 'abandoned');
   assert.equal(result.effect, 'unknown');

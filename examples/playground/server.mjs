@@ -1,3 +1,4 @@
+// @ts-check
 import { createServer, request } from 'node:http';
 import { once } from 'node:events';
 import { readFile } from 'node:fs/promises';
@@ -7,7 +8,11 @@ import { startHttpHost } from '@slop-lab/part-node/host/http';
 import { createPlaygroundSession } from './runtime.mjs';
 import { providerOptions } from './models.mjs';
 
-export async function startPlayground({ port = 4173, environment = {}, delayScale = 1 } = {}) {
+export async function startPlayground({
+  port = 4173,
+  environment = /** @type {NodeJS.ProcessEnv} */ ({}),
+  delayScale = 1,
+} = {}) {
   const sessions = new Map(),
     hostToken = randomUUID();
   const assets = new Map(
@@ -16,10 +21,13 @@ export async function startPlayground({ port = 4173, environment = {}, delayScal
         ['/', 'index.html', 'text/html; charset=utf-8'],
         ['/app.js', 'app.js', 'text/javascript; charset=utf-8'],
         ['/styles.css', 'styles.css', 'text/css; charset=utf-8'],
-      ].map(async ([path, file, type]) => [
-        path,
-        { bytes: await readFile(new URL(`../../preview/${file}`, import.meta.url)), type },
-      ]),
+      ].map(
+        async ([path, file, type]) =>
+          /** @type {const} */ ([
+            path,
+            { bytes: await readFile(new URL(`../../preview/${file}`, import.meta.url)), type },
+          ]),
+      ),
     ),
   );
   const findSession = (request) => {
@@ -49,7 +57,7 @@ export async function startPlayground({ port = 4173, environment = {}, delayScal
       },
     },
   );
-  if (!hosted.ok) throw Error('Could not start the SDK HTTP host');
+  if (hosted.ok === false) throw Error('Could not start the SDK HTTP host');
   let origin;
   const server = createServer(async (incoming, response) => {
     const json = (status, body) => {
@@ -161,7 +169,7 @@ export async function startPlayground({ port = 4173, environment = {}, delayScal
     await hosted.value.close();
     throw error;
   }
-  origin = `http://127.0.0.1:${server.address().port}`;
+  origin = `http://127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (server.address()).port}`;
   let closing;
   return {
     url: origin,

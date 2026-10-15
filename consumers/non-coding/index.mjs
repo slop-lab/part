@@ -1,3 +1,5 @@
+// @ts-check
+import { expectProperty } from '../../fixtures/assertions.mjs';
 import assert from 'node:assert/strict';
 import { createAgent } from '@slop-lab/part-plugins/agent';
 import { createAcpAgent } from '@slop-lab/part-plugins/acp';
@@ -6,7 +8,8 @@ import { schema, stringSchema } from '@slop-lab/part/contracts';
 import { fakeModel } from '@slop-lab/part-plugins/testing';
 const input = schema(
   'consumer/text',
-  (value) => value && typeof value === 'object' && typeof value.text === 'string',
+  /** @param {unknown} value @returns {value is {text: string}} */ (value) =>
+    value && typeof value === 'object' && 'text' in value && typeof value.text === 'string',
 );
 const model = fakeModel([
   { toolCalls: [{ name: 'uppercase', arguments: { text: 'hello' } }] },
@@ -28,7 +31,13 @@ const created = createAgent({
 });
 assert.equal(created.ok, true);
 assert.equal(
-  (await created.value.generate('uppercase hello')).value.result.content[0].text,
+  expectProperty(
+    expectProperty(
+      expectProperty(await created.value.generate('uppercase hello'), 'value'),
+      'result',
+    ).content[0],
+    'text',
+  ),
   'HELLO',
 );
 await created.value.dispose();
@@ -47,12 +56,13 @@ const acp = createAcpAgent({
 await acp.handle('initialize', { protocolVersion: 1, clientCapabilities: {} });
 const session = await acp.handle('session/new', { cwd: '/consumer', mcpServers: [] });
 assert.equal(
-  (
+  expectProperty(
     await acp.handle('session/prompt', {
-      sessionId: session.sessionId,
+      sessionId: expectProperty(session, 'sessionId'),
       prompt: [{ type: 'text', text: 'Hello' }],
-    })
-  ).stopReason,
+    }),
+    'stopReason',
+  ),
   'end_turn',
 );
 assert.equal(

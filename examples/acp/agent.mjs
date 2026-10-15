@@ -1,3 +1,4 @@
+// @ts-check
 import { createAcpAgent } from '@slop-lab/part-plugins/acp';
 import { startAcpStdio } from '@slop-lab/part-node/acp';
 import { connectAcpMcpServers } from '@slop-lab/part-node/acp/mcp';
@@ -87,9 +88,10 @@ const host = startAcpStdio({
               effects: 'write',
               input: schema(
                 'acp/note',
-                (value) =>
+                /** @param {unknown} value @returns {value is {text: string}} */ (value) =>
                   value &&
                   typeof value === 'object' &&
+                  'text' in value &&
                   typeof value.text === 'string' &&
                   value.text.length <= 4000,
               ),

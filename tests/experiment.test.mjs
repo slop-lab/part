@@ -1,3 +1,5 @@
+// @ts-check
+import { expectProperty } from '../fixtures/assertions.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { alternateBoundary } from '../experiments/alternate-boundary.mjs';
@@ -9,6 +11,7 @@ test('C12/G08: independent source boundary variant preserves nominal effect coun
     let count = 0;
     const boundary = create(),
       context = localContext(),
+      /** @type {import('@slop-lab/part/reference').Runtime.EffectPlan} */
       plan = {
         operationId: 'o',
         attemptId: 'a',
@@ -30,7 +33,10 @@ test('C12/G08: independent source boundary variant preserves nominal effect coun
     );
     assert.equal(result.phase, 'completed');
     counts.push(count);
-    const permit = (await boundary.prepare({ ...plan, attemptId: 'b' }, context)).value;
+    const permit = expectProperty(
+      await boundary.prepare({ ...plan, attemptId: 'b' }, context),
+      'value',
+    );
     assert.equal(
       (
         await boundary.settle(

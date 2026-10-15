@@ -1,3 +1,5 @@
+// @ts-check
+import { expectProperty } from '../fixtures/assertions.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createPlaygroundSession } from '../examples/playground/runtime.mjs';
@@ -154,7 +156,7 @@ test('Closing observation keeps playground work alive; shutdown cancels the owne
   const watcher = await session.endpoint.watch({ surface: 'test' }, localContext());
   await start(session, 'approval');
   await waiting(session);
-  await watcher.value.close();
+  await expectProperty(watcher, 'value').close();
   assert.equal(session.state().runs.at(-1).phase, 'waiting');
   await session.close();
   assert.equal(session.state().runs.at(-1).phase, 'cancelled');

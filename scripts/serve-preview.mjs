@@ -1,3 +1,4 @@
+// @ts-check
 import { startPlayground } from '../examples/playground/server.mjs';
 try {
   process.loadEnvFile(new URL('../.env', import.meta.url));

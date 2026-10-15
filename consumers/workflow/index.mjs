@@ -1,3 +1,5 @@
+// @ts-check
+import { expectProperty } from '../../fixtures/assertions.mjs';
 import assert from 'node:assert/strict';
 import { localContext, jsonSchema, ok } from '@slop-lab/part/contracts';
 import { defineCodeWorkflow, createCodeEngine } from '@slop-lab/part-plugins/workflows/code';
@@ -17,25 +19,28 @@ const definition = await defineCodeWorkflow({
     return ok({ received: input });
   },
 });
-const engine = createCodeEngine([definition], {}).value;
-const endpoint = createWorkflowEndpoint({
-  host: createWorkflowHost([engine]).value,
-  context,
-  composition: { id: 'consumer', revision: '1' },
-  registrations: [
-    {
-      engineId: engine.descriptor.id,
-      profileIds: ['default'],
-      definition: {
-        id: definition.definition.id,
-        format: 'part.code',
-        formatVersion: '1',
-        digest: definition.digest,
-        source: { owner: 'consumer', native: { installed: true } },
+const engine = expectProperty(createCodeEngine([definition], {}), 'value');
+const endpoint = expectProperty(
+  createWorkflowEndpoint({
+    host: expectProperty(createWorkflowHost([engine]), 'value'),
+    context,
+    composition: { id: 'consumer', revision: '1' },
+    registrations: [
+      {
+        engineId: engine.descriptor.id,
+        profileIds: ['default'],
+        definition: {
+          id: definition.definition.id,
+          format: 'part.code',
+          formatVersion: '1',
+          digest: definition.digest,
+          source: { owner: 'consumer', native: { installed: true } },
+        },
       },
-    },
-  ],
-}).value;
+    ],
+  }),
+  'value',
+);
 const controller = createController(
   createLocalPort(endpoint, () => context, { codecLoopback: true }),
 );
@@ -57,21 +62,30 @@ try {
     },
   };
   const delivery = await controller.invoke(command);
-  assert.equal(delivery.receipt.kind, 'accepted');
+  assert.equal(expectProperty(delivery, 'receipt').kind, 'accepted');
   assert.equal(
-    (await controller.invoke(command)).receipt.operation.id,
-    delivery.receipt.operation.id,
+    expectProperty(expectProperty(await controller.invoke(command), 'receipt'), 'operation').id,
+    expectProperty(expectProperty(delivery, 'receipt'), 'operation').id,
   );
   for (
     let i = 0;
-    i < 100 && controller.getItem(delivery.receipt.operation.id)?.payload.phase !== 'succeeded';
+    i < 100 &&
+    expectProperty(
+      controller.getItem(expectProperty(expectProperty(delivery, 'receipt'), 'operation').id)
+        ?.payload,
+      'phase',
+    ) !== 'succeeded';
     i++
   )
     await new Promise((resolve) => setTimeout(resolve, 2));
-  const item = controller.getItem(delivery.receipt.operation.id);
-  assert.equal(item.payload.phase, 'succeeded');
-  assert.deepEqual(item.payload.output.data, { received: { value: 42 } });
-  assert.equal(item.payload.nativeState, undefined);
+  const item = controller.getItem(
+    expectProperty(expectProperty(delivery, 'receipt'), 'operation').id,
+  );
+  assert.equal(expectProperty(item.payload, 'phase'), 'succeeded');
+  assert.deepEqual(expectProperty(expectProperty(item.payload, 'output'), 'data'), {
+    received: { value: 42 },
+  });
+  assert.equal(Object.hasOwn(Object(item.payload), 'nativeState'), false);
   assert.equal(executed, 1);
   console.log('Packed workflow consumer passed');
 } finally {

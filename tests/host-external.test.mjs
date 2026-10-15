@@ -1,3 +1,5 @@
+// @ts-check
+import { expectProperty, stub } from '../fixtures/assertions.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { localContext, ok, fail, jsonSchema } from '@slop-lab/part/contracts';
@@ -8,6 +10,7 @@ import { createExternalEngine } from '@slop-lab/part-plugins/workflows/external'
 import { provenance } from '@slop-lab/part/context';
 const context = localContext();
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+/** @template T @param {T} result @returns {import('@slop-lab/part/reference').Runtime.ManagedOutcome<T>} */
 const terminal = (result) => ({
   phase: 'completed',
   result,
@@ -68,7 +71,7 @@ test('Runtime admission enforces capacity, replacement, dedupe, expiry and drain
     },
   };
   const host = createRuntimeHost({
-    runs,
+    runs: stub(runs),
     maxConcurrent: 1,
     maxQueued: 2,
     policy: {
@@ -84,7 +87,7 @@ test('Runtime admission enforces capacity, replacement, dedupe, expiry and drain
     },
   });
   await host.start(context);
-  const composition = { inspection: { revision: '1' } };
+  const composition = stub({ localToken: {}, inspection: { revision: '1' } });
   const request = (id, extra = {}) => ({
     requestId: id,
     run: { driver: 'test', composition, input: id },
@@ -92,12 +95,15 @@ test('Runtime admission enforces capacity, replacement, dedupe, expiry and drain
   });
   const one = await host.submit(request('one'), context);
   await delay(2);
-  assert.equal(host.getJob('one', context).value.kind, 'started');
+  assert.equal(expectProperty(host.getJob('one', context), 'value').kind, 'started');
   await host.submit(request('old', { concurrencyKey: 'replace' }), context);
   await host.submit(request('new', { concurrencyKey: 'replace' }), context);
-  assert.equal(host.getJob('old', context).value.kind, 'superseded');
+  assert.equal(expectProperty(host.getJob('old', context), 'value').kind, 'superseded');
   assert.equal(
-    (await host.submit(request('new', { concurrencyKey: 'replace' }), context)).value.kind,
+    expectProperty(
+      await host.submit(request('new', { concurrencyKey: 'replace' }), context),
+      'value',
+    ).kind,
     'queued',
   );
   assert.equal(
@@ -122,17 +128,17 @@ test('Runtime admission enforces capacity, replacement, dedupe, expiry and drain
     deadline: new Date(Date.now() + 1000).toISOString(),
   });
   assert.equal(report.unresolved.length, 0);
-  assert.equal(host.getJob('expired', context).value.kind, 'rejected');
+  assert.equal(expectProperty(host.getJob('expired', context), 'value').kind, 'rejected');
   assert.equal((await host.submit(request('later'), context)).ok, false);
   const unknown = createRuntimeHost({
-    runs: {
+    runs: stub({
       start: (_request, c) =>
         operations.begin(
           { kind: 'part/run', childPolicy: 'attached', retryOwner: 'test' },
           async () => new Promise(() => {}),
           c,
         ),
-    },
+    }),
   });
   await unknown.start(context);
   await unknown.submit(request('uncooperative'), context);
@@ -148,6 +154,7 @@ test('External adapter attaches native owner state after unknown submission and 
     actions = 0;
   const records = new Map(),
     keys = new Map();
+  /** @type {import('@slop-lab/part/reference').Workflows.EngineDescriptor} */
   const descriptor = {
     id: 'test/native',
     version: '1',
@@ -155,6 +162,7 @@ test('External adapter attaches native owner state after unknown submission and 
     formats: [{ id: 'native', versions: ['1'] }],
     capabilities: { revision: '1', entries: [] },
   };
+  /** @type {import('@slop-lab/part/reference').Workflows.Guarantees} */
   const guarantees = {
     control: 'runner-enforced',
     effects: 'runner-path-only',
@@ -166,6 +174,7 @@ test('External adapter attaches native owner state after unknown submission and 
       'Inner agent effects are not checkpointed',
     ],
   };
+  /** @type {Parameters<typeof createExternalEngine>[1]} */
   const port = {
     prepare: async () =>
       ok({
@@ -176,19 +185,21 @@ test('External adapter attaches native owner state after unknown submission and 
         compatibility: {
           format: 'native',
           sourceVersion: '1',
-          decoder: 'test',
-          unsupportedRequired: [],
-          unsupportedOptional: [],
-          warnings: [],
+          adapter: 'test',
+          adapterVersion: '1',
+          status: /** @type {const} */ ('exact-tested-subset'),
+          ignored: [],
+          semantics: [],
         },
         report: [],
         localHandle: { code: 'installed' },
       }),
     async submit(key, _prepared, input) {
       submits++;
+
       const native = { job: 'one' };
       keys.set(key, native);
-      records.set(native.job, {
+      records.set(expectProperty(native, 'job'), {
         revision: 'native/1',
         definitionDigest: 'native-digest',
         owner: 'native-owner',
@@ -217,17 +228,21 @@ test('External adapter attaches native owner state after unknown submission and 
       };
     },
     get: async (native) =>
-      records.has(native.job)
-        ? ok(records.get(native.job))
+      records.has(expectProperty(native, 'job'))
+        ? ok(records.get(expectProperty(native, 'job')))
         : fail('native.missing', 'Unknown native job'),
     cancel: async (native) => {
-      records.get(native.job).phase = 'cancelled';
-      return ok({ state: 'confirmed', effect: 'unknown' });
+      records.get(expectProperty(native, 'job')).phase = 'cancelled';
+      return ok({
+        state: 'confirmed',
+        effect: /** @type {const} */ ('unknown'),
+        unresolvedTargets: [],
+      });
     },
     observe: () => ({ async *[Symbol.asyncIterator]() {} }),
     action: async (native, command) => {
       actions++;
-      const record = records.get(native.job);
+      const record = records.get(expectProperty(native, 'job'));
       record.phase = 'succeeded';
       record.output = {
         kind: 'native',
@@ -246,7 +261,7 @@ test('External adapter attaches native owner state after unknown submission and 
     reconcile: async (key) => ok(keys.get(key) ?? null),
   };
   const engine = createExternalEngine(descriptor, port);
-  const prepared = (
+  const prepared = expectProperty(
     await engine.prepare(
       {
         engineId: descriptor.id,
@@ -262,19 +277,23 @@ test('External adapter attaches native owner state after unknown submission and 
         requiredControl: 'runner-enforced',
       },
       context,
-    )
-  ).value;
+    ),
+    'value',
+  );
   const request = { requestId: 'one', idempotencyKey: 'stable', prepared, input: { task: 1 } };
   const [one, two] = await Promise.all([
     engine.start(request, context),
     engine.start(request, context),
   ]);
   assert.equal(one.kind, 'unknown');
-  assert.equal(two.reconciliationKey, one.reconciliationKey);
+  assert.equal(expectProperty(two, 'reconciliationKey'), one.reconciliationKey);
   assert.equal(submits, 1);
-  const attached = (await engine.reconcileSubmission(one.reconciliationKey, context)).value;
-  const snapshot = (await engine.get(attached, context)).value;
-  assert.equal(snapshot.nativeState.data.cursor, 'native-node-3');
+  const attached = expectProperty(
+    await engine.reconcileSubmission(one.reconciliationKey, context),
+    'value',
+  );
+  const snapshot = expectProperty(await engine.get(attached, context), 'value');
+  assert.equal(expectProperty(snapshot.nativeState.data, 'cursor'), 'native-node-3');
   assert.equal(snapshot.guarantees.checkpoint, 'engine-native');
   assert.equal((await engine.get({ ...attached, native: { job: 'other' } }, context)).ok, false);
   assert.equal(
@@ -297,7 +316,7 @@ test('External adapter attaches native owner state after unknown submission and 
     },
     context,
   );
-  assert.equal((await engine.get(attached, context)).value.phase, 'succeeded');
+  assert.equal(expectProperty(await engine.get(attached, context), 'value').phase, 'succeeded');
   assert.equal(actions, 1);
   assert.equal(submits, 1);
   assert.equal((await engine.start({ ...request, input: { task: 2 } }, context)).kind, 'rejected');

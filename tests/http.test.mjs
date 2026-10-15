@@ -1,3 +1,5 @@
+// @ts-check
+import { expectProperty } from '../fixtures/assertions.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -12,6 +14,7 @@ import { createHttpPort } from '@slop-lab/part/client/http';
 import { localContext, ok, fail } from '@slop-lab/part/contracts';
 const context = localContext();
 test('G03: provider adapter uses a real HTTP custom endpoint with a local fake response', async () => {
+  /** @type {Record<string, any>} */
   let body;
   const server = createServer(async (request, response) => {
     const chunks = [];
@@ -23,7 +26,7 @@ test('G03: provider adapter uses a real HTTP custom endpoint with a local fake r
   });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
-  const endpoint = `http://127.0.0.1:${server.address().port}/api/chat`;
+  const endpoint = `http://127.0.0.1:${expectProperty(server.address(), 'port')}/api/chat`;
   const model = {
     profile: {
       id: 'local',
@@ -40,12 +43,17 @@ test('G03: provider adapter uses a real HTTP custom endpoint with a local fake r
     transport: createFetchTransport({ allowedOrigins: [new URL(endpoint).origin] }),
     auth: noAuth,
   };
-  const agent = createAgent({ model }).value;
+  const agent = expectProperty(createAgent({ model }), 'value');
   try {
     const outcome = await agent.generate('local test');
-    assert.equal(outcome.value.phase, 'completed');
-    assert.equal(outcome.value.result.content[0].text, 'local endpoint');
+    assert.equal(expectProperty(outcome, 'value').phase, 'completed');
+    assert.equal(
+      expectProperty(expectProperty(expectProperty(outcome, 'value'), 'result').content[0], 'text'),
+      'local endpoint',
+    );
+    assert.ok(body);
     assert.equal(body.messages[0].content, 'local test');
+    assert.ok(body);
     assert.equal(body.model, 'fake-model');
   } finally {
     await agent.dispose();
@@ -54,8 +62,8 @@ test('G03: provider adapter uses a real HTTP custom endpoint with a local fake r
 });
 test('HTTP/SSE commands, queries, snapshots and owner authentication', async () => {
   const model = fakeModel([{ text: 'over http' }]),
-    agent = createAgent({ model }).value,
-    endpoint = createEmbeddedEndpoint(agent, { context }).value;
+    agent = expectProperty(createAgent({ model }), 'value'),
+    endpoint = expectProperty(createEmbeddedEndpoint(agent, { context }), 'value');
   const host = await startHttpHost(endpoint, {
     context: (request) =>
       request.headers.authorization === 'Bearer fixture'
@@ -74,7 +82,7 @@ test('HTTP/SSE commands, queries, snapshots and owner authentication', async () 
       false,
     );
     assert.equal((await port.discover()).ok, true);
-    watch = (await port.watch({ surface: 'chat' })).value;
+    watch = expectProperty(await port.watch({ surface: 'chat' }), 'value');
     assert.equal(watch.bootstrap.items.length, 0);
     const iterator = watch.frames[Symbol.asyncIterator]();
     const pending = iterator.next();
@@ -85,7 +93,7 @@ test('HTTP/SSE commands, queries, snapshots and owner authentication', async () 
       actionVersion: 1,
       input: 'hello',
     });
-    assert.equal(delivered.receipt.kind, 'accepted');
+    assert.equal(expectProperty(delivered, 'receipt').kind, 'accepted');
     const first = await pending;
     assert.equal(first.value.kind, 'event');
     assert.equal(first.value.event.type, 'part.item/upsert');
@@ -93,9 +101,9 @@ test('HTTP/SSE commands, queries, snapshots and owner authentication', async () 
     const run = await port.query({
       queryId: 'part.run/get',
       version: 1,
-      input: delivered.receipt.operation.id,
+      input: expectProperty(expectProperty(delivered, 'receipt'), 'operation').id,
     });
-    assert.equal(run.value.phase, 'completed');
+    assert.equal(expectProperty(expectProperty(run, 'value'), 'phase'), 'completed');
     await watch.close();
     await iterator.return();
   } finally {

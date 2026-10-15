@@ -1,3 +1,4 @@
+// @ts-check
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import ts from 'typescript';
@@ -114,8 +115,8 @@ for (const file of sources) {
       ? statement.importClause?.namedBindings
       : statement.exportClause;
     const typeOnly =
-      statement.isTypeOnly ||
-      statement.importClause?.isTypeOnly ||
+      (ts.isExportDeclaration(statement) && statement.isTypeOnly) ||
+      (ts.isImportDeclaration(statement) && statement.importClause?.isTypeOnly) ||
       (bindings &&
         (ts.isNamedImports(bindings) || ts.isNamedExports(bindings)) &&
         bindings.elements.length > 0 &&

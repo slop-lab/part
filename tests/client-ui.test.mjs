@@ -1,3 +1,5 @@
+// @ts-check
+import { expectProperty, json, stub } from '../fixtures/assertions.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
@@ -27,31 +29,37 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 test('G09/G10: in-process and codec loopback have command/query/watch parity', async () => {
   for (const codecLoopback of [false, true]) {
     const model = fakeModel([{ text: 'reply' }]),
-      agent = createAgent({ model }).value,
-      endpoint = createEmbeddedEndpoint(agent, { context }).value;
+      agent = expectProperty(createAgent({ model }), 'value'),
+      endpoint = expectProperty(createEmbeddedEndpoint(agent, { context }), 'value');
     const port = createLocalPort(endpoint, () => context, { codecLoopback }),
       controller = createController(port);
     assert.equal((await port.discover()).ok, true);
     assert.equal((await controller.connect({ surface: 'chat' })).ok, true);
     const request = command('hello');
     const delivery = await port.command(request);
-    assert.equal(delivery.receipt.kind, 'accepted');
+    assert.equal(expectProperty(delivery, 'receipt').kind, 'accepted');
     const duplicate = await port.command(request);
-    assert.deepEqual(duplicate.receipt, delivery.receipt);
+    assert.deepEqual(expectProperty(duplicate, 'receipt'), expectProperty(delivery, 'receipt'));
     await delay(10);
     assert.equal(model.requests.length, 1);
     assert.equal(controller.getState().itemIds.length, 2);
     const snapshot = await port.query({
       queryId: 'part.run/get',
       version: 1,
-      input: delivery.receipt.operation.id,
+      input: expectProperty(expectProperty(delivery, 'receipt'), 'operation').id,
     });
-    assert.equal(snapshot.value.phase, 'completed');
-    const latest = controller.getItem(`${delivery.receipt.operation.id}/assistant`);
+    assert.equal(expectProperty(expectProperty(snapshot, 'value'), 'phase'), 'completed');
+    const latest = controller.getItem(
+      `${expectProperty(expectProperty(delivery, 'receipt'), 'operation').id}/assistant`,
+    );
     assert.equal(latest.fallback.text, 'reply');
-    assert.equal((await port.command({ ...request, input: 'changed' })).receipt.kind, 'rejected');
     assert.equal(
-      (await port.command({ ...command('bad'), actor: 'admin' })).receipt.kind,
+      expectProperty(await port.command({ ...request, input: 'changed' }), 'receipt').kind,
+      'rejected',
+    );
+    assert.equal(
+      // @ts-expect-error Unknown actor fields must be rejected at the wire boundary.
+      expectProperty(await port.command({ ...command('bad'), actor: 'admin' }), 'receipt').kind,
       'rejected',
     );
     await controller.dispose();
@@ -60,7 +68,7 @@ test('G09/G10: in-process and codec loopback have command/query/watch parity', a
 });
 test('DU05/DU06/DU08: snapshot subscription includes intervening updates and authorization reset clears cache', async () => {
   const hub = createWatchHub({ revision: '1', entries: [] }),
-    controller = createController({ watch: () => hub.watch(context) });
+    controller = createController(stub({ watch: () => hub.watch(context) }));
   await controller.connect({ surface: 'chat' });
   const item = {
     id: 'private',
@@ -91,12 +99,13 @@ test('DU05/DU06/DU08: snapshot subscription includes intervening updates and aut
 });
 test('DU07: not-sent and delivery-unknown are distinct; disconnect does not cancel runs', async () => {
   let count = 0;
-  const endpoint = {
+  /** @type {import('@slop-lab/part/reference').Client.Endpoint} */
+  const endpoint = stub({
     command: async () => {
       count++;
       throw Error('receipt lost');
     },
-  };
+  });
   const port = createLocalPort(endpoint, () => context, { codecLoopback: true });
   const abort = new AbortController();
   abort.abort();
@@ -106,12 +115,15 @@ test('DU07: not-sent and delivery-unknown are distinct; disconnect does not canc
   assert.equal(unknown.kind, 'unknown');
   assert.equal(unknown.recovery, 'same-key-retry');
   assert.equal(count, 1);
-  assert.equal((await port.command({ ...command('x'), input: () => {} })).kind, 'not-sent');
+  assert.equal(
+    (await port.command({ ...command('x'), input: /** @type {any} */ (() => {}) })).kind,
+    'not-sent',
+  );
   assert.equal(count, 1);
 });
 test('DU09: composing Enter cannot submit and late success preserves a new draft', async () => {
   let count = 0,
-    release;
+    /** @type {(...args: any[]) => void} */ release;
   const composer = createComposer({
     command: (draft) => command(draft.text),
     invoke: async (request) => {
@@ -142,22 +154,27 @@ test('DU09: composing Enter cannot submit and late success preserves a new draft
   assert.equal(composer.getDraft().text, 'new');
 });
 test('G10/X05/X06: DOM Chat supports custom cards, safe fallback, IME, CSS and cleanup', async () => {
-  const window = new Window(),
+  const window =
+      /** @type {globalThis.Window & typeof globalThis & { happyDOM: import('happy-dom').Window['happyDOM'] }} */ (
+        /** @type {unknown} */ (new Window())
+      ),
     document = window.document;
   const hub = createWatchHub({ revision: '1', entries: [] }),
-    controller = createController({
-      watch: () => hub.watch(context),
-      command: async (request) => ({
-        kind: 'receipt',
-        receipt: {
-          kind: 'completed',
-          commandId: request.commandId,
-          result: null,
-          effect: 'not-applied',
-          commit: [],
-        },
+    controller = createController(
+      stub({
+        watch: () => hub.watch(context),
+        command: async (request) => ({
+          kind: 'receipt',
+          receipt: {
+            kind: 'completed',
+            commandId: request.commandId,
+            result: null,
+            effect: 'not-applied',
+            commit: [],
+          },
+        }),
       }),
-    });
+    );
   await controller.connect({ surface: 'chat' });
   const card = {
     id: 'card',
@@ -185,7 +202,7 @@ test('G10/X05/X06: DOM Chat supports custom cards, safe fallback, IME, CSS and c
         target: 'chat',
         render: (item) => {
           const node = document.createElement('p');
-          node.textContent = item.payload.summary;
+          node.textContent = expectProperty(item.payload, 'summary');
           return node;
         },
       },
@@ -241,14 +258,18 @@ test('C01/C10: browser entrypoint excludes storage, executor, provider and crede
 });
 
 test('G10: themed Chat sends to the real embedded agent, streams text and cancels through the owner action', async () => {
-  const window = new Window(),
+  const window =
+      /** @type {globalThis.Window & typeof globalThis & { happyDOM: import('happy-dom').Window['happyDOM'] }} */ (
+        /** @type {unknown} */ (new Window())
+      ),
     model = fakeModel([{ text: 'streamed response' }]);
   const transport = model.transport;
+  // @ts-expect-error Deliberately attempt mutation to verify snapshot isolation.
   model.transport = {
     ...transport,
     async send(...args) {
-      const result = await transport.send(...args);
-      if (!result.ok) return result;
+      const result = await transport.send(args[0], args[1], args[2], args[3]);
+      if (result.ok === false) return result;
       const body = result.value.body;
       return {
         ...result,
@@ -264,8 +285,8 @@ test('G10: themed Chat sends to the real embedded agent, streams text and cancel
       };
     },
   };
-  const agent = createAgent({ model }).value,
-    endpoint = createEmbeddedEndpoint(agent, { context }).value,
+  const agent = expectProperty(createAgent({ model }), 'value'),
+    endpoint = expectProperty(createEmbeddedEndpoint(agent, { context }), 'value'),
     controller = createController(
       createLocalPort(endpoint, () => context, { codecLoopback: true }),
     );
@@ -285,7 +306,7 @@ test('G10: themed Chat sends to the real embedded agent, streams text and cancel
     const cancel = chat.element.querySelector('article button');
     assert.equal(cancel.textContent, 'part.run/cancel');
     await delay(15);
-    cancel.click();
+    /** @type {HTMLElement} */ (cancel).click();
     for (let i = 0; i < 100 && !chat.element.textContent.includes('Cancelled'); i++) await delay(2);
     assert.equal(chat.element.textContent.includes('Cancelled'), true);
     assert.equal(model.requests.length, 1);

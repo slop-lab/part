@@ -1,3 +1,5 @@
+// @ts-check
+import { expectProperty, stub, json } from '../fixtures/assertions.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
@@ -63,6 +65,7 @@ test(
     try {
       await writeFile(join(root, 'collect.cjs'), source);
       const scripts = createNodeScripts({ root, interpreters: { node: process.execPath } }),
+        /** @type {import('@slop-lab/part/reference').Scripts.Request} */
         request = {
           requestId: 'collect',
           executorId: 'part/node-process',
@@ -77,22 +80,38 @@ test(
           retry: 'never',
         };
       const captured = await scripts.execute(request, context);
-      assert.equal((await captured.value.done).result.captured.value.text, 'collected');
+      assert.equal(
+        expectProperty(
+          expectProperty(
+            expectProperty(await expectProperty(captured, 'value').done, 'result').captured,
+            'value',
+          ),
+          'text',
+        ),
+        'collected',
+      );
       const uncaptured = await scripts.execute({ ...request, capture: { kind: 'none' } }, context);
-      assert.equal((await uncaptured.value.done).result.captured, undefined);
+      assert.equal(
+        expectProperty(await expectProperty(uncaptured, 'value').done, 'result').captured,
+        undefined,
+      );
       await writeFile(join(root, 'collect.cjs'), source + 'process.stdout.write("extra");');
       assert.equal((await scripts.execute(request, context)).ok, false);
       const newSource = source + 'process.stdout.write("extra");',
+        /** @type {import('@slop-lab/part/reference').Scripts.Request} */
         changed = {
           ...request,
           source: { ...request.source, digest: await digest(new TextEncoder().encode(newSource)) },
         };
-      assert.equal((await (await scripts.execute(changed, context)).value.done).phase, 'failed');
+      assert.equal(
+        (await expectProperty(await scripts.execute(changed, context), 'value').done).phase,
+        'failed',
+      );
       const large = await scripts.execute(
         { ...changed, capture: { kind: 'stdout-json', maxBytes: 2 } },
         context,
       );
-      assert.equal((await large.value.done).phase, 'failed');
+      assert.equal((await expectProperty(large, 'value').done).phase, 'failed');
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -107,18 +126,25 @@ test(
     const operations = createOperations(),
       scripts = createNodeScripts({ root, interpreters: { node: process.execPath }, operations }),
       waits = createSuspensions(),
-      results = createResults([
-        { id: jsonSchema.ref.id, version: 1, schema: jsonSchema, mediaType: 'application/json' },
-      ]).value;
+      results = expectProperty(
+        createResults([
+          { id: jsonSchema.ref.id, version: 1, schema: jsonSchema, mediaType: 'application/json' },
+        ]),
+        'value',
+      );
     const fake = fakeModel([{ text: 'model-result' }]),
-      model = createModelGateway({
-        profiles: [fake.profile],
-        adapters: [fake.adapter],
-        transports: [fake.transport],
-        auth: { none: fake.auth },
-        operations,
-      }).value;
+      model = expectProperty(
+        createModelGateway({
+          profiles: [fake.profile],
+          adapters: [fake.adapter],
+          transports: [fake.transport],
+          auth: { none: fake.auth },
+          operations,
+        }),
+        'value',
+      );
     await writeFile(join(root, 'collect.cjs'), source);
+    /** @type {import('@slop-lab/part/reference').Scripts.Request} */
     const request = {
       requestId: 'collect',
       executorId: 'part/node-process',
@@ -141,15 +167,15 @@ test(
       replay: 'none',
       async execute(input, c) {
         const collected = await c.script(
-          await callIdentity(c.execution, 'collect', request),
+          await callIdentity(c.execution, 'collect', json(request)),
           request,
         );
         if (collected.phase !== 'completed') return fail('fixture.script', 'Script failed');
         const item = await messageItem('user', [
-          { kind: 'json', value: collected.result.captured.value },
+          { kind: 'json', value: expectProperty(collected.result.captured, 'value') },
         ]);
-        const compiled = (
-          await createContextCompiler().value.compile(
+        const compiled = expectProperty(
+          await expectProperty(createContextCompiler(), 'value').compile(
             {
               input: [item],
               sources: [item.source],
@@ -157,26 +183,31 @@ test(
               toolsDigest: 'none',
             },
             context,
-          )
-        ).value;
+          ),
+          'value',
+        );
         const invocation = { profileId: 'fake', context: compiled, tools: [], options: {} };
         const invoked = await c.model(
-          await callIdentity(c.execution, 'model', invocation),
+          await callIdentity(c.execution, 'model', json(invocation)),
           invocation,
         );
         if (invoked.phase !== 'completed') return fail('fixture.model', 'Model failed');
+        /** @type {import('@slop-lab/part/reference').Results.Submission} */
         const submission = {
           submissionId: 'result',
           expectedType: jsonSchema.ref,
-          data: { kind: 'inline', value: { text: invoked.result.content[0].text } },
+          data: {
+            kind: 'inline',
+            value: { text: expectProperty(invoked.result.content[0], 'text') },
+          },
           producedBy: { owner: c.execution.engine, kind: 'workflow', id: c.execution.id },
           validationProfile: 'schema',
         };
         const accepted = await c.submit(
-          await callIdentity(c.execution, 'result', submission),
+          await callIdentity(c.execution, 'result', json(submission)),
           submission,
         );
-        if (!accepted.ok) return accepted;
+        if (accepted.ok === false) return accepted;
         acceptedResult = accepted.value;
         const spec = {
           type: 'approve',
@@ -184,28 +215,35 @@ test(
           presentation: { prompt: 'Approve?' },
           bindingDigest: accepted.value.digest,
         };
-        const identity = await callIdentity(c.execution, 'approval', {
-          type: spec.type,
-          responseSchema: jsonSchema.ref,
-          presentation: spec.presentation,
-          bindingDigest: spec.bindingDigest,
-        });
+        const identity = await callIdentity(
+          c.execution,
+          'approval',
+          json({
+            type: spec.type,
+            responseSchema: jsonSchema.ref,
+            presentation: spec.presentation,
+            bindingDigest: spec.bindingDigest,
+          }),
+        );
         const ticket = await c.wait(identity, spec);
-        if (!ticket.ok) return ticket;
+        if (ticket.ok === false) return ticket;
         const response = await c.response(ticket.value);
-        if (!response.ok) return response;
+        if (response.ok === false) return response;
         return response.value === true
-          ? ok({ text: invoked.result.content[0].text })
+          ? ok({ text: expectProperty(invoked.result.content[0], 'text') })
           : fail('fixture.approval', 'Not approved');
       },
     });
-    const engine = createCodeEngine([definition], {
-      operations,
-      scripts,
-      model,
-      results,
-      waits,
-    }).value;
+    const engine = expectProperty(
+      createCodeEngine([definition], {
+        operations,
+        scripts,
+        model,
+        results,
+        waits,
+      }),
+      'value',
+    );
     try {
       const prepared = (await prepare(engine, ref('code-review', 'part.code', definition.digest)))
         .value;
@@ -216,12 +254,13 @@ test(
       assert.equal(started.kind, 'accepted');
       let waiting;
       for (let i = 0; i < 200; i++) {
-        waiting = (await engine.get(started.ref, context)).value;
+        waiting = expectProperty(await engine.get(started.ref, context), 'value');
         if (waiting.phase === 'waiting') break;
         await delay(2);
       }
       assert.equal(waiting.phase, 'waiting');
       assert.equal(fake.requests.length, 1);
+      assert.ok(acceptedResult);
       assert.equal(acceptedResult.validation[0].status, 'pass');
       const response = {
         protocolVersion: 1,
@@ -240,7 +279,7 @@ test(
         { requestId: 'another-id', idempotencyKey: 'code-start', prepared, input: {} },
         context,
       );
-      assert.equal(duplicate.ref.id, started.ref.id);
+      assert.equal(expectProperty(duplicate, 'ref').id, started.ref.id);
       assert.equal(
         (
           await engine.start(
@@ -275,6 +314,7 @@ test('GW04/W02/W04: pipeline enforces validation/assert before write and execute
       return ok(value);
     },
   });
+  /** @type {Parameters<typeof createPipelineEngine>[0]['definitions'][number]} */
   const base = {
     format: 'part.pipeline',
     version: 1,
@@ -295,27 +335,32 @@ test('GW04/W02/W04: pipeline enforces validation/assert before write and execute
     ],
     result: { step: 'publish', pointer: '' },
   };
-  const engine = createPipelineEngine({
-      definitions: [base],
-      schemas: [jsonSchema],
-      services: {},
-      handlers: [handler],
-    }).value,
-    prepared = (await prepare(engine, ref('pipeline', 'part.pipeline', await digest(base)))).value;
+  const engine = expectProperty(
+      createPipelineEngine({
+        definitions: [base],
+        schemas: [jsonSchema],
+        services: {},
+        handlers: [handler],
+      }),
+      'value',
+    ),
+    prepared = (await prepare(engine, ref('pipeline', 'part.pipeline', await digest(json(base)))))
+      .value;
   const bad = await engine.start(
     { requestId: 'bad', prepared, input: { approved: false } },
     context,
   );
-  assert.equal((await terminal(engine, bad.ref)).phase, 'failed');
+  assert.equal((await terminal(engine, expectProperty(bad, 'ref'))).phase, 'failed');
   assert.equal(writes, 0);
   const good = await engine.start(
     { requestId: 'good', prepared, input: { approved: true } },
     context,
   );
-  const done = await terminal(engine, good.ref);
+  const done = await terminal(engine, expectProperty(good, 'ref'));
   assert.equal(done.phase, 'succeeded');
   assert.equal(done.effect, 'applied');
   assert.equal(writes, 1);
+  /** @type {Parameters<typeof createPipelineEngine>[0]['definitions'][number]} */
   const early = {
     ...base,
     id: 'early-result',
@@ -324,22 +369,28 @@ test('GW04/W02/W04: pipeline enforces validation/assert before write and execute
       { id: 'check', after: [], kind: 'assert', value: { input: '/approved' }, equals: true },
     ],
   };
-  const earlyEngine = createPipelineEngine({
-      definitions: [early],
-      schemas: [jsonSchema],
-      services: {},
-    }).value,
+  const earlyEngine = expectProperty(
+      createPipelineEngine({
+        definitions: [early],
+        schemas: [jsonSchema],
+        services: {},
+      }),
+      'value',
+    ),
     earlyPrepared = (
-      await prepare(earlyEngine, ref(early.id, 'part.pipeline', await digest(early)))
+      await prepare(
+        earlyEngine,
+        ref(expectProperty(early, 'id'), 'part.pipeline', await digest(json(early))),
+      )
     ).value;
   const failed = await earlyEngine.start(
     { requestId: 'early', prepared: earlyPrepared, input: { approved: false } },
     context,
   );
-  assert.equal((await terminal(earlyEngine, failed.ref)).phase, 'failed');
+  assert.equal((await terminal(earlyEngine, expectProperty(failed, 'ref'))).phase, 'failed');
 });
 test('W03/W14: missing engines, unsupported primitives and durable code requirements fail before effects', async () => {
-  const host = createWorkflowHost([]).value;
+  const host = expectProperty(createWorkflowHost([]), 'value');
   assert.equal(
     (
       await host.prepare(
@@ -355,6 +406,7 @@ test('W03/W14: missing engines, unsupported primitives and durable code requirem
     ).ok,
     false,
   );
+  /** @type {Parameters<typeof createPipelineEngine>[0]['definitions'][number]} */
   const definition = {
     format: 'part.pipeline',
     version: 1,
@@ -364,13 +416,16 @@ test('W03/W14: missing engines, unsupported primitives and durable code requirem
     steps: [{ id: 'branch', after: [], kind: 'branch', value: { literal: true }, cases: [] }],
     result: { literal: null },
   };
-  const engine = createPipelineEngine({
-    definitions: [definition],
-    schemas: [jsonSchema],
-    services: {},
-  }).value;
+  const engine = expectProperty(
+    createPipelineEngine({
+      definitions: [definition],
+      schemas: [jsonSchema],
+      services: {},
+    }),
+    'value',
+  );
   assert.equal(
-    (await prepare(engine, ref('branch', 'part.pipeline', await digest(definition)))).ok,
+    (await prepare(engine, ref('branch', 'part.pipeline', await digest(json(definition))))).ok,
     false,
   );
   const code = await defineCodeWorkflow({
@@ -381,7 +436,7 @@ test('W03/W14: missing engines, unsupported primitives and durable code requirem
       replay: 'none',
       execute: async () => ok(null),
     }),
-    codeEngine = createCodeEngine([code], {}).value;
+    codeEngine = expectProperty(createCodeEngine([code], {}), 'value');
   assert.equal(
     (
       await codeEngine.prepare(
@@ -442,8 +497,8 @@ test('W10: workflow host preserves independent native engine metadata and unknow
       error: fail('external.delivery', 'Receipt lost', 'unavailable').error,
     }),
   };
-  const host = createWorkflowHost([native]).value,
-    prepared = (
+  const host = expectProperty(createWorkflowHost([stub(native)]), 'value'),
+    prepared = expectProperty(
       await host.prepare(
         {
           engineId: 'external',
@@ -453,8 +508,9 @@ test('W10: workflow host preserves independent native engine metadata and unknow
           requiredControl: 'runner-enforced',
         },
         context,
-      )
-    ).value;
+      ),
+      'value',
+    );
   assert.equal(prepared.guarantees.checkpoint, 'engine-native');
   const submission = await host.start({ requestId: 'lost', prepared, input: {} }, context);
   assert.equal(submission.kind, 'unknown');

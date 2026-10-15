@@ -1,3 +1,5 @@
+// @ts-check
+import { expectProperty, json } from '../fixtures/assertions.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
@@ -30,12 +32,15 @@ const ref = (definition, format, hash) => ({
   source: { owner: 'test', native: {} },
 });
 async function startPipeline(definition, handlers = []) {
-  const engine = createPipelineEngine({
-    definitions: [definition],
-    schemas: [jsonSchema],
-    services: {},
-    handlers,
-  }).value;
+  const engine = expectProperty(
+    createPipelineEngine({
+      definitions: [definition],
+      schemas: [jsonSchema],
+      services: {},
+      handlers,
+    }),
+    'value',
+  );
   const prepared = await engine.prepare(
     {
       engineId: engine.descriptor.id,
@@ -53,10 +58,10 @@ async function startPipeline(definition, handlers = []) {
   );
   await until(async () =>
     ['succeeded', 'failed', 'cancelled', 'unknown'].includes(
-      (await engine.get(started.ref, context)).value.phase,
+      expectProperty(await engine.get(expectProperty(started, 'ref'), context), 'value').phase,
     ),
   );
-  return (await engine.get(started.ref, context)).value;
+  return expectProperty(await engine.get(expectProperty(started, 'ref'), context), 'value');
 }
 const assertion = (id, value) => ({
   id,
@@ -117,7 +122,7 @@ test('Pipeline lexical branches, bounded repeat and ordered parallel results exe
   ]);
   const snapshot = await startPipeline(definition, [next]);
   assert.equal(snapshot.phase, 'succeeded');
-  assert.equal(snapshot.output.data, 2);
+  assert.equal(expectProperty(snapshot.output, 'data'), 2);
   assert.equal(iterations, 2);
   const parallel = pipeline([
     {
@@ -129,7 +134,7 @@ test('Pipeline lexical branches, bounded repeat and ordered parallel results exe
       branches: [[assertion('same', 1)], [assertion('same', 2)]],
     },
   ]);
-  assert.deepEqual((await startPipeline(parallel)).output.data, [1, 2]);
+  assert.deepEqual(expectProperty((await startPipeline(parallel)).output, 'data'), [1, 2]);
   const exceeded = await startPipeline(pipeline([{ ...repeat, maxIterations: 1 }]), [next]);
   assert.equal(exceeded.phase, 'failed');
 });
@@ -244,26 +249,30 @@ test('Generic workflow endpoint and default DOM show waits, invoke owner respons
         presentation: { prompt: 'Approve this fixed result?' },
         bindingDigest: await digest(input),
       };
-      const identity = await callIdentity(steps.execution, 'approve', {
-        type: spec.type,
-        responseSchema: jsonSchema.ref,
-        presentation: spec.presentation,
-        bindingDigest: spec.bindingDigest,
-      });
+      const identity = await callIdentity(
+        steps.execution,
+        'approve',
+        json({
+          type: spec.type,
+          responseSchema: jsonSchema.ref,
+          presentation: spec.presentation,
+          bindingDigest: spec.bindingDigest,
+        }),
+      );
       const wait = await steps.wait(identity, spec);
-      if (!wait.ok) return wait;
+      if (wait.ok === false) return wait;
       const response = await steps.response(wait.value);
-      if (!response.ok) return response;
+      if (response.ok === false) return response;
       if (response.value !== true) return ok({ applied: false });
       applied++;
       return ok({ applied: true });
     },
   });
-  const engine = createCodeEngine([code], { waits: createSuspensions() }).value;
+  const engine = expectProperty(createCodeEngine([code], { waits: createSuspensions() }), 'value');
   const definition = ref(code.definition, 'part.code', code.digest);
   // defineCodeWorkflow exposes the ID on its definition.
   const endpointResult = createWorkflowEndpoint({
-    host: createWorkflowHost([engine]).value,
+    host: expectProperty(createWorkflowHost([engine]), 'value'),
     registrations: [{ definition, engineId: engine.descriptor.id, profileIds: ['default'] }],
     composition: { id: 'test', revision: '1' },
     context,
@@ -273,7 +282,10 @@ test('Generic workflow endpoint and default DOM show waits, invoke owner respons
   const controller = createController(
     createLocalPort(endpoint, () => context, { codec: jsonCodec, codecLoopback: true }),
   );
-  const window = new Window();
+  const window =
+    /** @type {globalThis.Window & typeof globalThis & { happyDOM: import('happy-dom').Window['happyDOM'] }} */ (
+      /** @type {unknown} */ (new Window())
+    );
   const view = createWorkflowView({ client: controller, document: window.document });
   window.document.body.append(view.element);
   try {
@@ -298,15 +310,17 @@ test('Generic workflow endpoint and default DOM show waits, invoke owner respons
     assert.equal(started.kind, 'receipt');
     assert.equal(started.receipt.kind, 'accepted', JSON.stringify(started));
     assert.equal(
-      (await controller.invoke({ ...command, input: { ...input, input: { fixed: 2 } } })).receipt
-        .kind,
+      expectProperty(
+        await controller.invoke({ ...command, input: { ...input, input: { fixed: 2 } } }),
+        'receipt',
+      ).kind,
       'rejected',
     );
     await until(() => view.element.textContent.includes('Approve this fixed result?'));
-    const textarea = view.element.querySelector(
-      'textarea[aria-label="JSON input for part.workflow/respond"]',
+    const textarea = /** @type {HTMLTextAreaElement} */ (
+      view.element.querySelector('textarea[aria-label="JSON input for part.workflow/respond"]')
     );
-    const response = JSON.parse(textarea.value);
+    const response = JSON.parse(expectProperty(textarea, 'value'));
     response.response = true;
     textarea.value = JSON.stringify(response);
     textarea.dispatchEvent(new window.Event('input'));
@@ -317,7 +331,7 @@ test('Generic workflow endpoint and default DOM show waits, invoke owner respons
     assert.equal(applied, 1);
     assert.ok(view.element.querySelector('[aria-label="Workflow result"]'));
     const item = controller.getItem(started.receipt.operation.id);
-    assert.equal(item.payload.nativeState, undefined);
+    assert.equal(Object.hasOwn(Object(item.payload), 'nativeState'), false);
     assert.equal(
       (
         await endpoint.query(

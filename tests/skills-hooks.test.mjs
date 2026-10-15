@@ -1,3 +1,5 @@
+// @ts-check
+import { stub, expectProperty, json } from '../fixtures/assertions.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, rm, symlink } from 'node:fs/promises';
@@ -25,10 +27,10 @@ test('SR02/SR03/SR12: skill discovery and activation pin content and never execu
     );
     await writeFile(join(root, 'scripts', 'run.js'), 'throw Error("Must never execute");');
     const source = createDirectoryPackages(),
-      packages = (await source.discover([root], context)).value,
+      packages = expectProperty(await source.discover([root], context), 'value'),
       skills = createSkills(source, packages);
     const descriptors = await skills.list(context);
-    assert.equal(descriptors.value.length, 1);
+    assert.equal(expectProperty(descriptors, 'value').length, 1);
     const owner = { owner: 'test', kind: 'run', id: context.scope.id };
     const activated = await skills.activate(
       {
@@ -42,8 +44,8 @@ test('SR02/SR03/SR12: skill discovery and activation pin content and never execu
     );
     assert.equal(activated.ok, true);
     assert.equal(activated.value.contextItems.length, 1);
-    const lowered = skillLowerer().lower(activated.value.contextItems[0]);
-    assert.equal(lowered.value.fragments[0].role, 'user');
+    const lowered = skillLowerer().lower(stub(activated).value.contextItems[0]);
+    assert.equal(expectProperty(expectProperty(lowered, 'value'), 'fragments')[0].role, 'user');
     skills.closeOwner(owner);
     assert.equal((await skills.deactivate(activated.value.id, context)).ok, false);
     assert.equal((await source.read(packages[0], '../outside', context)).ok, false);
@@ -74,6 +76,7 @@ test(
       const code = 'process.stdout.write(JSON.stringify({kind:"allow"}));';
       await writeFile(join(root, 'hook.cjs'), code);
       const scripts = createNodeScripts({ root, interpreters: { node: process.execPath } }),
+        /** @type {import('@slop-lab/part/reference').Hooks.Point<unknown, unknown>} */
         point = {
           id: 'before',
           version: 1,
@@ -84,8 +87,9 @@ test(
           allowedDecisions: ['allow', 'deny'],
           awaited: true,
         };
-      const hooks = createScriptHooks([point], scripts).value,
+      const hooks = expectProperty(createScriptHooks([point], scripts), 'value'),
         owner = { owner: 'test', kind: 'run', id: context.scope.id };
+      /** @type {import('@slop-lab/part/reference').Hooks.Binding} */
       const binding = {
         id: 'hook',
         pointId: 'before',
@@ -114,8 +118,11 @@ test(
         false,
       );
       assert.equal((await hooks.bind(binding, context)).ok, true);
-      assert.equal((await hooks.fire('before', {}, context)).value[0].kind, 'allow');
-      assert.equal((await hooks.fire('before', {}, context)).value.length, 0);
+      assert.equal(
+        expectProperty(expectProperty(await hooks.fire('before', {}, context), 'value')[0], 'kind'),
+        'allow',
+      );
+      assert.equal(expectProperty(await hooks.fire('before', {}, context), 'value').length, 0);
       hooks.closeOwner(owner);
       assert.equal(
         (await hooks.unbind({ owner: 'part/hooks', kind: 'binding', id: 'hook' }, context)).ok,
@@ -142,7 +149,7 @@ test(
       const boundary = createBoundary({
         prepare: async () => {
           const checked = await hooks.fire('before', {}, context);
-          return checked.ok ? ok() : checked;
+          return checked.ok === true ? ok(undefined) : checked;
         },
       });
       const outcome = await managedAttempt(
@@ -179,21 +186,24 @@ test('W16: a hook cannot recursively invoke the same point through its script se
       return fail('fixture.recursion', 'Nested hook denied');
     },
   };
-  hooks = createScriptHooks(
-    [
-      {
-        id: 'before',
-        version: 1,
-        owner: 'test',
-        phase: 'before-effect',
-        input: jsonSchema,
-        output: jsonSchema,
-        allowedDecisions: ['allow'],
-        awaited: true,
-      },
-    ],
-    scripts,
-  ).value;
+  hooks = expectProperty(
+    createScriptHooks(
+      [
+        {
+          id: 'before',
+          version: 1,
+          owner: 'test',
+          phase: 'before-effect',
+          input: jsonSchema,
+          output: jsonSchema,
+          allowedDecisions: ['allow'],
+          awaited: true,
+        },
+      ],
+      scripts,
+    ),
+    'value',
+  );
   await hooks.bind(
     {
       id: 'recursive',
@@ -221,6 +231,7 @@ test('W16: a hook cannot recursively invoke the same point through its script se
 });
 test('W06/W07: cancelling a waiting pipeline rejects late responses and never starts a write', async () => {
   const waits = createSuspensions();
+  /** @type {Parameters<typeof createPipelineEngine>[0]['definitions'][number]} */
   const definition = {
     format: 'part.pipeline',
     version: 1,
@@ -246,20 +257,23 @@ test('W06/W07: cancelling a waiting pipeline rejects late responses and never st
     ],
     result: { input: '' },
   };
-  const engine = createPipelineEngine({
-    definitions: [definition],
-    schemas: [jsonSchema],
-    services: { waits },
-  }).value;
-  const prepared = (
+  const engine = expectProperty(
+    createPipelineEngine({
+      definitions: [definition],
+      schemas: [jsonSchema],
+      services: { waits },
+    }),
+    'value',
+  );
+  const prepared = expectProperty(
     await engine.prepare(
       {
         engineId: engine.descriptor.id,
         definition: {
-          id: definition.id,
+          id: expectProperty(definition, 'id'),
           format: 'part.pipeline',
           formatVersion: '1',
-          digest: await digest(definition),
+          digest: await digest(json(definition)),
           source: { owner: 'test', native: {} },
         },
         profileId: 'default',
@@ -267,23 +281,24 @@ test('W06/W07: cancelling a waiting pipeline rejects late responses and never st
         requiredControl: 'runner-enforced',
       },
       context,
-    )
-  ).value;
+    ),
+    'value',
+  );
   const submission = await engine.start(
     { requestId: 'waiting', prepared, input: { data: 'fixed' } },
     context,
   );
   let state;
   for (let i = 0; i < 100; i++) {
-    state = (await engine.get(submission.ref, context)).value;
+    state = expectProperty(await engine.get(expectProperty(submission, 'ref'), context), 'value');
     if (state.phase === 'waiting') break;
     await new Promise((r) => setTimeout(r, 1));
   }
   assert.equal(state.phase, 'waiting');
-  await engine.requestCancel(submission.ref, 'cancel', context);
+  await engine.requestCancel(expectProperty(submission, 'ref'), 'cancel', context);
   await new Promise((r) => setTimeout(r, 2));
   const late = await engine.action(
-    submission.ref,
+    expectProperty(submission, 'ref'),
     {
       protocolVersion: 1,
       commandId: 'late',
@@ -294,7 +309,10 @@ test('W06/W07: cancelling a waiting pipeline rejects late responses and never st
     context,
   );
   assert.equal(late.kind, 'rejected');
-  assert.equal((await engine.get(submission.ref, context)).value.phase, 'cancelled');
+  assert.equal(
+    expectProperty(await engine.get(expectProperty(submission, 'ref'), context), 'value').phase,
+    'cancelled',
+  );
 });
 test('workflow submission dedupe prevents concurrent starts from executing twice', async () => {
   let count = 0;
@@ -309,8 +327,8 @@ test('workflow submission dedupe prevents concurrent starts from executing twice
         return ok(null);
       },
     }),
-    engine = createCodeEngine([installed], {}).value;
-  const prepared = (
+    engine = expectProperty(createCodeEngine([installed], {}), 'value');
+  const prepared = expectProperty(
     await engine.prepare(
       {
         engineId: engine.descriptor.id,
@@ -326,14 +344,15 @@ test('workflow submission dedupe prevents concurrent starts from executing twice
         requiredControl: 'runner-enforced',
       },
       context,
-    )
-  ).value;
+    ),
+    'value',
+  );
   const request = { requestId: 'same', prepared, input: null };
   const [a, b] = await Promise.all([
     engine.start(request, context),
     engine.start(request, context),
   ]);
-  assert.equal(a.ref.id, b.ref.id);
+  assert.equal(expectProperty(a, 'ref').id, expectProperty(b, 'ref').id);
   await new Promise((r) => setTimeout(r, 2));
   assert.equal(count, 1);
 });

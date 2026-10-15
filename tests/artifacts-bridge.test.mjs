@@ -1,3 +1,5 @@
+// @ts-check
+import { stub, expectProperty } from '../fixtures/assertions.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
@@ -18,15 +20,18 @@ test('Artifacts publish only complete immutable bytes, authorize ranges and surv
   const root = await mkdtemp(join(tmpdir(), 'part-artifacts-'));
   try {
     for (const store of [createMemoryArtifacts({ maxBytes: 16 }), await openFileArtifacts(root)]) {
-      const writer = (await store.create(metadata, context)).value;
+      const writer = expectProperty(await store.create(metadata, context), 'value');
       const bytes = new TextEncoder().encode('{"x":1}');
       assert.equal((await writer.write(bytes)).ok, true);
       bytes.fill(0);
-      const finalized = (await writer.finalize()).value;
+      const finalized = expectProperty(await writer.finalize(), 'value');
       assert.equal((await writer.write(new Uint8Array())).ok, false);
-      assert.deepEqual((await writer.finalize()).value, finalized);
+      assert.deepEqual(expectProperty(await writer.finalize(), 'value'), finalized);
       const reader = finalized.durability === 'durable' ? await openFileArtifacts(root) : store;
-      const loaded = (await reader.read(finalized.ref, { start: 5, length: 1 }, context)).value;
+      const loaded = expectProperty(
+        await reader.read(finalized.ref, { start: 5, length: 1 }, context),
+        'value',
+      );
       for await (const chunk of loaded) assert.equal(new TextDecoder().decode(chunk), '1');
       assert.equal((await reader.read(finalized.ref, { start: -1, length: 1 }, context)).ok, false);
       assert.equal(
@@ -41,10 +46,10 @@ test('Artifacts publish only complete immutable bytes, authorize ranges and surv
       );
     }
     const small = createMemoryArtifacts({ maxBytes: 1 });
-    const writer = (await small.create(metadata, context)).value;
+    const writer = expectProperty(await small.create(metadata, context), 'value');
     assert.equal((await writer.write(new Uint8Array(2))).ok, false);
     assert.equal((await writer.finalize()).ok, false);
-    const aborted = (await small.create(metadata, context)).value;
+    const aborted = expectProperty(await small.create(metadata, context), 'value');
     await aborted.abort();
     assert.equal((await aborted.finalize()).ok, false);
   } finally {
@@ -53,10 +58,11 @@ test('Artifacts publish only complete immutable bytes, authorize ranges and surv
 });
 test('Results pin artifact bytes and deduplicate concurrent processors; bad processor evidence never accepts', async () => {
   const artifacts = createMemoryArtifacts();
-  const writer = (await artifacts.create(metadata, context)).value;
+  const writer = expectProperty(await artifacts.create(metadata, context), 'value');
   await writer.write(new TextEncoder().encode('{"x":1}'));
-  const artifact = (await writer.finalize()).value;
+  const artifact = expectProperty(await writer.finalize(), 'value');
   let calls = 0;
+  /** @type {import('@slop-lab/part/reference').Results.Processor} */
   const processor = {
     id: 'test/normalize',
     version: '1',
@@ -65,24 +71,31 @@ test('Results pin artifact bytes and deduplicate concurrent processors; bad proc
     async process(input) {
       calls++;
       await new Promise((r) => setTimeout(r, 5));
-      const output = { kind: 'inline', value: { x: input.value.x + 1 } };
+      const output = {
+        kind: /** @type {const} */ ('inline'),
+        value: { x: expectProperty(expectProperty(input, 'value'), 'x') + 1 },
+      };
       return ok({
         output,
         evidence: {
           validator: 'test/normalize',
           version: '1',
           status: 'pass',
-          inputDigest: await digest(input.value),
+          inputDigest: await digest(expectProperty(input, 'value')),
           outputDigest: await digest(output.value),
           diagnostics: [],
         },
       });
     },
   };
-  const results = createResults(
-    [{ id: jsonSchema.ref.id, version: 1, schema: jsonSchema, mediaType: 'application/json' }],
-    { artifacts, processors: [processor], profiles: { normalize: [processor.id] } },
-  ).value;
+  const results = expectProperty(
+    createResults(
+      [{ id: jsonSchema.ref.id, version: 1, schema: jsonSchema, mediaType: 'application/json' }],
+      { artifacts, processors: [processor], profiles: { normalize: [processor.id] } },
+    ),
+    'value',
+  );
+  /** @type {import('@slop-lab/part/reference').Results.Submission} */
   const submission = {
     submissionId: 'one',
     expectedType: jsonSchema.ref,
@@ -96,33 +109,37 @@ test('Results pin artifact bytes and deduplicate concurrent processors; bad proc
   ]);
   assert.equal(calls, 1);
   assert.equal(accepted[0].ok, true);
-  assert.equal(accepted[0].value.id, accepted[1].value.id);
-  assert.deepEqual(accepted[0].value.data.value, { x: 2 });
+  assert.equal(accepted[0].value.id, expectProperty(accepted[1], 'value').id);
+  assert.deepEqual(expectProperty(accepted[0].value.data, 'value'), { x: 2 });
   assert.equal(
     (
       await results.submit(
         {
           ...submission,
           submissionId: 'two',
-          data: { ...submission.data, expectedDigest: 'stale' },
+          data: { kind: 'artifact', ref: artifact.ref, expectedDigest: 'stale' },
         },
         context,
       )
     ).ok,
     false,
   );
-  const broken = createResults(
-    [{ id: jsonSchema.ref.id, version: 1, schema: jsonSchema, mediaType: 'application/json' }],
-    {
-      processors: [
-        {
-          ...processor,
-          process: async () => ok({ output: { kind: 'inline', value: {} }, evidence: {} }),
-        },
-      ],
-      profiles: { normalize: [processor.id] },
-    },
-  ).value;
+  const broken = expectProperty(
+    createResults(
+      [{ id: jsonSchema.ref.id, version: 1, schema: jsonSchema, mediaType: 'application/json' }],
+      {
+        processors: [
+          {
+            ...processor,
+            // @ts-expect-error Malformed processor evidence must be rejected at runtime.
+            process: async () => ok({ output: { kind: 'inline', value: {} }, evidence: {} }),
+          },
+        ],
+        profiles: { normalize: [processor.id] },
+      },
+    ),
+    'value',
+  );
   assert.equal(
     (await broken.submit({ ...submission, data: { kind: 'inline', value: {} } }, context)).ok,
     false,
@@ -136,11 +153,11 @@ test(
     const upstream = createBudget({ maxModelInvocations: 1 });
     const owner = localContext({
       scope: { kind: 'runtime', id: 'owner' },
-      services: {
+      services: stub({
         get(key) {
           return key.id === budgetKey.id ? ok(upstream) : fail('missing', 'Missing service');
         },
-      },
+      }),
     });
     let calls = 0;
     const bridge = createScriptBridge({
@@ -148,22 +165,28 @@ test(
         profileRequired: true,
         async invoke(params, context) {
           calls++;
-          const budget = context.services.get(budgetKey).value.reserve('maxModelInvocations', 1);
+          const budget = expectProperty(context.services.get(budgetKey), 'value').reserve(
+            'maxModelInvocations',
+            1,
+          );
           return budget.ok
             ? {
                 kind: 'completed',
                 commandId: '',
-                result: { actor: context.principal.subject, value: params.value },
+                result: {
+                  actor: context.principal.subject,
+                  value: expectProperty(params, 'value'),
+                },
                 effect: 'not-applied',
                 commit: [],
               }
-            : { kind: 'rejected', commandId: '', error: budget.error };
+            : { kind: 'rejected', commandId: '', error: expectProperty(budget, 'error') };
         },
       },
     });
-    const transport = (await startScriptBridge(bridge)).value;
+    const transport = expectProperty(await startScriptBridge(bridge), 'value');
     try {
-      const grant = (
+      const grant = expectProperty(
         await bridge.issue(
           {
             version: 1,
@@ -176,9 +199,10 @@ test(
             enforcement: 'authenticated-channel',
           },
           owner,
-        )
-      ).value;
-      const env = transport.environment(grant.id, owner).value;
+        ),
+        'value',
+      );
+      const env = expectProperty(transport.environment(grant.id, owner), 'value');
       const payload = {
         id: 'request',
         grantId: grant.id,
@@ -191,11 +215,10 @@ test(
         403,
       );
       assert.equal((await bridge.invoke(payload, owner)).kind, 'rejected');
-      const authenticated = bridge.authenticate(
-        grant.id,
-        env.PART_BRIDGE_CREDENTIAL,
-        env.PART_BRIDGE_AUDIENCE,
-      ).value;
+      const authenticated = expectProperty(
+        bridge.authenticate(grant.id, env.PART_BRIDGE_CREDENTIAL, env.PART_BRIDGE_AUDIENCE),
+        'value',
+      );
       assert.equal(
         (await bridge.invoke({ ...payload, params: { profileId: 'foreign' } }, authenticated)).kind,
         'rejected',
@@ -207,7 +230,7 @@ test(
         interpreters: { node: process.execPath },
         bridge: transport,
       });
-      const handle = (
+      const handle = expectProperty(
         await scripts.execute(
           {
             requestId: 'script',
@@ -224,11 +247,18 @@ test(
             retry: 'never',
           },
           owner,
-        )
-      ).value;
+        ),
+        'value',
+      );
       const outcome = await handle.done;
       assert.equal(outcome.phase, 'completed');
-      assert.equal(outcome.result.captured.value.result.value, 42);
+      assert.equal(
+        expectProperty(
+          expectProperty(expectProperty(outcome.result.captured, 'value'), 'result'),
+          'value',
+        ),
+        42,
+      );
       assert.equal((await bridge.invoke(payload, authenticated)).kind, 'completed');
       assert.equal(calls, 1);
       assert.equal(
@@ -286,6 +316,7 @@ test(
         interpreters: { node: process.execPath },
         boundary,
       });
+      /** @type {import('@slop-lab/part/reference').Scripts.Request} */
       const request = {
         requestId: 'one',
         executorId: 'part/node-process',
@@ -317,34 +348,42 @@ test(
           throw Error('External executor must own the process');
         },
       });
-      const dispatcher = createToolDispatcher({
-        tools: [tool],
-        executors: [executor],
-        boundary,
-      }).value;
+      const dispatcher = expectProperty(
+        createToolDispatcher({
+          tools: [tool],
+          executors: [executor],
+          boundary,
+        }),
+        'value',
+      );
       const budget = createBudget({ maxExecutorAttempts: 1 });
       const caller = localContext({
-        services: {
+        services: stub({
           get: (key) => (key.id === budgetKey.id ? ok(budget) : fail('missing', 'Missing service')),
-        },
+        }),
       });
-      const handle = (
+      const handle = expectProperty(
         await dispatcher.dispatch(
           { logicalCallId: 'one', toolId: tool.id, arguments: request },
           caller,
-        )
-      ).value;
+        ),
+        'value',
+      );
       assert.equal((await handle.done).phase, 'completed');
       assert.equal(prepares, 1);
       assert.equal(settles, 1);
-      const second = (
+      const second = expectProperty(
         await dispatcher.dispatch(
           { logicalCallId: 'two', toolId: tool.id, arguments: request },
           caller,
-        )
-      ).value;
+        ),
+        'value',
+      );
       assert.equal((await second.done).phase, 'failed');
-      const direct = (await scripts.execute({ ...request, requestId: 'direct' }, context)).value;
+      const direct = expectProperty(
+        await scripts.execute({ ...request, requestId: 'direct' }, context),
+        'value',
+      );
       assert.equal((await direct.done).phase, 'completed');
       assert.equal(prepares, 3);
       assert.equal(settles, 3);
@@ -356,7 +395,8 @@ test(
 
 test('Processor timeout rejects acceptance and late normalization cannot revive the submission', async () => {
   const { createOperations } = await import('@slop-lab/part/runtime');
-  let finish;
+  let /** @type {(...args: any[]) => void} */ finish;
+  /** @type {import('@slop-lab/part/reference').Results.Processor} */
   const processor = {
     id: 'test/timeout',
     version: '1',
@@ -372,22 +412,26 @@ test('Processor timeout rejects acceptance and late normalization cannot revive 
           validator: 'test/timeout',
           version: '1',
           status: 'pass',
-          inputDigest: await digest(input.value),
-          outputDigest: await digest(input.value),
+          inputDigest: await digest(expectProperty(input, 'value')),
+          outputDigest: await digest(expectProperty(input, 'value')),
           diagnostics: [],
         },
       });
     },
   };
-  const results = createResults(
-    [{ id: jsonSchema.ref.id, version: 1, schema: jsonSchema, mediaType: 'application/json' }],
-    {
-      processors: [processor],
-      profiles: { normalize: [processor.id] },
-      processorTimeoutMs: 5,
-      operations: createOperations({ cancellationGraceMs: 5 }),
-    },
-  ).value;
+  const results = expectProperty(
+    createResults(
+      [{ id: jsonSchema.ref.id, version: 1, schema: jsonSchema, mediaType: 'application/json' }],
+      {
+        processors: [processor],
+        profiles: { normalize: [processor.id] },
+        processorTimeoutMs: 5,
+        operations: createOperations({ cancellationGraceMs: 5 }),
+      },
+    ),
+    'value',
+  );
+  /** @type {import('@slop-lab/part/reference').Results.Submission} */
   const request = {
     submissionId: 'one',
     expectedType: jsonSchema.ref,

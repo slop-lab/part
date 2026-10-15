@@ -9,14 +9,14 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "npm run build && node --test --test-isolation=none tests/*.test.mjs",
-    "check": "npm run build && node scripts/check-architecture.mjs",
+    "check": "npm run check:js && node scripts/check-architecture.mjs",
     "example": "npm run build && node examples/basic.mjs",
     "test:consumers": "npm run build && node scripts/test-consumers.mjs",
     "preview:build": "npm run build && node scripts/build-preview.mjs",
     "preview": "npm run preview:build && node scripts/serve-preview.mjs",
     "measure": "npm run build && node scripts/measure.mjs",
-    "format": "prettier --write packages tests scripts examples fixtures consumers experiments docs README.md CHANGELOG.md package.json tsconfig.json tsconfig.base.json .github",
-    "format:check": "prettier --check packages tests scripts examples fixtures consumers experiments docs README.md CHANGELOG.md package.json tsconfig.json tsconfig.base.json .github",
+    "format": "prettier --write packages tests scripts examples fixtures consumers experiments docs README.md CHANGELOG.md package.json tsconfig.json tsconfig.base.json .github jsconfig.json",
+    "format:check": "prettier --check packages tests scripts examples fixtures consumers experiments docs README.md CHANGELOG.md package.json tsconfig.json tsconfig.base.json .github jsconfig.json",
     "measure:ui": "npm run build && node scripts/measure-ui.mjs",
     "pack:local": "npm run build && node scripts/pack.mjs",
     "mock:provider": "node packages/node/dist/testing/mock-provider/cli.js",
@@ -24,7 +24,8 @@
     "smoke:provider": "npm run build && node --env-file=.env scripts/smoke-provider.mjs",
     "smoke:responses": "npm run build && node --env-file=.env scripts/smoke-provider.mjs responses",
     "test:browser": "npm run preview:build && node scripts/test-playground-browser.mjs",
-    "example:acp": "npm run build && node examples/acp/client.mjs"
+    "example:acp": "npm run build && node examples/acp/client.mjs",
+    "check:js": "npm run build && tsc -p jsconfig.json"
   },
   "engines": {
     "node": ">=22.18"

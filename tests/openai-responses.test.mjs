@@ -1,3 +1,5 @@
+// @ts-check
+import { expectProperty, stub } from '../fixtures/assertions.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -20,9 +22,10 @@ const profile = {
   defaults: {},
   capabilities: { revision: '1', entries: [] },
 };
+/** @returns {import('@slop-lab/part/reference').Model.Invocation} */
 const invocation = (fragments = [], options = {}) => ({
   profileId: profile.id,
-  context: { fragments },
+  context: stub({ fragments }),
   tools: [],
   options,
 });
@@ -54,6 +57,7 @@ const reasoning = {
   summary: [{ type: 'summary_text', text: 'Use the tool.' }],
   encrypted_content: 'opaque-fixture',
 };
+/** @param {Record<string, any>[]} [output] */
 const completion = (output = [message('HELLO')]) => ({
   id: 'resp-1',
   object: 'response',
@@ -76,21 +80,24 @@ const wire = (events, newline = '\n') =>
     )
     .join('');
 function decode(value, streaming = false, bytes = false) {
-  const decoder = adapter.createDecoder({
-    status: 200,
-    headers: {
-      'Content-Type': streaming ? 'text/event-stream; charset=utf-8' : 'application/json',
-    },
-  }).value;
+  const decoder = expectProperty(
+    adapter.createDecoder({
+      status: 200,
+      headers: {
+        'Content-Type': streaming ? 'text/event-stream; charset=utf-8' : 'application/json',
+      },
+    }),
+    'value',
+  );
   const body = new TextEncoder().encode(typeof value === 'string' ? value : JSON.stringify(value));
   let progress = [];
   for (const chunk of bytes ? [...body].map((byte) => Uint8Array.of(byte)) : [body]) {
     const pushed = decoder.push(chunk);
-    if (!pushed.ok) return pushed;
+    if (pushed.ok === false) return pushed;
     progress.push(...pushed.value);
   }
   const result = decoder.finish();
-  return result.ok ? { ...result, progress } : result;
+  return result.ok === true ? { ...result, progress } : result;
 }
 function eventsFor(output) {
   const events = [event('response.created', { response: { id: 'resp-1', status: 'in_progress' } })];
@@ -144,6 +151,7 @@ test('Responses encodes text, JSON, function calls/results and native reasoning 
     ],
     { stream: false, max_output_tokens: 50 },
   );
+  // @ts-expect-error Deliberately attempt mutation to verify snapshot isolation.
   source.tools = [
     {
       id: 'uppercase',
@@ -209,7 +217,8 @@ test('Responses rejects reserved/stateful requests, hosted tools, media and fore
     false,
   );
   assert.equal(
-    (await adapter.encode({ ...invocation(), tools: [{ execution: 'provider' }] }, profile)).ok,
+    (await adapter.encode({ ...invocation(), tools: [stub({ execution: 'provider' })] }, profile))
+      .ok,
     false,
   );
   for (const part of [
@@ -245,12 +254,15 @@ test('Responses rejects reserved/stateful requests, hosted tools, media and fore
 test('JSON Responses preserves reasoning and function native items, call IDs, usage and finish', () => {
   const result = decode(completion([reasoning, call, message('HELLO')]));
   assert.equal(result.ok, true);
-  assert.equal(result.value.finish.normalized, 'tool_calls');
-  assert.deepEqual(result.value.content[0].native.payload, reasoning);
-  assert.equal(result.value.toolCalls[0].id, 'call-1');
-  assert.deepEqual(result.value.toolCalls[0].arguments, { text: 'hello' });
-  assert.deepEqual(result.value.toolCalls[0].native.payload, call);
-  assert.deepEqual(result.value.usage, {
+  assert.equal(expectProperty(result.value, 'finish').normalized, 'tool_calls');
+  assert.deepEqual(
+    expectProperty(expectProperty(result.value, 'content')[0], 'native').payload,
+    reasoning,
+  );
+  assert.equal(expectProperty(result.value, 'toolCalls')[0].id, 'call-1');
+  assert.deepEqual(expectProperty(result.value, 'toolCalls')[0].arguments, { text: 'hello' });
+  assert.deepEqual(expectProperty(result.value, 'toolCalls')[0].native.payload, call);
+  assert.deepEqual(expectProperty(result.value, 'usage'), {
     inputTokens: 12,
     outputTokens: 3,
     providerNative: completion().usage,
@@ -268,21 +280,21 @@ test('SSE Responses handles every UTF-8/CRLF boundary, fragmented arguments and 
     const result = decode(wire(eventsFor(output), newline), true, true);
     assert.equal(result.ok, true, JSON.stringify(result));
     assert.equal(
-      result.progress
+      expectProperty(result, 'progress')
         .filter((entry) => entry.type === 'text-delta')
-        .map((entry) => entry.payload.text)
+        .map((entry) => expectProperty(entry.payload, 'text'))
         .join(''),
       'Snowman ☃',
     );
     assert.equal(
-      result.value.content
+      expectProperty(result.value, 'content')
         .filter((part) => part.kind === 'text')
         .map((part) => part.text)
         .join(''),
       'Snowman ☃',
     );
     assert.deepEqual(
-      result.value.toolCalls.map((entry) => entry.id),
+      expectProperty(result.value, 'toolCalls').map((entry) => entry.id),
       ['call-1', 'call-2'],
     );
   }
@@ -384,11 +396,17 @@ test('SSE Responses rejects missing terminals, mismatched snapshots, failed even
     'event: wrong\ndata: {"type":"response.completed"}\n\n',
   ])
     assert.equal(decode(malformed, true).ok, false);
-  const decoder = adapter.createDecoder({ headers: { 'content-type': 'text/event-stream' } }).value;
+  const decoder = expectProperty(
+    adapter.createDecoder({ headers: { 'content-type': 'text/event-stream' } }),
+    'value',
+  );
   assert.equal(decoder.push(new TextEncoder().encode('data: {broken}\n\n')).ok, false);
   assert.equal(decoder.push(new TextEncoder().encode(wire(good))).ok, false);
   assert.equal(decoder.finish().ok, false);
-  const utf8 = adapter.createDecoder({ headers: { 'content-type': 'text/event-stream' } }).value;
+  const utf8 = expectProperty(
+    adapter.createDecoder({ headers: { 'content-type': 'text/event-stream' } }),
+    'value',
+  );
   assert.equal(utf8.push(Uint8Array.of(0xff)).ok, false);
   assert.equal(utf8.finish().ok, false);
 });
@@ -443,7 +461,11 @@ for (const mode of ['json', 'sse', 'truncated']) {
           description: 'Uppercase text',
           input: schema(
             'responses/text',
-            (value) => value && typeof value === 'object' && typeof value.text === 'string',
+            /** @param {unknown} value @returns {value is {text: string}} */ (value) =>
+              value &&
+              typeof value === 'object' &&
+              'text' in value &&
+              typeof value.text === 'string',
           ),
           output: stringSchema,
           execute: ({ text }) => {
@@ -467,7 +489,7 @@ for (const mode of ['json', 'sse', 'truncated']) {
       }
       assert.equal(outcome.value.phase, 'completed', JSON.stringify(outcome));
       assert.deepEqual(executions, ['hello']);
-      assert.equal(outcome.value.result.content[0].text, 'HELLO');
+      assert.equal(expectProperty(outcome.value.result.content[0], 'text'), 'HELLO');
       assert.equal(transcript.length, 2);
       assert.deepEqual(transcript, fixture.exchanges);
     } finally {

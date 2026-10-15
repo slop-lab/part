@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+  },
+  "include": [
+    "scripts/**/*.js",
+    "scripts/**/*.mjs",
+    "scripts/**/*.cjs",
+    "tests/**/*.js",
+    "tests/**/*.mjs",
+    "tests/**/*.cjs",
+    "examples/**/*.js",
+    "examples/**/*.mjs",
+    "examples/**/*.cjs",
+    "consumers/**/*.js",
+    "consumers/**/*.mjs",
+    "consumers/**/*.cjs",
+    "fixtures/**/*.js",
+    "fixtures/**/*.mjs",
+    "fixtures/**/*.cjs",
+    "experiments/**/*.js",
+    "experiments/**/*.mjs",
+    "experiments/**/*.cjs"
+  ],
+  "exclude": ["node_modules", "**/dist", "preview", "artifacts", ".local"]
+}
