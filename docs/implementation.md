@@ -30,6 +30,9 @@ The portable OpenAI-compatible adapter is verified against this local profile,
 including a real agent/function-tool loop. See [mock workflows](mock-provider.md).
 The separate live R4U smoke also passed JSON/SSE text and a real function-tool loop;
 see [provider evidence](provider-smoke.md).
+The separate [Responses adapter](openai-responses.md) also passes live R4U JSON/SSE
+and function-tool smoke; fixed fixtures verify native reasoning replay and prevent
+tool execution on incomplete streams.
 
 ## Dependent-project readiness
 

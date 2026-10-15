@@ -23,3 +23,9 @@ Node mock and an explicitly configured compatible endpoint. This profile does no
 implement Responses API, media or provider-hosted tools. Live R4U smoke with
 `gpt-6-luna` passed JSON/SSE text and a function-tool loop.
 See [provider smoke](../../docs/provider-smoke.md).
+
+`@part/plugins/providers/openai-responses` exports `createOpenAIResponsesAdapter`
+for stateless Responses text/runtime-function calls over JSON or SSE, with native
+reasoning replay. Live R4U `gpt-6-luna` smoke passed JSON/SSE text and a tool loop.
+See [Responses usage and limits](../../docs/openai-responses.md). Media, hosted tools,
+background requests and stored conversation/continuation handles are unsupported.

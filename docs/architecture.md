@@ -78,6 +78,9 @@ require explicit projection. See https://docs.ollama.com/api/chat . Live
 Ollama smoke remains unverified; fake fixtures establish only that adapter's
 implemented protocol subset. The separate OpenAI-compatible Chat Completions adapter
 has live R4U JSON/SSE and function-tool evidence; see [provider smoke](provider-smoke.md).
+The separate portable [Responses adapter](openai-responses.md) uses explicit stateless
+input, native reasoning replay and completed-response validation, with its own live
+R4U text/tool evidence.
 
 This environment's Node 26 test subprocess runner reports file-level tests only.
 The project runs `--test-isolation=none` so individual registered tests execute and

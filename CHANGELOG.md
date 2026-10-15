@@ -2,6 +2,11 @@
 
 ## 0.1.0-alpha.2 (unreleased)
 
+- Add the portable `@part/plugins/providers/openai-responses` adapter for stateless
+  JSON/SSE text, runtime function calls and native reasoning replay. Validate final
+  snapshots before tool execution, with exact fixtures and live R4U smoke.
+- Add `npm run smoke:responses` using the shared bounded provider smoke flow.
+
 - Accept nullable tool calls in JSON/SSE Chat Completions responses while rejecting
   malformed non-null values. Verify live R4U text and function-tool flows with
   `gpt-6-luna`, closing G-BASE for the selected reference profile.

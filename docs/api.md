@@ -66,6 +66,9 @@ tools at `@part/node/testing/mock-provider/tools` and a packaged `part-mock-prov
 CLI. The portable Chat Completions adapter is
 `@part/plugins/providers/openai-compatible`. See [mock workflows](mock-provider.md)
 for session ownership, exact fixture matching, transcript export and profile limits.
+The separate `@part/plugins/providers/openai-responses` adapter supports stateless
+Responses text/function calls over JSON/SSE and native reasoning replay. See
+[Responses usage and limits](openai-responses.md).
 
 ## Extension contracts
 

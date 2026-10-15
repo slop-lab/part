@@ -66,7 +66,8 @@ aliases for the former flat imports. The browser stylesheet is
 
 Dependent projects can begin development against the pinned package tarballs.
 G-BASE passes for the selected reference profile, including live R4U Chat Completions
-JSON/SSE and function-tool smoke with `gpt-6-luna`. APIs remain experimental. See
+and Responses JSON/SSE/function-tool smoke with `gpt-6-luna`. APIs remain experimental. See
+[Responses adapter](docs/openai-responses.md),
 [provider smoke](docs/provider-smoke.md),
 [gate evidence](docs/gates.md), [supported contracts](docs/api.md),
 [implementation coverage](docs/implementation.md), [architecture](docs/architecture.md),

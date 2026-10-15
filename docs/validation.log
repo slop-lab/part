@@ -224,3 +224,28 @@ f80bca43c8c15052aab2549a426e44313fe7d79c6da3575823bb20a65b9b85b9  part-core-0.1.
 a6bf29eb2072e775d16240a1b3d38fbdf816ddb5e90199c896587b06401558b4  part-plugins-0.1.0-alpha.2.tgz
 003435bc3f554023b81c18b1cc347bbb88f539869d2b50e2b59c21b54e1e62f5  part-node-0.1.0-alpha.2.tgz
 adf20cd63693653b7a29f1ca9cbd651acef48b01821772063443707cfabb2c16  part-browser-0.1.0-alpha.2.tgz
+
+OpenAI Responses adapter validation
+Recorded UTC: 2026-10-15T15:51:24.886Z
+Source revision: 1412634
+Public export: @part/plugins/providers/openai-responses, factory createOpenAIResponsesAdapter, adapter ID part/openai-responses
+Implemented: stateless explicit history, store:false, JSON/SSE text, runtime function calls/results, native reasoning/summary/encrypted payload replay and usage
+Unsupported: stored response/conversation continuation, background execution, media, hosted tools, refusal and annotated/logprob output
+Focused Responses tests: 9 passed; includes UTF-8/LF/CRLF/CR byte boundaries, fragmented/multiple tool calls, strict sequence/identity/snapshot checks, duplicate or malformed input, missing/failed terminals, invalid usage and native-provider boundaries
+Fixed JSON and SSE agent/tool flows: exact fixture requests/responses, preserved native reasoning, one uppercase execution, final HELLO
+Fixed truncated SSE agent flow: failed with part.openai-responses.eof; zero tool executions
+Reproduction: npm run smoke:responses; opt-in .env credentials, four bounded requests, no automatic retries
+Live R4U gpt-6-luna Responses: text-json, text-sse and two-request tool-sse all passed; all four HTTP 200
+Final-response usage: text-json 308 input / 6 output; text-sse 308 / 6; tool-sse 401 / 6 (not aggregate billing)
+Final live verification rerun after stricter stream completion/identity checks; no endpoint configuration or credentials modified
+Evidence: docs/responses-smoke.evidence.json; usage and profile limits: docs/openai-responses.md
+npm test: 105 passed, 0 failed (9 new Responses tests)
+npm run test:consumers: 7 isolated packed consumers passed; all 65 public entrypoints checked, portable declarations remain independent of Node typings
+node scripts/check-architecture.mjs: passed (4 packages, 127 source modules, 65 public entrypoints)
+npm run format:check and git diff --check: passed
+Hosted CI, other provider models/protocols, Ollama live smoke and browser/device validation remain separate
+npm run pack:local: four tarballs and SHA-256 sidecars refreshed with the Responses export
+f80bca43c8c15052aab2549a426e44313fe7d79c6da3575823bb20a65b9b85b9  part-core-0.1.0-alpha.2.tgz
+11dbc8736d060bffe7001e32dc4d9d3830dcf18083caa2de094c4b3f306cf729  part-plugins-0.1.0-alpha.2.tgz
+003435bc3f554023b81c18b1cc347bbb88f539869d2b50e2b59c21b54e1e62f5  part-node-0.1.0-alpha.2.tgz
+adf20cd63693653b7a29f1ca9cbd651acef48b01821772063443707cfabb2c16  part-browser-0.1.0-alpha.2.tgz

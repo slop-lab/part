@@ -4,7 +4,8 @@ Candidate: `@part/core`, `@part/plugins`, `@part/node` and `@part/browser` at `0
 
 **Dependent projects can start against the selected pinned package tarballs.**
 G-BASE passes for the selected reference profile, including live R4U Chat Completions
-JSON/SSE and function-tool smoke with `gpt-6-luna`. See [provider smoke](provider-smoke.md).
+and Responses JSON/SSE/function-tool smoke with `gpt-6-luna`. See
+[provider smoke](provider-smoke.md) and [Responses evidence](responses-smoke.evidence.json).
 G-WORKFLOW's local reference profile has execution evidence for every gate area.
 This does not certify third-party product compatibility or durable continuation.
 See [implementation coverage](implementation.md) and [support limits](api.md).
@@ -15,7 +16,7 @@ See [implementation coverage](implementation.md) and [support limits](api.md).
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | G01  | ADRs, strict codecs, seven isolated packed consumers, zero runtime dependencies                                                             | Verified local profile                                                                      |
 | G02  | Input → fake model → function tool → result, cold import resources/heap/time                                                                | Verified                                                                                    |
-| G03  | Text/tool/error/native/EOF fixtures, loopback HTTP, live R4U JSON/SSE and function-tool loop                                                | Verified fixtures and selected live provider profile                                        |
+| G03  | Text/tool/error/native/EOF fixtures, loopback HTTP, live R4U Chat/Responses JSON/SSE and function-tool loops                                | Verified fixtures and selected live provider profile                                        |
 | G04  | Allow/rewrite/deny/substitute/redirect/suspend, output validation, substitute original calls zero                                           | Verified tested cases                                                                       |
 | G05  | Unobserved completion, cancel races, late responses, attached children, cross-service supervision, budgets/deadlines and awaited boundaries | Verified tested cases                                                                       |
 | G06  | Immutable CAS history and run attachment; source versions/maps and authorized public projection                                             | Verified local profile                                                                      |
