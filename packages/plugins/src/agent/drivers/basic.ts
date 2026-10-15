@@ -1,7 +1,7 @@
-import { messageItem } from '@part/core/context';
-import { emptyCleanup, fail, isJson, isJsonObject, schema } from '@part/core/contracts';
-import type { Context, Contracts, Driver, Model, Runtime } from '@part/core/reference';
-import { combineEffects } from '@part/core/runtime';
+import { messageItem } from '@slop-lab/part/context';
+import { emptyCleanup, fail, isJson, isJsonObject, schema } from '@slop-lab/part/contracts';
+import type { Context, Contracts, Driver, Model, Runtime } from '@slop-lab/part/reference';
+import { combineEffects } from '@slop-lab/part/runtime';
 export type BasicInput = string | readonly Context.SemanticItem[];
 export const basicInputSchema = schema<BasicInput>(
   'part/basic-input',

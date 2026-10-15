@@ -3,12 +3,12 @@
 Progressive agent runtime: a small environment-independent core with optional
 plugins and separate Node and browser packages.
 
-| Package         | Responsibility                                                                                     | Runtime dependencies |
-| --------------- | -------------------------------------------------------------------------------------------------- | -------------------- |
-| `@part/core`    | Contracts, composition, operations, model/tool ports, context, storage ports and client protocol   | None                 |
-| `@part/plugins` | Agent presets/drivers, model providers, workflows, hooks/skills, script bridge and test fixtures   | `@part/core`         |
-| `@part/node`    | POSIX script processes, loopback bridge, HTTP host, SQLite, file artifacts and directory snapshots | `@part/core`         |
-| `@part/browser` | DOM/headless UI, renderers, workflow forms, Inspector/Workbench and CSS                            | `@part/core`         |
+| Package                  | Responsibility                                                                                     | Runtime dependencies |
+| ------------------------ | -------------------------------------------------------------------------------------------------- | -------------------- |
+| `@slop-lab/part`         | Contracts, composition, operations, model/tool ports, context, storage ports and client protocol   | None                 |
+| `@slop-lab/part-plugins` | Agent presets/drivers, model providers, workflows, hooks/skills, script bridge and test fixtures   | `@slop-lab/part`     |
+| `@slop-lab/part-node`    | POSIX script processes, loopback bridge, HTTP host, SQLite, file artifacts and directory snapshots | `@slop-lab/part`     |
+| `@slop-lab/part-browser` | DOM/headless UI, renderers, workflow forms, Inspector/Workbench and CSS                            | `@slop-lab/part`     |
 
 The repository root is a private npm workspace, not an installable aggregate SDK.
 Each package has explicit exports, independent build output and a local tarball.
@@ -37,8 +37,8 @@ not require Node types; Node HTTP host declarations are checked with explicit
 Node typings.
 
 ```js
-import { createAgent } from '@part/plugins/agent';
-import { fakeModel } from '@part/plugins/testing';
+import { createAgent } from '@slop-lab/part-plugins/agent';
+import { fakeModel } from '@slop-lab/part-plugins/testing';
 
 const created = createAgent({ model: fakeModel([{ text: 'Hello from part' }]) });
 if (!created.ok) throw new Error(created.error.message);
@@ -52,8 +52,8 @@ registered operator tools. Requests wait for explicit decisions; successful tran
 can become exact fixed fixtures for automated tests. Run `npm run example:mock:fixed`
 for the complete tool flow, or see [mock provider workflows](docs/mock-provider.md).
 
-Run part as an ACP agent for editor clients with `@part/plugins/acp` and the
-`@part/node/acp` stdio adapter. `npm run example:acp` demonstrates conversation and
+Run part as an ACP agent for editor clients with `@slop-lab/part-plugins/acp` and the
+`@slop-lab/part-node/acp` stdio adapter. `npm run example:acp` demonstrates conversation and
 tool permission requests using the official SDK client. See [ACP integration](docs/acp.md)
 for Zed settings, session-owned MCP tools and optional live R4U providers.
 
@@ -62,16 +62,16 @@ Build local packages and install only the packages a dependent repository needs:
 ```sh
 npm run pack:local
 # In the consumer repository, for an agent application:
-npm install /path/to/part/artifacts/part-core-0.1.0-alpha.2.tgz \
-  /path/to/part/artifacts/part-plugins-0.1.0-alpha.2.tgz
-# Add part-node-*.tgz for Node adapters or part-browser-*.tgz for DOM UI.
+npm install /path/to/part/artifacts/slop-lab-part-0.1.0-alpha.2.tgz \
+  /path/to/part/artifacts/slop-lab-part-plugins-0.1.0-alpha.2.tgz
+# Add slop-lab-part-node-*.tgz for Node adapters or slop-lab-part-browser-*.tgz for DOM UI.
 ```
 
 Commit the consumer lockfile and pin package versions exactly. Packages are private
 and have not been published to npm. APIs are experimental; there are no compatibility
 aliases for the former flat imports. The browser stylesheet is
-`@part/browser/styles.css`. Run a single package build with
-`npm run build --workspace @part/browser` (or another workspace name).
+`@slop-lab/part-browser/styles.css`. Run a single package build with
+`npm run build --workspace @slop-lab/part-browser` (or another workspace name).
 
 Dependent projects can begin development against the pinned package tarballs.
 G-BASE passes for the selected reference profile, including live R4U Chat Completions

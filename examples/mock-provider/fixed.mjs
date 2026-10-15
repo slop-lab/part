@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { startMockProvider, readFixture } from '@part/node/testing/mock-provider';
+import { startMockProvider, readFixture } from '@slop-lab/part-node/testing/mock-provider';
 import { createMockFlow } from './flow.mjs';
 const load = async (name) =>
   JSON.parse(

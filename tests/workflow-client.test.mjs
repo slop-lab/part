@@ -1,15 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
-import { localContext, jsonSchema, ok, fail, digest } from '@part/core/contracts';
-import { createCodeEngine, defineCodeWorkflow } from '@part/plugins/workflows/code';
-import { createPipelineEngine, installStepHandler } from '@part/plugins/workflows/pipeline';
-import { createWorkflowHost } from '@part/plugins/workflows/host';
-import { createWorkflowEndpoint } from '@part/plugins/workflows/endpoint';
-import { createSuspensions } from '@part/core/runtime/waits';
-import { callIdentity } from '@part/plugins/workflows/memory';
-import { createLocalPort, createController, jsonCodec } from '@part/core/client';
-import { createWorkflowView } from '@part/browser/workflow';
+import { localContext, jsonSchema, ok, fail, digest } from '@slop-lab/part/contracts';
+import { createCodeEngine, defineCodeWorkflow } from '@slop-lab/part-plugins/workflows/code';
+import {
+  createPipelineEngine,
+  installStepHandler,
+} from '@slop-lab/part-plugins/workflows/pipeline';
+import { createWorkflowHost } from '@slop-lab/part-plugins/workflows/host';
+import { createWorkflowEndpoint } from '@slop-lab/part-plugins/workflows/endpoint';
+import { createSuspensions } from '@slop-lab/part/runtime/waits';
+import { callIdentity } from '@slop-lab/part-plugins/workflows/memory';
+import { createLocalPort, createController, jsonCodec } from '@slop-lab/part/client';
+import { createWorkflowView } from '@slop-lab/part-browser/workflow';
 const context = localContext();
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function until(predicate) {

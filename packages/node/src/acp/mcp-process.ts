@@ -1,5 +1,5 @@
-import { emptyCleanup, fail } from '@part/core/contracts';
-import type { Contracts } from '@part/core/reference';
+import { emptyCleanup, fail } from '@slop-lab/part/contracts';
+import type { Contracts } from '@slop-lab/part/reference';
 import { spawn } from 'node:child_process';
 import { setTimeout } from 'node:timers/promises';
 import { isAbsolute } from 'node:path';

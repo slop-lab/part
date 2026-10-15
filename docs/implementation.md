@@ -2,7 +2,7 @@
 
 The runtime is named **part (progressive agent runtime)**. The ignored `.local/`
 source specification retains its original `car` name; implementation identifiers,
-package exports and examples use `@part/core`.
+package exports and examples use `@slop-lab/part`.
 
 This release implements the specification's initial local profiles through S3,
 including the actual code and pipeline plugins required by section 16.1. The

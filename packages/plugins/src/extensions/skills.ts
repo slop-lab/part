@@ -1,6 +1,6 @@
-import { semanticItem } from '@part/core/context';
-import { canonical, fail, freeze, ok } from '@part/core/contracts';
-import type { Context, Contracts, Packages, Skills } from '@part/core/reference';
+import { semanticItem } from '@slop-lab/part/context';
+import { canonical, fail, freeze, ok } from '@slop-lab/part/contracts';
+import type { Context, Contracts, Packages, Skills } from '@slop-lab/part/reference';
 interface Decoded {
   name: string;
   description: string;

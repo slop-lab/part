@@ -1,6 +1,6 @@
-import { provenance } from '@part/core/context';
-import { canonical, fail, freeze, isJson, ok } from '@part/core/contracts';
-import type { Contracts, Storage, Workflows } from '@part/core/reference';
+import { provenance } from '@slop-lab/part/context';
+import { canonical, fail, freeze, isJson, ok } from '@slop-lab/part/contracts';
+import type { Contracts, Storage, Workflows } from '@slop-lab/part/reference';
 /** A storage port only. Each engine still owns checkpoint eligibility and scheduling. */
 export function createCheckpointStore(
   store: Storage.StateJournalStore,

@@ -1,5 +1,5 @@
 {
-  "name": "@part/node",
+  "name": "@slop-lab/part-node",
   "version": "0.1.0-alpha.2",
   "private": true,
   "type": "module",
@@ -51,7 +51,7 @@
     }
   },
   "dependencies": {
-    "@part/core": "0.1.0-alpha.2"
+    "@slop-lab/part": "0.1.0-alpha.2"
   },
   "engines": {
     "node": ">=22.18"

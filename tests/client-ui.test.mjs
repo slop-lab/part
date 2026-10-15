@@ -2,13 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
 import { build } from 'esbuild';
-import { createAgent } from '@part/plugins/agent';
-import { fakeModel } from '@part/plugins/testing';
-import { createEmbeddedEndpoint } from '@part/core/host/embedded';
-import { createLocalPort, createWatchHub, createController, jsonCodec } from '@part/core/client';
-import { createComposer } from '@part/browser/headless';
-import { createChat } from '@part/browser/dom';
-import { localContext } from '@part/core/contracts';
+import { createAgent } from '@slop-lab/part-plugins/agent';
+import { fakeModel } from '@slop-lab/part-plugins/testing';
+import { createEmbeddedEndpoint } from '@slop-lab/part/host/embedded';
+import {
+  createLocalPort,
+  createWatchHub,
+  createController,
+  jsonCodec,
+} from '@slop-lab/part/client';
+import { createComposer } from '@slop-lab/part-browser/headless';
+import { createChat } from '@slop-lab/part-browser/dom';
+import { localContext } from '@slop-lab/part/contracts';
 const context = localContext();
 const command = (text, id = crypto.randomUUID()) => ({
   protocolVersion: 1,
@@ -212,7 +217,7 @@ test('C01/C10: browser entrypoint excludes storage, executor, provider and crede
   const result = await build({
     stdin: {
       contents:
-        "export { createChat } from '@part/browser/dom'; export { createController } from '@part/core/client';",
+        "export { createChat } from '@slop-lab/part-browser/dom'; export { createController } from '@slop-lab/part/client';",
       resolveDir: process.cwd(),
     },
     bundle: true,

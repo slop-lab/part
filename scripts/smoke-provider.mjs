@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
-import { createAgent } from '@part/plugins/agent';
-import { createOpenAICompatibleAdapter } from '@part/plugins/providers/openai-compatible';
-import { createOpenAIResponsesAdapter } from '@part/plugins/providers/openai-responses';
-import { bearerAuth, createFetchTransport } from '@part/core/model';
-import { schema, stringSchema } from '@part/core/contracts';
-import { functionTool } from '@part/core/tools';
+import { createAgent } from '@slop-lab/part-plugins/agent';
+import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible';
+import { createOpenAIResponsesAdapter } from '@slop-lab/part-plugins/providers/openai-responses';
+import { bearerAuth, createFetchTransport } from '@slop-lab/part/model';
+import { schema, stringSchema } from '@slop-lab/part/contracts';
+import { functionTool } from '@slop-lab/part/tools';
 
 // Opt-in only: never run as part of the credential-free test suite.
 async function main() {

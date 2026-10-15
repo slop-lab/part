@@ -3,15 +3,15 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { localContext, digest, jsonSchema, ok, fail } from '@part/core/contracts';
-import { provenance } from '@part/core/context';
-import { createMemoryArtifacts } from '@part/core/artifacts';
-import { openFileArtifacts } from '@part/node/artifacts';
-import { createResults } from '@part/core/results';
-import { createScriptBridge } from '@part/plugins/scripts/bridge';
-import { startScriptBridge } from '@part/node/scripts/bridge';
-import { createNodeScripts } from '@part/node/scripts';
-import { createBudget, budgetKey } from '@part/core/runtime';
+import { localContext, digest, jsonSchema, ok, fail } from '@slop-lab/part/contracts';
+import { provenance } from '@slop-lab/part/context';
+import { createMemoryArtifacts } from '@slop-lab/part/artifacts';
+import { openFileArtifacts } from '@slop-lab/part-node/artifacts';
+import { createResults } from '@slop-lab/part/results';
+import { createScriptBridge } from '@slop-lab/part-plugins/scripts/bridge';
+import { startScriptBridge } from '@slop-lab/part-node/scripts/bridge';
+import { createNodeScripts } from '@slop-lab/part-node/scripts';
+import { createBudget, budgetKey } from '@slop-lab/part/runtime';
 const context = localContext();
 const metadata = { mediaType: 'application/json', provenance };
 test('Artifacts publish only complete immutable bytes, authorize ranges and survive reopening', async () => {
@@ -250,10 +250,10 @@ test('Authenticated bridge rejects public IDs, profile widening and changed IDs;
 });
 
 test('Script tools share one prepared executor attempt; direct workflow scripts retain their own boundary', async () => {
-  const { createToolDispatcher, installTool } = await import('@part/core/tools');
-  const { schema } = await import('@part/core/contracts');
-  const { isScriptRequest } = await import('@part/core/scripts');
-  const { createBoundary, createOperations } = await import('@part/core/runtime');
+  const { createToolDispatcher, installTool } = await import('@slop-lab/part/tools');
+  const { schema } = await import('@slop-lab/part/contracts');
+  const { isScriptRequest } = await import('@slop-lab/part/scripts');
+  const { createBoundary, createOperations } = await import('@slop-lab/part/runtime');
   const root = await mkdtemp(join(tmpdir(), 'part-script-attempt-'));
   try {
     const source = 'console.log(JSON.stringify({done:true}));';
@@ -339,7 +339,7 @@ test('Script tools share one prepared executor attempt; direct workflow scripts 
 });
 
 test('Processor timeout rejects acceptance and late normalization cannot revive the submission', async () => {
-  const { createOperations } = await import('@part/core/runtime');
+  const { createOperations } = await import('@slop-lab/part/runtime');
   let finish;
   const processor = {
     id: 'test/timeout',

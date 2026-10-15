@@ -1,5 +1,5 @@
-import { digest, fail, isJsonObject, ok } from '@part/core/contracts';
-import type { Contracts, Model } from '@part/core/reference';
+import { digest, fail, isJsonObject, ok } from '@slop-lab/part/contracts';
+import type { Contracts, Model } from '@slop-lab/part/reference';
 export async function encodeChat(
   invocation: Model.Invocation,
   profile: Model.Profile,

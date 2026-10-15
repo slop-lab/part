@@ -1,6 +1,6 @@
-import { fail, isJson, isJsonObject, ok } from '@part/core/contracts';
-import type { Contracts, Runtime, Scripts } from '@part/core/reference';
-import type { OperationContext } from '@part/core/runtime';
+import { fail, isJson, isJsonObject, ok } from '@slop-lab/part/contracts';
+import type { Contracts, Runtime, Scripts } from '@slop-lab/part/reference';
+import type { OperationContext } from '@slop-lab/part/runtime';
 import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

@@ -1,5 +1,5 @@
-import { digest, fail, freeze, ok } from '@part/core/contracts';
-import type { Contracts, Packages } from '@part/core/reference';
+import { digest, fail, freeze, ok } from '@slop-lab/part/contracts';
+import type { Contracts, Packages } from '@slop-lab/part/reference';
 import { lstat, readdir, readFile, realpath } from 'node:fs/promises';
 import { basename, join, relative, resolve } from 'node:path';
 export function createDirectoryPackages(options: { maxBytes?: number } = {}): Packages.Source {

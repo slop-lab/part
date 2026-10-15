@@ -37,7 +37,8 @@ const coreFiles = new Set([
 function resolveDependency(file, specifier, runtime) {
   const pkg = owner(file);
   if (specifier.startsWith('node:')) {
-    if (pkg.directory !== 'node') failures.push(`${file}: Node imports belong in @part/node`);
+    if (pkg.directory !== 'node')
+      failures.push(`${file}: Node imports belong in @slop-lab/part-node`);
     return specifier;
   }
   if (specifier.startsWith('.')) {
@@ -178,7 +179,9 @@ for (const target of reachable('packages/core/src/index.ts'))
 let entries = 0;
 for (const pkg of packages) {
   const expectedDependencies =
-    pkg.directory === 'core' ? {} : { '@part/core': byName.get('@part/core').manifest.version };
+    pkg.directory === 'core'
+      ? {}
+      : { '@slop-lab/part': byName.get('@slop-lab/part').manifest.version };
   if (JSON.stringify(pkg.manifest.dependencies ?? {}) !== JSON.stringify(expectedDependencies))
     failures.push(`${pkg.path}: dependencies must follow the core/plugin/environment boundary`);
   const targets = new Set();

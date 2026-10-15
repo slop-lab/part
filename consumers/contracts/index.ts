@@ -1,10 +1,10 @@
-import { createChat } from '@part/browser/dom';
-import { createControl, installAction } from '@part/core/client/control';
-import { createContextCompiler, lowerersPoint, semanticItem } from '@part/core/context';
-import { localContext, ok, stringSchema } from '@part/core/contracts';
-import type { Context, Contracts, UI } from '@part/core/reference';
-import { createAgent } from '@part/plugins/agent';
-import { fakeModel } from '@part/plugins/testing';
+import { createChat } from '@slop-lab/part-browser/dom';
+import { createControl, installAction } from '@slop-lab/part/client/control';
+import { createContextCompiler, lowerersPoint, semanticItem } from '@slop-lab/part/context';
+import { localContext, ok, stringSchema } from '@slop-lab/part/contracts';
+import type { Context, Contracts, UI } from '@slop-lab/part/reference';
+import { createAgent } from '@slop-lab/part-plugins/agent';
+import { fakeModel } from '@slop-lab/part-plugins/testing';
 
 const lowerer: Context.Lowerer<unknown> = {
   id: 'consumer/report-lowerer',
@@ -36,7 +36,7 @@ const extension = {
     requires: [{ id: 'part/context', contractVersion: 1, optional: false }],
     provides: [],
   },
-  register(registry: import('@part/core/reference').Composition.RegistrationPort) {
+  register(registry: import('@slop-lab/part/reference').Composition.RegistrationPort) {
     return registry.contribute({
       id: 'consumer/report-lowerer',
       point: { ...lowerersPoint },

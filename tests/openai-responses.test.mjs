@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { createOpenAIResponsesAdapter } from '@part/plugins/providers/openai-responses';
-import { createOpenAICompatibleAdapter } from '@part/plugins/providers/openai-compatible';
-import { createAgent } from '@part/plugins/agent';
-import { createFetchTransport, noAuth } from '@part/core/model';
-import { functionTool } from '@part/core/tools';
-import { digest, schema, stringSchema } from '@part/core/contracts';
+import { createOpenAIResponsesAdapter } from '@slop-lab/part-plugins/providers/openai-responses';
+import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible';
+import { createAgent } from '@slop-lab/part-plugins/agent';
+import { createFetchTransport, noAuth } from '@slop-lab/part/model';
+import { functionTool } from '@slop-lab/part/tools';
+import { digest, schema, stringSchema } from '@slop-lab/part/contracts';
 
 const adapter = createOpenAIResponsesAdapter();
 const profile = {

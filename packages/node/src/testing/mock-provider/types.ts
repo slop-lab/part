@@ -1,4 +1,4 @@
-import type { Contracts } from '@part/core/reference';
+import type { Contracts } from '@slop-lab/part/reference';
 
 export interface MockProject {
   readonly id: string;

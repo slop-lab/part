@@ -1,11 +1,11 @@
-import { canonical, fail, freeze, isJson, isJsonObject, ok } from '@part/core/contracts';
-import type { Contracts, Runtime, Scripts } from '@part/core/reference';
-import { budgetKey, createBudget } from '@part/core/runtime';
-import { numericLimits } from '@part/core/runtime/budgets';
-import { costServices } from '@part/core/runtime/costs';
-import { scheduleDeadline } from '@part/core/runtime/deadline';
-import type { BridgeMethod, ManagedBridge } from '@part/core/scripts/bridge';
-export type { BridgeMethod, ManagedBridge } from '@part/core/scripts/bridge';
+import { canonical, fail, freeze, isJson, isJsonObject, ok } from '@slop-lab/part/contracts';
+import type { Contracts, Runtime, Scripts } from '@slop-lab/part/reference';
+import { budgetKey, createBudget } from '@slop-lab/part/runtime';
+import { numericLimits } from '@slop-lab/part/runtime/budgets';
+import { costServices } from '@slop-lab/part/runtime/costs';
+import { scheduleDeadline } from '@slop-lab/part/runtime/deadline';
+import type { BridgeMethod, ManagedBridge } from '@slop-lab/part/scripts/bridge';
+export type { BridgeMethod, ManagedBridge } from '@slop-lab/part/scripts/bridge';
 
 /** Trusted methods are supplied by the host, never loaded from a script request. */
 export function createScriptBridge(

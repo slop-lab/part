@@ -123,7 +123,7 @@ try {
       const bundle = await build({
         stdin: {
           contents:
-            "export { createChat } from '@part/browser/dom'; export { createController } from '@part/core/client';",
+            "export { createChat } from '@slop-lab/part-browser/dom'; export { createController } from '@slop-lab/part/client';",
           resolveDir: directory,
         },
         bundle: true,
@@ -131,7 +131,11 @@ try {
         write: false,
         metafile: true,
       });
-      if (Object.keys(bundle.metafile.inputs).some((path) => /@part\/(node|plugins)\//.test(path)))
+      if (
+        Object.keys(bundle.metafile.inputs).some((path) =>
+          /@slop-lab\/part-(node|plugins)\//.test(path),
+        )
+      )
         throw Error('Browser consumer pulled in another runtime');
     }
     const lock = JSON.parse(readFileSync(join(directory, 'package-lock.json'), 'utf8'));

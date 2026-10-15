@@ -1,6 +1,6 @@
-import { fail, isJsonObject, ok } from '@part/core/contracts';
-import type { Contracts, Scripts } from '@part/core/reference';
-import type { ManagedBridge } from '@part/core/scripts/bridge';
+import { fail, isJsonObject, ok } from '@slop-lab/part/contracts';
+import type { Contracts, Scripts } from '@slop-lab/part/reference';
+import type { ManagedBridge } from '@slop-lab/part/scripts/bridge';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
 export interface ScriptBridgeEnvironment {

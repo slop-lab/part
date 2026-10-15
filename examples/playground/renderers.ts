@@ -1,4 +1,4 @@
-import type { Client, Contracts, UI } from '@part/core/reference';
+import type { Client, Contracts, UI } from '@slop-lab/part/reference';
 
 export function playgroundRenderers(
   invoke: (action: string, target?: Contracts.EntityRef) => void,

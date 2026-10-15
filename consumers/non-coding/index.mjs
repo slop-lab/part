@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import { createAgent } from '@part/plugins/agent';
-import { createAcpAgent } from '@part/plugins/acp';
-import { functionTool } from '@part/core/tools';
-import { schema, stringSchema } from '@part/core/contracts';
-import { fakeModel } from '@part/plugins/testing';
+import { createAgent } from '@slop-lab/part-plugins/agent';
+import { createAcpAgent } from '@slop-lab/part-plugins/acp';
+import { functionTool } from '@slop-lab/part/tools';
+import { schema, stringSchema } from '@slop-lab/part/contracts';
+import { fakeModel } from '@slop-lab/part-plugins/testing';
 const input = schema(
   'consumer/text',
   (value) => value && typeof value === 'object' && typeof value.text === 'string',

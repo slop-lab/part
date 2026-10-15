@@ -1,5 +1,5 @@
-import { fail, ok } from '@part/core/contracts';
-import type { Composition, Contracts, Workflows } from '@part/core/reference';
+import { fail, ok } from '@slop-lab/part/contracts';
+import type { Composition, Contracts, Workflows } from '@slop-lab/part/reference';
 export const enginesPoint: Composition.ExtensionPoint<Workflows.Engine> = {
   id: 'part.workflow/engines',
   owner: 'part/workflow-host',

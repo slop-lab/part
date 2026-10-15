@@ -1,5 +1,5 @@
 {
-  "name": "@part/browser",
+  "name": "@slop-lab/part-browser",
   "version": "0.1.0-alpha.2",
   "private": true,
   "type": "module",
@@ -42,7 +42,7 @@
     }
   },
   "dependencies": {
-    "@part/core": "0.1.0-alpha.2"
+    "@slop-lab/part": "0.1.0-alpha.2"
   },
   "scripts": {
     "build": "node ../../scripts/build.mjs browser",

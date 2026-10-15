@@ -10,11 +10,11 @@ import {
   createMockProviderClient,
   readMockSession,
   readFixture,
-} from '@part/node/testing/mock-provider';
-import { createMockProviderTools } from '@part/node/testing/mock-provider/tools';
-import { createOpenAICompatibleAdapter } from '@part/plugins/providers/openai-compatible';
-import { createToolDispatcher } from '@part/core/tools';
-import { localContext } from '@part/core/contracts';
+} from '@slop-lab/part-node/testing/mock-provider';
+import { createMockProviderTools } from '@slop-lab/part-node/testing/mock-provider/tools';
+import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible';
+import { createToolDispatcher } from '@slop-lab/part/tools';
+import { localContext } from '@slop-lab/part/contracts';
 import { createMockFlow } from '../examples/mock-provider/flow.mjs';
 const load = async (name) =>
   JSON.parse(await readFile(new URL(`../fixtures/mock-provider/${name}`, import.meta.url), 'utf8'));

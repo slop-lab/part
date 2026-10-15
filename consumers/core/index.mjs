@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createOperations, localContext, ok } from '@part/core';
+import { createOperations, localContext, ok } from '@slop-lab/part';
 const operations = createOperations();
 const started = await operations.begin(
   { kind: 'consumer', childPolicy: 'attached', retryOwner: 'consumer' },

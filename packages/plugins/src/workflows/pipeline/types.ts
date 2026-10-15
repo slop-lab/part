@@ -1,4 +1,4 @@
-import type { Composition, Contracts, PipelineV1, Runtime, Skills } from '@part/core/reference';
+import type { Composition, Contracts, PipelineV1, Runtime, Skills } from '@slop-lab/part/reference';
 import type { WorkflowServices } from '../memory/types.js';
 export interface PipelineOptions {
   definitions: readonly PipelineV1.Definition[];

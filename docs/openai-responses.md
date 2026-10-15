@@ -1,14 +1,14 @@
 # OpenAI Responses adapter
 
-`@part/plugins/providers/openai-responses` exports `createOpenAIResponsesAdapter()`.
+`@slop-lab/part-plugins/providers/openai-responses` exports `createOpenAIResponsesAdapter()`.
 Its adapter ID is `part/openai-responses` and its encoded protocol is
-`openai.responses`. It is a portable plugin depending only on `@part/core`;
+`openai.responses`. It is a portable plugin depending only on `@slop-lab/part`;
 transport and authentication remain independently replaceable.
 
 ```js
-import { createAgent } from '@part/plugins/agent';
-import { createOpenAIResponsesAdapter } from '@part/plugins/providers/openai-responses';
-import { bearerAuth, createFetchTransport } from '@part/core/model';
+import { createAgent } from '@slop-lab/part-plugins/agent';
+import { createOpenAIResponsesAdapter } from '@slop-lab/part-plugins/providers/openai-responses';
+import { bearerAuth, createFetchTransport } from '@slop-lab/part/model';
 
 const endpoint = `${process.env.R4U_BASE_URL.replace(/\/$/, '')}/responses`;
 const created = createAgent({

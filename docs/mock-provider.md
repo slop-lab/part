@@ -8,8 +8,8 @@ The working agent decides interactive responses using project context and the
 captured request; fixed mode uses exact ordered fixture exchanges.
 
 Implementation ownership stays explicit: the service, CLI and operator tools are
-in `@part/node`; the portable Chat Completions adapter is in
-`@part/plugins/providers/openai-compatible`. Core and browser packages do not
+in `@slop-lab/part-node`; the portable Chat Completions adapter is in
+`@slop-lab/part-plugins/providers/openai-compatible`. Core and browser packages do not
 acquire Node dependencies.
 
 ## Interactive flow for a working agent
@@ -68,8 +68,11 @@ neither evaluates prompts nor launches another model. CLI commands print JSON;
 
 ```js
 import { readFile } from 'node:fs/promises';
-import { createMockProviderClient, readMockSession } from '@part/node/testing/mock-provider';
-import { createMockProviderTools } from '@part/node/testing/mock-provider/tools';
+import {
+  createMockProviderClient,
+  readMockSession,
+} from '@slop-lab/part-node/testing/mock-provider';
+import { createMockProviderTools } from '@slop-lab/part-node/testing/mock-provider/tools';
 
 const session = readMockSession(JSON.parse(await readFile('/tmp/part-mock-session.json', 'utf8')));
 const client = createMockProviderClient(session);

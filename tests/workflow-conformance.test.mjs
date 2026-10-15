@@ -3,21 +3,21 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { localContext, ok, fail, jsonSchema, digest } from '@part/core/contracts';
-import { createOperations, createBudget, budgetKey } from '@part/core/runtime';
-import { createPlanner } from '@part/core/composition';
-import { createBasicDriver } from '@part/plugins/agent/drivers/basic';
-import { createRunService, installDriver } from '@part/core/runtime/runs';
-import { createModelGateway } from '@part/core/model';
-import { fakeModel } from '@part/plugins/testing';
-import { createContextCompiler } from '@part/core/context';
-import { createNodeScripts } from '@part/node/scripts';
-import { createResults } from '@part/core/results';
-import { createSuspensions } from '@part/core/runtime/waits';
-import { createCodeEngine, defineCodeWorkflow } from '@part/plugins/workflows/code';
-import { callIdentity } from '@part/plugins/workflows/memory';
-import { createScriptBridge } from '@part/plugins/scripts/bridge';
-import { createScriptHooks } from '@part/plugins/extensions/hooks';
+import { localContext, ok, fail, jsonSchema, digest } from '@slop-lab/part/contracts';
+import { createOperations, createBudget, budgetKey } from '@slop-lab/part/runtime';
+import { createPlanner } from '@slop-lab/part/composition';
+import { createBasicDriver } from '@slop-lab/part-plugins/agent/drivers/basic';
+import { createRunService, installDriver } from '@slop-lab/part/runtime/runs';
+import { createModelGateway } from '@slop-lab/part/model';
+import { fakeModel } from '@slop-lab/part-plugins/testing';
+import { createContextCompiler } from '@slop-lab/part/context';
+import { createNodeScripts } from '@slop-lab/part-node/scripts';
+import { createResults } from '@slop-lab/part/results';
+import { createSuspensions } from '@slop-lab/part/runtime/waits';
+import { createCodeEngine, defineCodeWorkflow } from '@slop-lab/part-plugins/workflows/code';
+import { callIdentity } from '@slop-lab/part-plugins/workflows/memory';
+import { createScriptBridge } from '@slop-lab/part-plugins/scripts/bridge';
+import { createScriptHooks } from '@slop-lab/part-plugins/extensions/hooks';
 const context = localContext();
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function until(predicate) {
@@ -418,10 +418,10 @@ test('GW09: bridge expiry/revocation propagate cancellation and never widen pare
 });
 
 test('Pinned pipeline skill binding contributes explicit user instructions and releases the activation', async () => {
-  const { createDirectoryPackages } = await import('@part/node/packages');
-  const { createSkills, skillLowerer } = await import('@part/plugins/extensions/skills');
-  const { messageItem, messageLowerer } = await import('@part/core/context');
-  const { createPipelineEngine } = await import('@part/plugins/workflows/pipeline');
+  const { createDirectoryPackages } = await import('@slop-lab/part-node/packages');
+  const { createSkills, skillLowerer } = await import('@slop-lab/part-plugins/extensions/skills');
+  const { messageItem, messageLowerer } = await import('@slop-lab/part/context');
+  const { createPipelineEngine } = await import('@slop-lab/part-plugins/workflows/pipeline');
   const root = await mkdtemp(join(tmpdir(), 'part-skill-'));
   try {
     const name = 'review-skill',
@@ -537,8 +537,8 @@ test('Pinned pipeline skill binding contributes explicit user instructions and r
 });
 
 test('Bridge service adapter executes the configured gateway and exposes only its owner handles', async () => {
-  const { createBridgeMethods } = await import('@part/plugins/scripts/bridge/services');
-  const { messageItem } = await import('@part/core/context');
+  const { createBridgeMethods } = await import('@slop-lab/part-plugins/scripts/bridge/services');
+  const { messageItem } = await import('@slop-lab/part/context');
   const operations = createOperations(),
     model = fakeModel([{ text: 'bridge response' }]),
     gateway = createModelGateway({
@@ -631,7 +631,7 @@ test('Bridge service adapter executes the configured gateway and exposes only it
 });
 
 test('W12: native logical step keys attach the same managed agent run and reject changed input', async () => {
-  const { createAgentStepBinding } = await import('@part/plugins/workflows/agent-step');
+  const { createAgentStepBinding } = await import('@slop-lab/part-plugins/workflows/agent-step');
   const operations = createOperations(),
     model = fakeModel([{ text: 'attached once' }]),
     gateway = createModelGateway({

@@ -1,8 +1,8 @@
-import { canonical, digest, fail, freeze, isJson, ok } from '@part/core/contracts';
-import type { Contracts, Runtime, Workflows } from '@part/core/reference';
-import { budgetKey, createOperations } from '@part/core/runtime';
-import { createChildBudget, numericLimits } from '@part/core/runtime/budgets';
-import { costServices } from '@part/core/runtime/costs';
+import { canonical, digest, fail, freeze, isJson, ok } from '@slop-lab/part/contracts';
+import type { Contracts, Runtime, Workflows } from '@slop-lab/part/reference';
+import { budgetKey, createOperations } from '@slop-lab/part/runtime';
+import { createChildBudget, numericLimits } from '@slop-lab/part/runtime/budgets';
+import { costServices } from '@slop-lab/part/runtime/costs';
 import { executeWorkflow } from './execute.js';
 import { memoryGuarantees, workflowSnapshot } from './state.js';
 import type { Execution, PreparedRunner, WorkflowServices } from './types.js';

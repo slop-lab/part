@@ -1,5 +1,5 @@
-import { jsonCodec } from '@part/core/client';
-import type { Contracts } from '@part/core/reference';
+import { jsonCodec } from '@slop-lab/part/client';
+import type { Contracts } from '@slop-lab/part/reference';
 import type { Writable } from 'node:stream';
 import { AcpRpcError } from './types.js';
 

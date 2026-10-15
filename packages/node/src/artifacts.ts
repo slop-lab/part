@@ -1,6 +1,6 @@
-import { createArtifactStore } from '@part/core/artifacts';
-import { isJsonObject } from '@part/core/contracts';
-import type { Storage } from '@part/core/reference';
+import { createArtifactStore } from '@slop-lab/part/artifacts';
+import { isJsonObject } from '@slop-lab/part/contracts';
+import type { Storage } from '@slop-lab/part/reference';
 import { mkdir, open, readFile, rename, rm, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 /** A bounded reference backend. One fsynced atomic record owns metadata and bytes. */
@@ -56,7 +56,10 @@ export async function openFileArtifacts(
           const bytes = Buffer.from(value.bytes, 'base64');
           if (bytes.toString('base64') !== value.bytes)
             throw new Error('Invalid artifact encoding');
-          return { ...value, bytes } as unknown as import('@part/core/artifacts').ArtifactRecord;
+          return {
+            ...value,
+            bytes,
+          } as unknown as import('@slop-lab/part/artifacts').ArtifactRecord;
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
           throw error;

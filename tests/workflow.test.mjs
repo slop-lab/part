@@ -11,18 +11,21 @@ import {
   stringSchema,
   schema,
   digest,
-} from '@part/core/contracts';
-import { createOperations, createBoundary } from '@part/core/runtime';
-import { createNodeScripts } from '@part/node/scripts';
-import { createResults } from '@part/core/results';
-import { createSuspensions } from '@part/core/runtime/waits';
-import { createCodeEngine, defineCodeWorkflow } from '@part/plugins/workflows/code';
-import { createPipelineEngine, installStepHandler } from '@part/plugins/workflows/pipeline';
-import { createWorkflowHost } from '@part/plugins/workflows/host';
-import { callIdentity } from '@part/plugins/workflows/memory';
-import { fakeModel } from '@part/plugins/testing';
-import { createModelGateway } from '@part/core/model';
-import { messageItem, createContextCompiler } from '@part/core/context';
+} from '@slop-lab/part/contracts';
+import { createOperations, createBoundary } from '@slop-lab/part/runtime';
+import { createNodeScripts } from '@slop-lab/part-node/scripts';
+import { createResults } from '@slop-lab/part/results';
+import { createSuspensions } from '@slop-lab/part/runtime/waits';
+import { createCodeEngine, defineCodeWorkflow } from '@slop-lab/part-plugins/workflows/code';
+import {
+  createPipelineEngine,
+  installStepHandler,
+} from '@slop-lab/part-plugins/workflows/pipeline';
+import { createWorkflowHost } from '@slop-lab/part-plugins/workflows/host';
+import { callIdentity } from '@slop-lab/part-plugins/workflows/memory';
+import { fakeModel } from '@slop-lab/part-plugins/testing';
+import { createModelGateway } from '@slop-lab/part/model';
+import { messageItem, createContextCompiler } from '@slop-lab/part/context';
 const context = localContext(),
   delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const ref = (id, format, digest) => ({

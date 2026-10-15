@@ -1,15 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { localContext, ok, fail, jsonSchema, stringSchema, canonical } from '@part/core/contracts';
-import { createPlanner, createScopeManager } from '@part/core/composition';
+import {
+  localContext,
+  ok,
+  fail,
+  jsonSchema,
+  stringSchema,
+  canonical,
+} from '@slop-lab/part/contracts';
+import { createPlanner, createScopeManager } from '@slop-lab/part/composition';
 import {
   createOperations,
   createBoundary,
   managedAttempt,
   createBudget,
   createProgress,
-} from '@part/core/runtime';
-import { createSuspensions } from '@part/core/runtime/waits';
+} from '@slop-lab/part/runtime';
+import { createSuspensions } from '@slop-lab/part/runtime/waits';
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const completed = (result) => ({
   phase: 'completed',
@@ -311,7 +318,7 @@ test('waits validate authority, revision, schema and deduplicate responses', asy
 
 test('synchronous composition hashing matches native SHA-256', async () => {
   const { sha256 } = await import('../packages/core/dist/foundation/hash.js');
-  const { digest } = await import('@part/core/contracts');
+  const { digest } = await import('@slop-lab/part/contracts');
   for (const text of ['', 'abc', '한국어', 'x'.repeat(1000)]) {
     const bytes = new TextEncoder().encode(text);
     assert.equal(sha256(bytes), await digest(bytes));
@@ -508,7 +515,7 @@ test('Attached work from a separately configured service joins the parent superv
 });
 
 test('Unresolved driver cleanup is abandoned and retains the actual resource reference', async () => {
-  const { createRunService, installDriver } = await import('@part/core/runtime/runs');
+  const { createRunService, installDriver } = await import('@slop-lab/part/runtime/runs');
   const operations = createOperations();
   let disposals = 0;
   const ref = { owner: 'test/driver', kind: 'test/resource', id: 'unclosed' };

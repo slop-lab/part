@@ -1,7 +1,7 @@
-import { jsonCodec } from '@part/core/client';
-import { commandSchema, querySchema } from '@part/core/client/control';
-import { fail, isJsonObject, ok } from '@part/core/contracts';
-import type { Client, Contracts } from '@part/core/reference';
+import { jsonCodec } from '@slop-lab/part/client';
+import { commandSchema, querySchema } from '@slop-lab/part/client/control';
+import { fail, isJsonObject, ok } from '@slop-lab/part/contracts';
+import type { Client, Contracts } from '@slop-lab/part/reference';
 import { once } from 'node:events';
 import type { IncomingMessage } from 'node:http';
 import { createServer } from 'node:http';

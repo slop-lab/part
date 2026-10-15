@@ -1,5 +1,5 @@
-import { canonical, fail, freeze, isJson, ok } from '@part/core/contracts';
-import type { Contracts, Runtime, Workflows } from '@part/core/reference';
+import { canonical, fail, freeze, isJson, ok } from '@slop-lab/part/contracts';
+import type { Contracts, Runtime, Workflows } from '@slop-lab/part/reference';
 /** Native schedulers choose stable logical keys; this adapter owns one attached run. */
 export function createAgentStepBinding(
   runs: Runtime.RunService,

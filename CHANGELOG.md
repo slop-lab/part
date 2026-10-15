@@ -13,7 +13,7 @@
   opt-in R4U providers, request/event inspection, memory sessions and responsive themes.
 - Add a documented Chromium interaction suite and playground ownership regressions.
 
-- Add the portable `@part/plugins/providers/openai-responses` adapter for stateless
+- Add the portable `@slop-lab/part-plugins/providers/openai-responses` adapter for stateless
   JSON/SSE text, runtime function calls and native reasoning replay. Validate final
   snapshots before tool execution, with exact fixtures and live R4U smoke.
 - Add `npm run smoke:responses` using the shared bounded provider smoke flow.
@@ -33,15 +33,15 @@
 - Add a portable Chat Completions text/function-tool adapter, agent tool-loop
   examples and fixed/interactive golden transcripts.
 
-- Split the SDK into `@part/core`, `@part/plugins`, `@part/node` and `@part/browser`.
+- Split the SDK into `@slop-lab/part`, `@slop-lab/part-plugins`, `@slop-lab/part-node` and `@slop-lab/part-browser`.
   The private workspace root is not an aggregate package. All three optional packages
   depend only on the matching core version; each has independent output and packaging.
 - Verify seven isolated consumers and all public entrypoints, including core-only,
   Node-only and browser-only installs without unrelated packages.
 
 - Replace abbreviated import aliases with descriptive names and group source files
-  by responsibility. Public paths follow their domains, including `@part/plugins/workflows/code`,
-  `@part/node/scripts` and `@part/browser/dom`; remove flat compatibility paths and `part/core`.
+  by responsibility. Public paths follow their domains, including `@slop-lab/part-plugins/workflows/code`,
+  `@slop-lab/part-node/scripts` and `@slop-lab/part-browser/dom`; remove flat compatibility paths and `part/core`.
 - Move shared budget/effect helpers into runtime and use direct internal dependencies.
 - Separate workflow lifecycle, managed calls, output validation and state; split script
   admission/source/process handling, composition planning/scopes and client codec/watch/controller.
@@ -66,8 +66,8 @@ Direct `createRunService` callers must pass a planner-resolved composition handl
 DOM component overrides now have concrete exported signatures. Durable checkpoint
 storage does not enable code/pipeline replay. Pin this version and rerun consumers.
 Update imports to the domain paths listed in `docs/api.md`; there are no compatibility
-aliases. `reserve`, `budgetKey` and `combineEffects` belong to `@part/core/runtime`.
-The public stylesheet is `@part/browser/styles.css`. Use `npm run pack:local`
+aliases. `reserve`, `budgetKey` and `combineEffects` belong to `@slop-lab/part/runtime`.
+The public stylesheet is `@slop-lab/part-browser/styles.css`. Use `npm run pack:local`
 and install core plus only the required optional package tarballs.
 
 ## 0.1.0-alpha.1 (local baseline)

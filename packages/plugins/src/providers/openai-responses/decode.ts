@@ -1,5 +1,5 @@
-import { canonical, fail, isJsonObject, ok } from '@part/core/contracts';
-import type { Contracts, Model } from '@part/core/reference';
+import { canonical, fail, isJsonObject, ok } from '@slop-lab/part/contracts';
+import type { Contracts, Model } from '@slop-lab/part/reference';
 import { decodeOutput } from './output.js';
 
 interface StreamItem {

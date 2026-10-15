@@ -1,6 +1,6 @@
 # Integration gate evidence
 
-Candidate: `@part/core`, `@part/plugins`, `@part/node` and `@part/browser` at `0.1.0-alpha.2`.
+Candidate: `@slop-lab/part`, `@slop-lab/part-plugins`, `@slop-lab/part-node` and `@slop-lab/part-browser` at `0.1.0-alpha.2`.
 
 **Dependent projects can start against the selected pinned package tarballs.**
 G-BASE passes for the selected reference profile, including live R4U Chat Completions

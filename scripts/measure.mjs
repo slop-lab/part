@@ -2,7 +2,7 @@ import { performance } from 'node:perf_hooks';
 const before = process.getActiveResourcesInfo(),
   memory = process.memoryUsage().heapUsed,
   start = performance.now();
-await import('@part/core');
+await import('@slop-lab/part');
 const elapsed = performance.now() - start,
   after = process.getActiveResourcesInfo();
 const activeDelta = after.filter(

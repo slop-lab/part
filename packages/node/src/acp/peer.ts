@@ -1,6 +1,6 @@
-import { jsonCodec } from '@part/core/client';
-import { emptyCleanup, fail, isJson, isJsonObject } from '@part/core/contracts';
-import type { Contracts } from '@part/core/reference';
+import { jsonCodec } from '@slop-lab/part/client';
+import { emptyCleanup, fail, isJson, isJsonObject } from '@slop-lab/part/contracts';
+import type { Contracts } from '@slop-lab/part/reference';
 import { createAcpOutput } from './output.js';
 import { AcpRpcError, limit } from './types.js';
 import type { AcpHandler, AcpPeer, AcpStdioOptions } from './types.js';

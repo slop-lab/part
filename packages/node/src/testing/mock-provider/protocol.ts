@@ -1,5 +1,5 @@
-import { isJson, isJsonObject } from '@part/core/contracts';
-import type { Contracts } from '@part/core/reference';
+import { isJson, isJsonObject } from '@slop-lab/part/contracts';
+import type { Contracts } from '@slop-lab/part/reference';
 import type { MockChatRequest, MockFixture, MockReply } from './types.js';
 
 export function readChatRequest(value: unknown): MockChatRequest {

@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import { localContext, jsonSchema, ok } from '@part/core/contracts';
-import { defineCodeWorkflow, createCodeEngine } from '@part/plugins/workflows/code';
-import { createWorkflowHost } from '@part/plugins/workflows/host';
-import { createWorkflowEndpoint } from '@part/plugins/workflows/endpoint';
-import { createLocalPort, createController } from '@part/core/client';
+import { localContext, jsonSchema, ok } from '@slop-lab/part/contracts';
+import { defineCodeWorkflow, createCodeEngine } from '@slop-lab/part-plugins/workflows/code';
+import { createWorkflowHost } from '@slop-lab/part-plugins/workflows/host';
+import { createWorkflowEndpoint } from '@slop-lab/part-plugins/workflows/endpoint';
+import { createLocalPort, createController } from '@slop-lab/part/client';
 const context = localContext();
 let executed = 0;
 const definition = await defineCodeWorkflow({

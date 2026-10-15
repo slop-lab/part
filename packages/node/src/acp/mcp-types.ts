@@ -1,4 +1,4 @@
-import type { Contracts, Tools } from '@part/core/reference';
+import type { Contracts, Tools } from '@slop-lab/part/reference';
 
 export interface AcpMcpServer {
   readonly name: string;

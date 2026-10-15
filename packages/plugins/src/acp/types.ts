@@ -1,7 +1,7 @@
-import type { Contracts, Tools } from '@part/core/reference';
+import type { Contracts, Tools } from '@slop-lab/part/reference';
 import type { AgentOptions } from '../agent/index.js';
 
-/** Structural peer port, implemented by @part/node/acp or a host's ACP SDK binding. */
+/** Structural peer port, implemented by @slop-lab/part-node/acp or a host's ACP SDK binding. */
 export interface AcpConnection {
   notify(method: string, params: Contracts.Json): Promise<void>;
   request(

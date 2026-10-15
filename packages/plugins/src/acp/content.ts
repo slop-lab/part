@@ -1,5 +1,5 @@
-import { isJsonObject } from '@part/core/contracts';
-import type { Contracts, Model } from '@part/core/reference';
+import { isJsonObject } from '@slop-lab/part/contracts';
+import type { Contracts, Model } from '@slop-lab/part/reference';
 import { AcpError } from './types.js';
 import type { AcpMcpServer } from './types.js';
 

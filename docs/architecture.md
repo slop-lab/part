@@ -57,8 +57,8 @@ separates codecs, watch state, local transport and controller state. The Node sc
 host separates admission/attempt ownership, immutable source selection and process I/O.
 
 Imports use their original descriptive names. Public package paths follow the
-domain hierarchy, such as `@part/plugins/workflows/code`, `@part/plugins/providers/ollama` and
-`@part/browser/dom`. Flat compatibility paths and the duplicate core entrypoint are removed.
+domain hierarchy, such as `@slop-lab/part-plugins/workflows/code`, `@slop-lab/part-plugins/providers/ollama` and
+`@slop-lab/part-browser/dom`. Flat compatibility paths and the duplicate core entrypoint are removed.
 Internal modules import their actual dependencies instead of their own public barrels.
 Shared budget/effect logic belongs to runtime, so script and workflow engines do not
 depend on model gateways or agent drivers. Internal helper paths are not public exports.

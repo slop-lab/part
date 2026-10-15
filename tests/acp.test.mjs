@@ -7,14 +7,14 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { connectAcpMcpServers } from '@part/node/acp/mcp';
+import { connectAcpMcpServers } from '@slop-lab/part-node/acp/mcp';
 import { setTimeout } from 'node:timers/promises';
 import { client, methods, ndJsonStream } from '@agentclientprotocol/sdk';
-import { createAcpAgent } from '@part/plugins/acp';
-import { startAcpStdio } from '@part/node/acp';
-import { fakeModel } from '@part/plugins/testing';
-import { functionTool } from '@part/core/tools';
-import { emptyCleanup, ok, schema, stringSchema } from '@part/core/contracts';
+import { createAcpAgent } from '@slop-lab/part-plugins/acp';
+import { startAcpStdio } from '@slop-lab/part-node/acp';
+import { fakeModel } from '@slop-lab/part-plugins/testing';
+import { functionTool } from '@slop-lab/part/tools';
+import { emptyCleanup, ok, schema, stringSchema } from '@slop-lab/part/contracts';
 
 const textSchema = schema(
   'acp/text',

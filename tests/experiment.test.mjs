@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { alternateBoundary } from '../experiments/alternate-boundary.mjs';
-import { createBoundary, managedAttempt } from '@part/core/runtime';
-import { localContext } from '@part/core/contracts';
+import { createBoundary, managedAttempt } from '@slop-lab/part/runtime';
+import { localContext } from '@slop-lab/part/contracts';
 test('C12/G08: independent source boundary variant preserves nominal effect count and single-use settlement', async () => {
   const counts = [];
   for (const create of [createBoundary, alternateBoundary]) {

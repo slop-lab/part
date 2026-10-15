@@ -1,6 +1,6 @@
-import { digest, fail, ok } from '@part/core/contracts';
-import type { Contracts, Skills, Workflows } from '@part/core/reference';
-import { createOperations } from '@part/core/runtime';
+import { digest, fail, ok } from '@slop-lab/part/contracts';
+import type { Contracts, Skills, Workflows } from '@slop-lab/part/reference';
+import { createOperations } from '@slop-lab/part/runtime';
 import { createMemoryWorkflowEngine } from '../memory/index.js';
 import { createBlockCompiler } from './compile.js';
 import { createPipelineExecutor } from './execute.js';

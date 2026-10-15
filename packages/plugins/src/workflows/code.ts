@@ -1,5 +1,5 @@
-import { digest, fail, ok } from '@part/core/contracts';
-import type { Contracts, Workflows } from '@part/core/reference';
+import { digest, fail, ok } from '@slop-lab/part/contracts';
+import type { Contracts, Workflows } from '@slop-lab/part/reference';
 import { createMemoryWorkflowEngine } from './memory/index.js';
 import type { WorkflowServices } from './memory/types.js';
 export function createCodeEngine(

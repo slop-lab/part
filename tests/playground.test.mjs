@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createPlaygroundSession } from '../examples/playground/runtime.mjs';
-import { localContext } from '@part/core/contracts';
+import { localContext } from '@slop-lab/part/contracts';
 
 const command = (actionId, input = null, target) => ({
   protocolVersion: 1,

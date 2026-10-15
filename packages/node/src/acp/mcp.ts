@@ -1,7 +1,7 @@
-import { digest, fail, isJsonObject, schema } from '@part/core/contracts';
-import type { Contracts, Model, Runtime, Tools } from '@part/core/reference';
-import { reserve } from '@part/core/runtime';
-import { installTool } from '@part/core/tools';
+import { digest, fail, isJsonObject, schema } from '@slop-lab/part/contracts';
+import type { Contracts, Model, Runtime, Tools } from '@slop-lab/part/reference';
+import { reserve } from '@slop-lab/part/runtime';
+import { installTool } from '@slop-lab/part/tools';
 import { startMcpProcess } from './mcp-process.js';
 import { limit } from './types.js';
 import type { AcpMcpOptions, AcpMcpTools } from './mcp-types.js';

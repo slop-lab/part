@@ -1,4 +1,4 @@
-import type { Client, Contracts, UI } from '@part/core/reference';
+import type { Client, Contracts, UI } from '@slop-lab/part/reference';
 export function createComposer(options: {
   invoke: (request: Contracts.CommandRequest) => Promise<Client.CommandDelivery>;
   command: (draft: UI.Draft) => Contracts.CommandRequest;

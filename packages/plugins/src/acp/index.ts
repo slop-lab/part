@@ -1,5 +1,5 @@
-import { emptyCleanup, isJsonObject } from '@part/core/contracts';
-import type { Contracts } from '@part/core/reference';
+import { emptyCleanup, isJsonObject } from '@slop-lab/part/contracts';
+import type { Contracts } from '@slop-lab/part/reference';
 import { mcpServers, positiveLimit, sessionParams } from './content.js';
 import { createAcpSession } from './session.js';
 import { AcpError } from './types.js';

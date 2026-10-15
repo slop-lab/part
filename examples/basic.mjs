@@ -1,14 +1,14 @@
-import { createAgent } from '@part/plugins/agent';
-import { functionTool } from '@part/core/tools';
-import { stringSchema } from '@part/core/contracts';
-import { fakeModel } from '@part/plugins/testing';
+import { createAgent } from '@slop-lab/part-plugins/agent';
+import { functionTool } from '@slop-lab/part/tools';
+import { stringSchema } from '@slop-lab/part/contracts';
+import { fakeModel } from '@slop-lab/part-plugins/testing';
 
 const model = fakeModel([
   { toolCalls: [{ name: 'uppercase', arguments: { text: 'hello' } }] },
   { text: 'HELLO' },
 ]);
 // Runtime validation and provider JSON Schema are separate contracts.
-import { schema } from '@part/core/contracts';
+import { schema } from '@slop-lab/part/contracts';
 const input = schema(
   'example/text',
   (value) => value !== null && typeof value === 'object' && typeof value.text === 'string',

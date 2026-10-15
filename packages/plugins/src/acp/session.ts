@@ -1,6 +1,6 @@
-import { messageItem } from '@part/core/context';
-import { isJsonObject } from '@part/core/contracts';
-import type { Context, Contracts, Convenience, Model, Runtime } from '@part/core/reference';
+import { messageItem } from '@slop-lab/part/context';
+import { isJsonObject } from '@slop-lab/part/contracts';
+import type { Context, Contracts, Convenience, Model, Runtime } from '@slop-lab/part/reference';
 import { createAgent } from '../agent/index.js';
 import { promptContent } from './content.js';
 import { createAcpToolBridge } from './permissions.js';

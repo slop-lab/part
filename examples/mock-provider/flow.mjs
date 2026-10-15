@@ -1,8 +1,8 @@
-import { createAgent } from '@part/plugins/agent';
-import { createOpenAICompatibleAdapter } from '@part/plugins/providers/openai-compatible';
-import { bearerAuth, createFetchTransport } from '@part/core/model';
-import { functionTool } from '@part/core/tools';
-import { schema, stringSchema } from '@part/core/contracts';
+import { createAgent } from '@slop-lab/part-plugins/agent';
+import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible';
+import { bearerAuth, createFetchTransport } from '@slop-lab/part/model';
+import { functionTool } from '@slop-lab/part/tools';
+import { schema, stringSchema } from '@slop-lab/part/contracts';
 export const prompt = 'Uppercase hello using the uppercase tool.';
 export function createMockFlow(session) {
   const toolExecutions = [];

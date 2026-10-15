@@ -1,7 +1,7 @@
-import { canonical, digest, fail, isJson, ok } from '@part/core/contracts';
-import type { Contracts, PipelineV1, Skills, Workflows } from '@part/core/reference';
-import type { OperationContext } from '@part/core/runtime';
-import { createBoundary, managedAttempt, reserve } from '@part/core/runtime';
+import { canonical, digest, fail, isJson, ok } from '@slop-lab/part/contracts';
+import type { Contracts, PipelineV1, Skills, Workflows } from '@slop-lab/part/reference';
+import type { OperationContext } from '@slop-lab/part/runtime';
+import { createBoundary, managedAttempt, reserve } from '@slop-lab/part/runtime';
 import { scopeStepContext } from '../memory/context.js';
 import { callIdentity } from '../memory/identity.js';
 import type { PreparedRunner, WorkflowServices } from '../memory/types.js';

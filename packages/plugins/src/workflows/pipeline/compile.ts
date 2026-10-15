@@ -1,6 +1,6 @@
-import { canonical, fail, isJsonObject, ok } from '@part/core/contracts';
-import type { Contracts, PipelineV1, Skills } from '@part/core/reference';
-import { isScriptRequest } from '@part/core/scripts';
+import { canonical, fail, isJsonObject, ok } from '@slop-lab/part/contracts';
+import type { Contracts, PipelineV1, Skills } from '@slop-lab/part/reference';
+import { isScriptRequest } from '@slop-lab/part/scripts';
 import type { Handler } from './handlers.js';
 import type { Block, PipelineOptions } from './types.js';
 import { objectValid, valueValid } from './values.js';

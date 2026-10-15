@@ -1,5 +1,5 @@
-import { canonical, fail, isJsonObject } from '@part/core/contracts';
-import type { Composition, Contracts, Model, Results, Runtime } from '@part/core/reference';
+import { canonical, fail, isJsonObject } from '@slop-lab/part/contracts';
+import type { Composition, Contracts, Model, Results, Runtime } from '@slop-lab/part/reference';
 import type { BridgeMethod } from './index.js';
 /** Installed profile bindings contain executable/composition values only on the host. */
 export function createBridgeMethods(options: {

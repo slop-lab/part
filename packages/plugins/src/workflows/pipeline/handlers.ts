@@ -1,5 +1,5 @@
-import { fail, ok } from '@part/core/contracts';
-import type { Composition, Contracts, PipelineV1, Workflows } from '@part/core/reference';
+import { fail, ok } from '@slop-lab/part/contracts';
+import type { Composition, Contracts, PipelineV1, Workflows } from '@slop-lab/part/reference';
 export const handlersPoint: Composition.ExtensionPoint<PipelineV1.InstalledStepHandler> = {
   id: 'part.pipeline/handlers',
   owner: 'part/workflow-pipeline-v1',

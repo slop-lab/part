@@ -1,13 +1,13 @@
-import { createWatchHub } from '@part/core/client';
-import { commandSchema, querySchema } from '@part/core/client/control';
-import { canonical, fail, freeze, isJsonObject, ok } from '@part/core/contracts';
+import { createWatchHub } from '@slop-lab/part/client';
+import { commandSchema, querySchema } from '@slop-lab/part/client/control';
+import { canonical, fail, freeze, isJsonObject, ok } from '@slop-lab/part/contracts';
 import type {
   Client,
   Contracts,
   ControlCatalog,
   Projection,
   Workflows,
-} from '@part/core/reference';
+} from '@slop-lab/part/reference';
 export interface WorkflowRegistration {
   readonly definition: Workflows.DefinitionRef;
   readonly engineId: string;

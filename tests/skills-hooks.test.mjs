@@ -3,15 +3,15 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, rm, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createDirectoryPackages } from '@part/node/packages';
-import { createSkills, skillLowerer } from '@part/plugins/extensions/skills';
-import { createScriptHooks } from '@part/plugins/extensions/hooks';
-import { createNodeScripts } from '@part/node/scripts';
-import { createBoundary, managedAttempt, createOperations } from '@part/core/runtime';
-import { createPipelineEngine } from '@part/plugins/workflows/pipeline';
-import { createCodeEngine, defineCodeWorkflow } from '@part/plugins/workflows/code';
-import { createSuspensions } from '@part/core/runtime/waits';
-import { localContext, jsonSchema, ok, schema, digest, fail } from '@part/core/contracts';
+import { createDirectoryPackages } from '@slop-lab/part-node/packages';
+import { createSkills, skillLowerer } from '@slop-lab/part-plugins/extensions/skills';
+import { createScriptHooks } from '@slop-lab/part-plugins/extensions/hooks';
+import { createNodeScripts } from '@slop-lab/part-node/scripts';
+import { createBoundary, managedAttempt, createOperations } from '@slop-lab/part/runtime';
+import { createPipelineEngine } from '@slop-lab/part-plugins/workflows/pipeline';
+import { createCodeEngine, defineCodeWorkflow } from '@slop-lab/part-plugins/workflows/code';
+import { createSuspensions } from '@slop-lab/part/runtime/waits';
+import { localContext, jsonSchema, ok, schema, digest, fail } from '@slop-lab/part/contracts';
 const context = localContext();
 test('SR02/SR03/SR12: skill discovery and activation pin content and never execute bundled scripts', async () => {
   const temporary = await mkdtemp(join(tmpdir(), 'part-skill-')),

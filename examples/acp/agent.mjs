@@ -1,12 +1,12 @@
-import { createAcpAgent } from '@part/plugins/acp';
-import { startAcpStdio } from '@part/node/acp';
-import { connectAcpMcpServers } from '@part/node/acp/mcp';
-import { fakeModel } from '@part/plugins/testing';
-import { createOpenAIResponsesAdapter } from '@part/plugins/providers/openai-responses';
-import { createOpenAICompatibleAdapter } from '@part/plugins/providers/openai-compatible';
-import { bearerAuth, createFetchTransport } from '@part/core/model';
-import { schema, stringSchema } from '@part/core/contracts';
-import { functionTool } from '@part/core/tools';
+import { createAcpAgent } from '@slop-lab/part-plugins/acp';
+import { startAcpStdio } from '@slop-lab/part-node/acp';
+import { connectAcpMcpServers } from '@slop-lab/part-node/acp/mcp';
+import { fakeModel } from '@slop-lab/part-plugins/testing';
+import { createOpenAIResponsesAdapter } from '@slop-lab/part-plugins/providers/openai-responses';
+import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible';
+import { bearerAuth, createFetchTransport } from '@slop-lab/part/model';
+import { schema, stringSchema } from '@slop-lab/part/contracts';
+import { functionTool } from '@slop-lab/part/tools';
 
 try {
   process.loadEnvFile(new URL('../../.env', import.meta.url));

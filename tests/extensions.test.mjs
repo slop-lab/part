@@ -8,12 +8,12 @@ import {
   jsonSchema,
   schema,
   digest,
-} from '@part/core/contracts';
-import { functionTool, createToolDispatcher } from '@part/core/tools';
-import { createContextCompiler, messageItem, semanticItem } from '@part/core/context';
-import { createModelGateway, noAuth } from '@part/core/model';
-import { createOllamaAdapter } from '@part/plugins/providers/ollama';
-import { createSuspensions } from '@part/core/runtime/waits';
+} from '@slop-lab/part/contracts';
+import { functionTool, createToolDispatcher } from '@slop-lab/part/tools';
+import { createContextCompiler, messageItem, semanticItem } from '@slop-lab/part/context';
+import { createModelGateway, noAuth } from '@slop-lab/part/model';
+import { createOllamaAdapter } from '@slop-lab/part-plugins/providers/ollama';
+import { createSuspensions } from '@slop-lab/part/runtime/waits';
 const context = localContext();
 const decision = (id, decide, resume) => ({
   id,
@@ -339,7 +339,7 @@ test('MT04: inspection digest matches bytes after final request transform', asyn
 });
 
 test('X06: inspector targets confer no authority and unknown projections never expose raw payload', async () => {
-  const { createProjectionService } = await import('@part/core/context/projection');
+  const { createProjectionService } = await import('@slop-lab/part/context/projection');
   let reads = 0;
   const projection = createProjectionService({
     authorize: (_target, _audience, c) => c.principal.subject === 'local',

@@ -1,4 +1,4 @@
-import type { Contracts } from '@part/core/reference';
+import type { Contracts } from '@slop-lab/part/reference';
 import type { Readable, Writable } from 'node:stream';
 
 export interface AcpPeer {

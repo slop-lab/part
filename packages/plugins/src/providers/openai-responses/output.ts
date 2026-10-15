@@ -1,5 +1,5 @@
-import { fail, isJsonObject, ok } from '@part/core/contracts';
-import type { Contracts, Model, Runtime } from '@part/core/reference';
+import { fail, isJsonObject, ok } from '@slop-lab/part/contracts';
+import type { Contracts, Model, Runtime } from '@slop-lab/part/reference';
 
 export function isReasoningItem(value: unknown): value is Record<string, Contracts.Json> {
   return (

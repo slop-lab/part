@@ -1,5 +1,5 @@
-import { freeze, jsonSchema } from '@part/core/contracts';
-import type { Workflows } from '@part/core/reference';
+import { freeze, jsonSchema } from '@slop-lab/part/contracts';
+import type { Workflows } from '@slop-lab/part/reference';
 import type { Execution } from './types.js';
 export const memoryGuarantees: Workflows.Guarantees = freeze({
   control: 'runner-enforced',

@@ -1,5 +1,12 @@
-import type { Contracts, Model, Results, Runtime, Scripts, Workflows } from '@part/core/reference';
-import type { OperationContext, Operations } from '@part/core/runtime';
+import type {
+  Contracts,
+  Model,
+  Results,
+  Runtime,
+  Scripts,
+  Workflows,
+} from '@slop-lab/part/reference';
+import type { OperationContext, Operations } from '@slop-lab/part/runtime';
 export interface WorkflowServices {
   readonly operations?: Operations;
   readonly model?: Model.Gateway;

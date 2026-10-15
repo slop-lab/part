@@ -1,10 +1,10 @@
-import { createAgent } from '@part/plugins/agent';
-import { createWatchHub } from '@part/core/client';
-import { messageItem } from '@part/core/context';
-import { canonical, fail, localContext, ok, schema, stringSchema } from '@part/core/contracts';
-import { createMemoryArtifacts } from '@part/core/artifacts';
-import { createSuspensions } from '@part/core/runtime/waits';
-import { functionTool } from '@part/core/tools';
+import { createAgent } from '@slop-lab/part-plugins/agent';
+import { createWatchHub } from '@slop-lab/part/client';
+import { messageItem } from '@slop-lab/part/context';
+import { canonical, fail, localContext, ok, schema, stringSchema } from '@slop-lab/part/contracts';
+import { createMemoryArtifacts } from '@slop-lab/part/artifacts';
+import { createSuspensions } from '@slop-lab/part/runtime/waits';
+import { functionTool } from '@slop-lab/part/tools';
 import catalog from './catalog.json' with { type: 'json' };
 import { createPlaygroundModel, providerOptions } from './models.mjs';
 

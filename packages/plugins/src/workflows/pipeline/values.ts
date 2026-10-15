@@ -1,5 +1,5 @@
-import { fail, isJson, isJsonObject, ok } from '@part/core/contracts';
-import type { Contracts, PipelineV1 } from '@part/core/reference';
+import { fail, isJson, isJsonObject, ok } from '@slop-lab/part/contracts';
+import type { Contracts, PipelineV1 } from '@slop-lab/part/reference';
 export const objectValid = (value: unknown): boolean => isJsonObject(value);
 export const jsonValid = (value: unknown): boolean => isJson(value);
 export function pointer(value: Contracts.Json, path: string): Contracts.Result<Contracts.Json> {

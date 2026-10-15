@@ -1,4 +1,4 @@
-import type { Model } from '@part/core/reference';
+import type { Model } from '@slop-lab/part/reference';
 import { createResponsesDecoder } from './decode.js';
 import { encodeResponses } from './encode.js';
 
