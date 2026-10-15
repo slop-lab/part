@@ -8,6 +8,8 @@
     "outDir": "dist",
     "rootDir": "src",
     "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "verbatimModuleSyntax": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "skipLibCheck": false

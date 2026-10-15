@@ -1,5 +1,5 @@
 import { createControl, installAction, installQuery } from '../client/control.js';
-import { createWatchHub } from '../client/index.js';
+import { createWatchHub } from '../client/watch.js';
 import { fail, jsonSchema, localContext, ok, schema, stringSchema } from '../contracts/index.js';
 import type { Client } from '../reference/client.js';
 import type { Context } from '../reference/context.js';

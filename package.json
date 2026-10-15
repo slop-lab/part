@@ -250,7 +250,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "npm run build && node --test --test-isolation=none tests/*.test.mjs",
-    "check": "tsc --noEmit",
+    "check": "tsc --noEmit && node scripts/check-architecture.mjs",
     "example": "npm run build && node examples/basic.mjs",
     "test:consumers": "npm run build && node scripts/test-consumers.mjs",
     "preview:build": "node scripts/build-preview.mjs",

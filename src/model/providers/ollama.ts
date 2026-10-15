@@ -109,7 +109,6 @@ export function createOllamaAdapter(): Model.Adapter {
         terminal = false,
         poisoned: Contracts.Failure | undefined,
         finish: Contracts.Json = 'stop',
-        native: Contracts.Json = {},
         usage: Model.Response['usage'] = {};
       const calls: Model.ToolCall[] = [];
       const decodeLine = (line: string): Contracts.Result<Model.ProviderEvent[]> => {
@@ -163,7 +162,6 @@ export function createOllamaAdapter(): Model.Adapter {
         if (chunk.done) {
           terminal = true;
           finish = chunk.done_reason ?? 'stop';
-          native = chunk;
           const input = chunk.prompt_eval_count,
             output = chunk.eval_count;
           if (

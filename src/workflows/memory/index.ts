@@ -1,67 +1,17 @@
-import { provenance } from '../../context/index.js';
-import { canonical, digest, fail, freeze, isJson, jsonSchema, ok } from '../../contracts/index.js';
+import { canonical, digest, fail, freeze, isJson, ok } from '../../contracts/index.js';
 import type { Contracts } from '../../reference/contracts.js';
-import type { Model } from '../../reference/model.js';
-import type { Results } from '../../reference/results.js';
 import type { Runtime } from '../../reference/runtime.js';
-import type { Scripts } from '../../reference/scripts.js';
 import type { Workflows } from '../../reference/workflows.js';
 import { budgetKey } from '../../runtime/budget.js';
 import { createChildBudget, numericLimits } from '../../runtime/budgets.js';
 import { costServices } from '../../runtime/costs.js';
-import { combineEffects } from '../../runtime/effects.js';
-import type { OperationContext, Operations } from '../../runtime/operations.js';
 import { createOperations } from '../../runtime/operations.js';
-export interface WorkflowServices {
-  readonly operations?: Operations;
-  readonly model?: Model.Gateway;
-  readonly scripts?: Scripts.Service;
-  readonly runs?: Runtime.RunService;
-  readonly results?: Results.Service;
-  readonly waits?: Runtime.SuspensionPort;
-}
-export interface PreparedRunner {
-  readonly input: Contracts.Schema<Contracts.Json>;
-  readonly output: Contracts.Schema<Contracts.Json>;
-  execute(
-    input: Contracts.Json,
-    steps: Workflows.StepContext,
-    context: OperationContext,
-    record: (outcome: Runtime.ManagedOutcome<unknown>) => void,
-  ): Promise<Contracts.Result<Contracts.Json>>;
-}
-const stepScopes = new WeakMap<
-  Workflows.StepContext,
-  (context: OperationContext) => Workflows.StepContext
->();
-export function scopeStepContext(
-  steps: Workflows.StepContext,
-  context: OperationContext,
-): Workflows.StepContext {
-  const bind = stepScopes.get(steps);
-  if (!bind) throw new Error('Step context cannot be rebound by this engine');
-  return bind(context);
-}
-export const memoryGuarantees: Workflows.Guarantees = freeze({
-  control: 'runner-enforced',
-  effects: 'runner-path-only',
-  checkpoint: 'none',
-  submissionDedupe: 'memory',
-  scriptCancellation: 'cooperative',
-  nativeSemantics: [
-    'Trusted in-process definitions',
-    'No stack recovery or automatic effect retry',
-  ],
-});
-export async function callIdentity(
-  execution: Workflows.ExecutionRef,
-  stepKey: string,
-  input: Contracts.Json,
-  iterationPath: readonly (string | number)[] = [],
-  attempt = 1,
-): Promise<Workflows.CallIdentity> {
-  return { workflow: execution, stepKey, iterationPath, attempt, inputDigest: await digest(input) };
-}
+import { executeWorkflow } from './execute.js';
+import { memoryGuarantees, workflowSnapshot } from './state.js';
+import type { Execution, PreparedRunner, WorkflowServices } from './types.js';
+export { callIdentity } from './identity.js';
+export { memoryGuarantees } from './state.js';
+export type { PreparedRunner, WorkflowServices } from './types.js';
 export function createMemoryWorkflowEngine(options: {
   descriptor: Workflows.EngineDescriptor;
   services: WorkflowServices;
@@ -80,24 +30,7 @@ export function createMemoryWorkflowEngine(options: {
   const pendingSubmissions = new Map<string, Promise<Workflows.Submission>>();
   const operations = options.services.operations ?? createOperations(),
     preparedTokens = new WeakMap<object, PreparedRunner>();
-  interface Execution {
-    ref: Workflows.ExecutionRef;
-    prepared: Workflows.Prepared;
-    context: Contracts.InvocationContext;
-    handle: Runtime.ExecutionHandle<Contracts.Json>;
-    native: Contracts.Json;
-    nativeRevision: number;
-    waits: Map<
-      string,
-      {
-        ticket: Runtime.WaitTicket;
-        schema: Contracts.Schema<Contracts.Json>;
-        presentation: Contracts.Json;
-      }
-    >;
-    active: Set<Contracts.EntityRef>;
-    output?: Workflows.Output;
-  }
+
   const executions = new Map<string, Execution>(),
     submissions = new Map<string, { digest: string; ref: Workflows.ExecutionRef }>();
   const authorized = (execution: Execution, context: Contracts.InvocationContext) =>
@@ -116,56 +49,8 @@ export function createMemoryWorkflowEngine(options: {
         ? ok(execution)
         : fail('workflow.permission', 'Workflow access denied', 'permission');
   };
-  const snapshot = (execution: Execution): Workflows.Snapshot => {
-    const state = execution.handle.snapshot(),
-      phase = (
-        {
-          pending: 'queued',
-          running: 'running',
-          waiting: 'waiting',
-          completed: 'succeeded',
-          failed: 'failed',
-          cancelled: 'cancelled',
-          abandoned: 'unknown',
-        } as const
-      )[state.phase];
-    const waiting = ['pending', 'running', 'waiting'].includes(state.phase)
-      ? [...execution.waits.values()].filter((v) => v.ticket.state === 'open')
-      : [];
-    return {
-      ref: execution.ref,
-      revision: `${state.revision}/${execution.nativeRevision}`,
-      definitionDigest: execution.prepared.definition.digest,
-      owner: options.descriptor.id,
-      phase: phase === 'running' && waiting.length ? 'waiting' : phase,
-      nativeState: {
-        schema: { id: `${options.descriptor.id}/state`, version: 1 },
-        data: structuredClone(execution.native),
-      },
-      guarantees: memoryGuarantees,
-      activeOperations: [...execution.active],
-      waitingOn: waiting.map((w) => ({
-        owner: 'part/waits',
-        kind: w.ticket.type,
-        id: w.ticket.id,
-      })),
-      ...(state.phase === 'completed' && execution.output ? { output: execution.output } : {}),
-      diagnostics: state.error ? [state.error] : [],
-      actions: waiting.length
-        ? [
-            {
-              id: 'part.workflow/respond',
-              version: 1,
-              input: { id: 'part/workflow-response', version: 1 },
-              output: jsonSchema.ref,
-              execution: 'immediate',
-              availability: { state: 'available', checkedAt: state.revision },
-            },
-          ]
-        : [],
-      effect: state.effect,
-    };
-  };
+  const snapshot = (execution: Execution): Workflows.Snapshot =>
+    workflowSnapshot(execution, options.descriptor.id);
   return {
     descriptor: options.descriptor,
     async prepare(request, context) {
@@ -322,262 +207,17 @@ export function createMemoryWorkflowEngine(options: {
           retryOwner: options.descriptor.id,
           ...(request.parent ? { parent: request.parent } : {}),
         },
-        async (operationContext) => {
-          let effect: Contracts.EffectState = 'not-attempted';
-          const commit: Contracts.CommitEvidence[] = [];
-          const memo = new Map<string, { digest: string; pending: Promise<unknown> }>();
-          const memoize = async <T>(
-            identity: Workflows.CallIdentity,
-            input: Contracts.Json,
-            body: () => Promise<T>,
-          ): Promise<T> => {
-            if (
-              identity.workflow.id !== ref.id ||
-              identity.workflow.engine !== ref.engine ||
-              identity.workflow.engineVersion !== ref.engineVersion ||
-              !identity.stepKey ||
-              !Number.isSafeInteger(identity.attempt) ||
-              identity.attempt < 1 ||
-              identity.inputDigest !== (await digest(input))
-            )
-              throw Error('Invalid workflow call identity');
-            const key = canonical({
-                step: identity.stepKey,
-                path: identity.iterationPath,
-                attempt: identity.attempt,
-              }),
-              fingerprint = await digest(input);
-            const old = memo.get(key);
-            if (old) {
-              if (old.digest !== fingerprint) throw Error('Workflow call identity conflict');
-              return old.pending as Promise<T>;
-            }
-            if (operationContext.signal.aborted) throw Error('Workflow cancelled');
-            operationContext.progress.publish('part.workflow/step', {
-              stepKey: identity.stepKey,
-              iterationPath: identity.iterationPath,
-              attempt: identity.attempt,
-            });
-            if (execution) {
-              execution.native = {
-                stepKey: identity.stepKey,
-                iterationPath: identity.iterationPath,
-                attempt: identity.attempt,
-              };
-              execution.nativeRevision++;
-            }
-            const pending = Promise.resolve().then(body);
-            memo.set(key, { digest: fingerprint, pending });
-            return pending;
-          };
-          const missing = (name: string): Runtime.ManagedOutcome<never> => ({
-            phase: 'failed',
-            error: fail('workflow.service', `${name} is not installed`, 'unsupported').error,
-            effect: 'not-attempted',
-            commit: [],
-            unsettledChildren: [],
-          });
-          const runHandle = async <T>(
-            result: Contracts.Result<Runtime.ExecutionHandle<T>>,
-          ): Promise<Runtime.ManagedOutcome<T>> => {
-            if (!result.ok)
-              return {
-                phase: 'failed',
-                error: result.error,
-                effect: 'not-attempted',
-                commit: [],
-                unsettledChildren: [],
-              };
-            active.add(result.value.ref);
-            const outcome = await result.value.done;
-            active.delete(result.value.ref);
-            effect = combineEffects(effect, outcome.effect);
-            commit.push(...outcome.commit);
-            return outcome;
-          };
-          const makeStepContext = (invocation: OperationContext): Workflows.StepContext => {
-            const scoped: Workflows.StepContext = {
-              execution: ref,
-              signal: invocation.signal,
-              limits: request.limits ?? {},
-              script: (identity, input) =>
-                memoize(identity, input as unknown as Contracts.Json, async () => {
-                  const outcome = options.services.scripts
-                    ? await runHandle(await options.services.scripts.execute(input, invocation))
-                    : missing('scripts');
-                  if (
-                    outcome.phase === 'completed' &&
-                    (outcome.result.exitCode !== 0 || outcome.result.completeness !== 'complete')
-                  )
-                    return {
-                      phase: 'failed',
-                      effect: outcome.effect,
-                      commit: outcome.commit,
-                      unsettledChildren: outcome.unsettledChildren,
-                      error: fail(
-                        'workflow.script-exit',
-                        'Script exited unsuccessfully or capture is incomplete',
-                      ).error,
-                    };
-                  return outcome;
-                }),
-              model: (identity, input) =>
-                memoize(identity, input as unknown as Contracts.Json, async () =>
-                  options.services.model
-                    ? runHandle(await options.services.model.invoke(input, invocation))
-                    : missing('model'),
-                ),
-              agent: (identity, input) =>
-                memoize(
-                  identity,
-                  {
-                    driver: input.driver,
-                    input: input.input,
-                    compositionRevision: input.composition.inspection.revision,
-                  },
-                  async () =>
-                    options.services.runs
-                      ? runHandle(await options.services.runs.start(input, invocation))
-                      : missing('runs'),
-                ),
-              submit: (identity, input) =>
-                memoize(identity, input as unknown as Contracts.Json, async () =>
-                  input.producedBy.id !== ref.id || input.producedBy.owner !== ref.engine
-                    ? Promise.resolve(
-                        fail(
-                          'workflow.result-owner',
-                          'Result producer is not this execution',
-                          'permission',
-                        ),
-                      )
-                    : options.services.results
-                      ? options.services.results.submit(input, invocation)
-                      : fail('workflow.results', 'Results service not installed', 'unsupported'),
-                ),
-              wait: (identity, input) =>
-                memoize(
-                  identity,
-                  {
-                    type: input.type,
-                    responseSchema: { ...input.responseSchema.ref },
-                    presentation: input.presentation,
-                    bindingDigest: input.bindingDigest,
-                  },
-                  async () => {
-                    if (!options.services.waits)
-                      return fail('workflow.waits', 'Wait service not installed', 'unsupported');
-                    const opened = await options.services.waits.open(
-                      {
-                        ...input,
-                        bindingDigest: await digest({
-                          definition: request.prepared.definition.digest,
-                          execution: ref.id,
-                          binding: input.bindingDigest,
-                        }),
-                      },
-                      invocation,
-                    );
-                    if (opened.ok)
-                      waiting.set(opened.value.id, {
-                        ticket: opened.value,
-                        schema: input.responseSchema,
-                        presentation: structuredClone(input.presentation),
-                      });
-                    if (opened.ok) {
-                      if (execution) execution.nativeRevision++;
-                      operationContext.progress.publish('part.workflow/wait', {
-                        ticketId: opened.value.id,
-                      });
-                    }
-                    return opened;
-                  },
-                ),
-              async response(ticket) {
-                const entry = waiting.get(ticket.id);
-                if (!entry || !options.services.waits)
-                  return fail('workflow.ticket', 'Ticket not owned by this execution');
-                const response = await invocation.wait(
-                  options.services.waits.wait(entry.ticket, entry.schema, invocation),
-                );
-                entry.ticket = {
-                  ...entry.ticket,
-                  state: response.ok
-                    ? 'resolved'
-                    : invocation.signal.aborted
-                      ? 'cancelled'
-                      : 'expired',
-                };
-                return response;
-              },
-            };
-            stepScopes.set(scoped, makeStepContext);
-            return scoped;
-          };
-          const stepContext = makeStepContext(operationContext);
-          let result: Contracts.Result<Contracts.Json>;
-          try {
-            result = await runner.execute(
-              structuredClone(checked.value),
-              stepContext,
-              operationContext,
-              (outcome) => {
-                effect = combineEffects(effect, outcome.effect);
-                commit.push(...outcome.commit);
-              },
-            );
-          } catch {
-            return {
-              phase: 'failed',
-              error: fail('workflow.exception', 'Workflow definition failed', 'internal', 'unknown')
-                .error,
-              effect: 'unknown',
-              commit,
-              unsettledChildren: [],
-            };
-          }
-          if (!result.ok)
-            return {
-              phase: 'failed',
-              error: result.error,
-              effect: combineEffects(effect, result.error.effect ?? 'not-attempted'),
-              commit,
-              unsettledChildren: [],
-            };
-          const validated = runner.output.validate(result.value);
-          if (!validated.ok)
-            return {
-              phase: 'failed',
-              error: fail('workflow.output', 'Workflow output validation failed').error,
-              effect,
-              commit,
-              unsettledChildren: [],
-            };
-          const encoded = runner.output.codec?.encode(validated.value);
-          if (!encoded?.ok)
-            return {
-              phase: 'failed',
-              error: fail('workflow.codec', 'Workflow output codec failed').error,
-              effect,
-              commit,
-              unsettledChildren: [],
-            };
-          if (execution) {
-            execution.output = freeze({
-              kind: 'native',
-              data: structuredClone(encoded.value),
-              validation: 'engine-reported',
-              provenance,
-            });
-            execution.nativeRevision++;
-          }
-          return {
-            phase: 'completed',
-            result: encoded.value,
-            effect,
-            commit,
-            unsettledChildren: [],
-          };
-        },
+        (operationContext) =>
+          executeWorkflow(operationContext, {
+            services: options.services,
+            ref,
+            request,
+            runner,
+            input: checked.value,
+            active,
+            waiting,
+            getExecution: () => execution,
+          }),
         c,
       );
       if (!started.ok) {

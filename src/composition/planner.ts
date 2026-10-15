@@ -1,0 +1,285 @@
+import { canonical, fail, freeze, isJson, ok } from '../contracts/index.js';
+import { sha256 } from '../foundation/hash.js';
+import type { Composition } from '../reference/composition.js';
+import type { Contracts } from '../reference/contracts.js';
+
+import type { Binding, Point } from './handles.js';
+import { plans } from './handles.js';
+const same = (a: Point, b: Point) =>
+  a.id === b.id &&
+  a.owner === b.owner &&
+  a.contractVersion === b.contractVersion &&
+  a.kind === b.kind &&
+  a.scope === b.scope;
+function order(ids: string[], edges: [string, string][]): Contracts.Result<string[]> {
+  const remaining = new Set(ids),
+    result: string[] = [];
+  for (const [a, b] of edges)
+    if (!remaining.has(a) || !remaining.has(b))
+      return fail('composition.order-target', `Unknown ordering target ${a} -> ${b}`);
+  while (remaining.size) {
+    const next = [...remaining]
+      .sort()
+      .find((id) => !edges.some(([a, b]) => b === id && remaining.has(a)));
+    if (!next) return fail('composition.cycle', 'Dependency or ordering cycle');
+    result.push(next);
+    remaining.delete(next);
+  }
+  return ok(result);
+}
+export function createPlanner(
+  options: { schemas?: readonly Contracts.Schema<unknown>[]; surface?: Composition.Surface } = {},
+): Composition.CompositionPlanner {
+  return {
+    resolve(spec) {
+      const points = new Map<string, Point>(),
+        bindings = new Map<string, Binding[]>(),
+        factories = new Map<string, Composition.ServiceFactory<unknown>>();
+      const errors: Contracts.Failure[] = [];
+      const record = (r: Contracts.Result<void>) => {
+        if (!r.ok) errors.push(r.error);
+        return r;
+      };
+      const port: Composition.RegistrationPort = {
+        declare(point) {
+          if (
+            !point.id ||
+            !point.owner ||
+            !point.scope ||
+            !['service', 'pipeline', 'registry', 'collection'].includes(point.kind) ||
+            !Number.isSafeInteger(point.contractVersion) ||
+            point.contractVersion < 1
+          )
+            return record(fail('composition.point', 'Invalid extension point'));
+
+          const existing = points.get(point.id);
+          if (existing && !same(existing, point as Point))
+            return record(fail('composition.point-conflict', point.id));
+          points.set(point.id, Object.freeze({ ...point }) as Point);
+          return ok(undefined);
+        },
+        contribute(contribution) {
+          const point = points.get(contribution.point.id);
+          if (!point || !same(point, contribution.point as Point))
+            return record(fail('composition.point-mismatch', contribution.point.id));
+          const list = bindings.get(point.id) ?? [];
+          if (list.some((item) => item.id === contribution.id))
+            return record(fail('composition.duplicate', contribution.id));
+          list.push({
+            ...contribution,
+            point,
+            before: [...(contribution.before ?? [])],
+            after: [...(contribution.after ?? [])],
+          } as Binding);
+          bindings.set(point.id, list);
+          return ok(undefined);
+        },
+        provide(point, factory) {
+          const declared = points.get(point.id);
+          if (
+            !declared ||
+            !same(declared, point as Point) ||
+            point.kind !== 'service' ||
+            point.scope !== factory.scope
+          )
+            return record(fail('composition.service-scope', point.id));
+          if (factories.has(point.id))
+            return record(fail('composition.duplicate-service', point.id));
+          factories.set(point.id, {
+            ...factory,
+            dependencies: factory.dependencies.map((d) => ({ ...d })),
+          } as Composition.ServiceFactory<unknown>);
+          return ok(undefined);
+        },
+        replace(replacement) {
+          const point = points.get(replacement.point.id),
+            list = bindings.get(replacement.point.id);
+          if (
+            point &&
+            same(point, replacement.point as Point) &&
+            same(point, replacement.with.point as Point) &&
+            factories.get(point.id)?.id === replacement.replaces
+          ) {
+            factories.delete(point.id);
+            return port.contribute(replacement.with);
+          }
+          const index = list?.findIndex((binding) => binding.id === replacement.replaces) ?? -1;
+          if (
+            !point ||
+            !same(point, replacement.point as Point) ||
+            !same(point, replacement.with.point as Point) ||
+            index < 0
+          )
+            return record(fail('composition.replace-target', replacement.replaces));
+          list!.splice(index, 1);
+          return port.contribute(replacement.with);
+        },
+      };
+      try {
+        if (
+          new Set((options.schemas ?? []).map((s) => `${s.ref.id}@${s.ref.version}`)).size !==
+          (options.schemas ?? []).length
+        )
+          return fail('composition.schema-conflict', 'Duplicate configuration schema');
+        const ids = new Set<string>();
+        for (const component of spec.components) {
+          if (options.surface && !component.descriptor.surfaces.includes(options.surface))
+            return fail(
+              'composition.surface',
+              'Component does not support the selected surface',
+              'unsupported',
+            );
+          if (component.descriptor.configSchema) {
+            const ref = component.descriptor.configSchema;
+            const schema = options.schemas?.find(
+              (schema) => schema.ref.id === ref.id && schema.ref.version === ref.version,
+            );
+            if (!schema)
+              return fail(
+                'composition.config-schema',
+                'Configuration schema not installed',
+                'unsupported',
+              );
+            if (!schema.validate(spec.config).ok)
+              return fail('composition.config', 'Configuration schema validation failed');
+          }
+          if (ids.has(component.descriptor.id))
+            return fail('composition.duplicate-component', component.descriptor.id);
+          ids.add(component.descriptor.id);
+          const r = component.register(port);
+          if (!r.ok) return r;
+        }
+        for (const edit of spec.edits ?? []) {
+          const r = edit(port);
+          if (!r.ok) return r;
+        }
+      } catch {
+        return fail('composition.register', 'Component registration failed', 'internal');
+      }
+      if (errors.length) return { ok: false, error: errors[0]! };
+      const capabilities = spec.components.flatMap((c) => c.descriptor.provides);
+      const componentEdges: [string, string][] = [];
+      for (const component of spec.components)
+        for (const req of component.descriptor.requires) {
+          const providers = spec.components.filter((c) =>
+            c.descriptor.provides.some(
+              (p) =>
+                p.id === req.id &&
+                p.contractVersion === req.contractVersion &&
+                p.status === 'supported',
+            ),
+          );
+          if (providers.length !== 1 && !(req.optional && providers.length === 0))
+            return fail('composition.requirement', `Unresolved or ambiguous requirement ${req.id}`);
+          if (providers[0] && providers[0] !== component)
+            componentEdges.push([providers[0].descriptor.id, component.descriptor.id]);
+        }
+      const componentOrder = order(
+        spec.components.map((c) => c.descriptor.id),
+        componentEdges,
+      );
+      if (!componentOrder.ok) return componentOrder;
+      const factoryEdges: [string, string][] = [];
+      for (const [id, factory] of factories)
+        for (const dep of factory.dependencies) {
+          const point = points.get(dep.id);
+          if (
+            !point ||
+            (!factories.has(dep.id) &&
+              !(point.kind === 'service' && bindings.get(dep.id)?.length === 1)) ||
+            point.contractVersion !== dep.contractVersion ||
+            point.scope !== dep.scope ||
+            factory.scope !== dep.scope
+          )
+            return fail('composition.service-dependency', `Invalid dependency ${id} -> ${dep.id}`);
+          if (factories.has(dep.id)) factoryEdges.push([dep.id, id]);
+        }
+      const factoryOrder = order([...factories.keys()], factoryEdges);
+      if (!factoryOrder.ok) return factoryOrder;
+      for (const [id, list] of bindings) {
+        const point = points.get(id)!;
+        if (point.kind === 'service' && (list.length > 1 || factories.has(id)))
+          return fail('composition.duplicate-service', id);
+        if (
+          point.kind === 'registry' &&
+          (list.some((b) => !b.key) || new Set(list.map((b) => b.key)).size !== list.length)
+        )
+          return fail('composition.duplicate-key', id);
+        const sorted = order(
+          list.map((b) => b.id),
+          list.flatMap((b) => [
+            ...(b.before ?? []).map((target) => [b.id, target] as [string, string]),
+            ...(b.after ?? []).map((target) => [target, b.id] as [string, string]),
+          ]),
+        );
+        if (!sorted.ok) return sorted;
+        bindings.set(
+          id,
+          sorted.value.map((key) => list.find((b) => b.id === key)!),
+        );
+      }
+      const token = {},
+        revision = crypto.randomUUID();
+      const components = componentOrder.value.map((id) =>
+        spec.components.find((c) => c.descriptor.id === id)!,
+      );
+      let config: Contracts.Json;
+      try {
+        if (!isJson(spec.config))
+          return fail('composition.config', 'Configuration must be lossless JSON');
+        config = freeze(structuredClone(spec.config));
+      } catch {
+        return fail('composition.config', 'Configuration must be cloneable JSON');
+      }
+      const inspection: Composition.ResolvedComposition = freeze({
+        id: crypto.randomUUID(),
+        revision,
+        digest: sha256(
+          new TextEncoder().encode(
+            canonical({
+              components: components.map((c) => c.descriptor) as unknown as Contracts.Json,
+              config,
+              factories: factoryOrder.value.map((point) => ({
+                point,
+                id: factories.get(point)!.id,
+                dependencies: factories.get(point)!.dependencies.map((d) => ({ ...d })),
+              })),
+              bindings: [...bindings]
+                .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+                .map(([point, list]) => ({
+                  point,
+                  contributions: list.map((b) => ({ id: b.id, key: b.key ?? null })),
+                })),
+            }),
+          ),
+        ),
+        components: components.map((c) => structuredClone(c.descriptor)),
+        orderedBindings: [
+          ...[...bindings].map(([point, list]) => ({
+            point,
+            contributions: list.map((b) => b.id),
+          })),
+          ...factoryOrder.value.map((point) => ({
+            point,
+            contributions: [factories.get(point)!.id],
+          })),
+        ].sort((a, b) => (a.point < b.point ? -1 : a.point > b.point ? 1 : 0)),
+        capabilities: { revision, entries: structuredClone(capabilities) },
+        configProvenance: [{ key: '*', source: 'explicit', effective: config }],
+        warnings: [
+          'Composition digest covers descriptors, configuration and bindings; executable code is identified by component version.',
+        ],
+      });
+      plans.set(token, {
+        inspection,
+        components,
+        config,
+        points,
+        bindings,
+        factories,
+        factoryOrder: factoryOrder.value,
+      });
+      return ok({ inspection, localToken: token });
+    },
+  };
+}

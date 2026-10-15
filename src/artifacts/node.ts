@@ -1,5 +1,5 @@
-import { mkdir,open,readFile,rename,rm,stat } from 'node:fs/promises';
-import { join,resolve } from 'node:path';
+import { mkdir, open, readFile, rename, rm, stat } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { isJsonObject } from '../contracts/index.js';
 import type { Storage } from '../reference/storage.js';
 import { createArtifactStore } from './index.js';

@@ -1,8 +1,8 @@
 import { once } from 'node:events';
 import type { IncomingMessage } from 'node:http';
 import { createServer } from 'node:http';
+import { jsonCodec } from '../client/codec.js';
 import { commandSchema, querySchema } from '../client/control.js';
-import { jsonCodec } from '../client/index.js';
 import { fail, isJsonObject, ok } from '../contracts/index.js';
 import type { Client } from '../reference/client.js';
 import type { Contracts } from '../reference/contracts.js';

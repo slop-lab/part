@@ -1,8 +1,8 @@
 import { digest, fail, ok } from '../contracts/index.js';
 import type { Contracts } from '../reference/contracts.js';
 import type { Workflows } from '../reference/workflows.js';
-import type { WorkflowServices } from './memory/index.js';
 import { createMemoryWorkflowEngine } from './memory/index.js';
+import type { WorkflowServices } from './memory/types.js';
 export function createCodeEngine(
   definitions: readonly {
     definition: Workflows.CodeDefinition<Contracts.Json, Contracts.Json>;

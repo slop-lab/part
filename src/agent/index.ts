@@ -1,4 +1,5 @@
-import { createPlanner, createScopeManager } from '../composition/index.js';
+import { createPlanner } from '../composition/planner.js';
+import { createScopeManager } from '../composition/scopes.js';
 import {
   createContextCompiler,
   lowerersKey,

@@ -1,8 +1,8 @@
 import { fail, isJsonObject, ok } from '../contracts/index.js';
 import type { Client } from '../reference/client.js';
 import type { Contracts } from '../reference/contracts.js';
+import { jsonCodec } from './codec.js';
 import { commandSchema, querySchema } from './control.js';
-import { jsonCodec } from './index.js';
 export function createHttpPort(
   baseUrl: string,
   options: {

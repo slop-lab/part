@@ -4,6 +4,9 @@ import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 const root = process.cwd(),
   temporary = mkdtempSync(join(tmpdir(), 'part-consumers-'));
+const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+const publicEntries = Object.entries(manifest.exports);
+const publicPath = (name) => (name === '.' ? manifest.name : `${manifest.name}/${name.slice(2)}`);
 function run(command, args, cwd = root) {
   const result = spawnSync(command, args, {
     cwd,
@@ -37,6 +40,17 @@ try {
     );
     run('npm', ['install', '--ignore-scripts', '--offline', '--no-audit', '--no-fund'], directory);
     if (name === 'contracts') {
+      const writeEntrypoints = (entries) =>
+        writeFileSync(
+          join(directory, 'entrypoints.ts'),
+          `export type Entrypoints = [\n${entries
+            .filter(([, entry]) => entry.types)
+            .map(([name]) => `  typeof import(${JSON.stringify(publicPath(name))})`)
+            .join(',\n')}\n];\n`,
+        );
+      // The Node HTTP adapter intentionally exposes IncomingMessage. All other
+      // declarations must also compile in a consumer without ambient Node types.
+      writeEntrypoints(publicEntries.filter(([name]) => name !== './host/http'));
       writeFileSync(
         join(directory, 'tsconfig.json'),
         JSON.stringify({
@@ -45,18 +59,47 @@ try {
             module: 'NodeNext',
             moduleResolution: 'NodeNext',
             strict: true,
+            types: [],
             skipLibCheck: false,
             outDir: 'out',
             lib: ['ES2022', 'DOM', 'DOM.Iterable'],
           },
-          include: ['index.ts'],
+          include: ['index.ts', 'entrypoints.ts'],
         }),
       );
       run(process.execPath, [join(root, 'node_modules/typescript/bin/tsc')], directory);
       process.stdout.write(run(process.execPath, ['out/index.js'], directory));
+      writeEntrypoints(publicEntries);
+      run(
+        process.execPath,
+        [
+          join(root, 'node_modules/typescript/bin/tsc'),
+          '--types',
+          'node',
+          '--typeRoots',
+          join(root, 'node_modules/@types'),
+        ],
+        directory,
+      );
+      const modules = publicEntries
+        .filter(([, entry]) => entry.default?.endsWith('.js'))
+        .map(([name]) => publicPath(name));
+      run(
+        process.execPath,
+        [
+          '--input-type=module',
+          '--eval',
+          `for (const path of ${JSON.stringify(modules)}) await import(path);`,
+        ],
+        directory,
+      );
+      for (const [, entry] of publicEntries)
+        if (entry.default?.endsWith('.css'))
+          readFileSync(join(directory, 'node_modules', manifest.name, entry.default));
+      console.log(`All ${publicEntries.length} public package entrypoints verified`);
     } else process.stdout.write(run(process.execPath, ['index.mjs'], directory));
     const lock = JSON.parse(readFileSync(join(directory, 'package-lock.json'), 'utf8'));
-    if (lock.packages['node_modules/part'].version !== '0.1.0-alpha.2')
+    if (lock.packages['node_modules/part'].version !== manifest.version)
       throw Error('Unpinned consumer version');
   }
 } finally {

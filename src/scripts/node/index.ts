@@ -1,39 +1,23 @@
-import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { extname, isAbsolute, join, relative, resolve } from 'node:path';
-import { digest, fail, isJson, isJsonObject, ok } from '../../contracts/index.js';
+import { resolve } from 'node:path';
+import { digest, fail, isJson, ok } from '../../contracts/index.js';
 import type { Contracts } from '../../reference/contracts.js';
 import type { Runtime } from '../../reference/runtime.js';
 import type { Scripts } from '../../reference/scripts.js';
-import type { Tools } from '../../reference/tools.js';
 import { createBoundary, managedAttempt } from '../../runtime/boundary.js';
 import { reserve } from '../../runtime/budget.js';
-import type { Operations } from '../../runtime/operations.js';
 import { createOperations } from '../../runtime/operations.js';
-import type { ScriptBridgeEnvironment } from '../bridge/node.js';
 import { isScriptRequest } from '../index.js';
-export interface NodeScriptService extends Scripts.Service {
-  executor(id?: string): Tools.Executor;
-}
-export function createNodeScripts(options: {
-  root: string;
-  interpreters: Readonly<Record<string, string>>;
-  environments?: Readonly<Record<string, Readonly<Record<string, string>>>>;
-  operations?: Operations;
-  boundary?: Runtime.InvocationBoundary;
-  maxOutputBytes?: number;
-  bridge?: ScriptBridgeEnvironment;
-  source?: (
-    source: Scripts.Source,
-    context: Contracts.InvocationContext,
-  ) => Promise<Contracts.Result<Uint8Array>>;
-  workspace?: (
-    ref: Contracts.DataRef,
-    context: Contracts.InvocationContext,
-  ) => Promise<Contracts.Result<string>>;
-  maxSourceBytes?: number;
-}): NodeScriptService {
+import { runScriptProcess } from './process.js';
+import { resolveScriptSource } from './source.js';
+import type { NodeScriptOptions, NodeScriptService } from './types.js';
+export type { NodeScriptOptions, NodeScriptService } from './types.js';
+export function createNodeScripts(options: NodeScriptOptions): NodeScriptService {
+  options = {
+    ...options,
+    root: resolve(options.root),
+    interpreters: { ...options.interpreters },
+    environments: structuredClone(options.environments ?? {}),
+  };
   const root = resolve(options.root),
     interpreters = { ...options.interpreters },
     environments = structuredClone(options.environments ?? {}),
@@ -217,37 +201,9 @@ export function createNodeScripts(options: {
         (!Number.isSafeInteger(request.capture.maxBytes) || request.capture.maxBytes < 1)
       )
         return fail('scripts.capture-limit', 'Invalid capture size limit');
-      const path = request.source.relativePath;
-      if (isAbsolute(path)) return fail('scripts.path', 'Script path must be relative');
-      let bytes: Uint8Array,
-        workspace = root;
-      if (request.workspace) {
-        const selected = await options.workspace!(request.workspace, context);
-        if (!selected.ok) return selected;
-        workspace = await realpath(selected.value);
-      }
-      if (request.source.packageId) {
-        const selected = await options.source!(request.source, context);
-        if (!selected.ok) return selected;
-        bytes = selected.value.slice();
-      } else {
-        try {
-          const actual = await realpath(resolve(root, path)),
-            base = await realpath(root),
-            local = relative(base, actual);
-          if (!local || local === '..' || local.startsWith('../') || isAbsolute(local))
-            return fail('scripts.path', 'Script is outside the configured root', 'permission');
-          if ((await stat(actual)).size > (options.maxSourceBytes ?? 16 * 1024 * 1024))
-            return fail('scripts.source-size', 'Script exceeds source byte limit');
-          bytes = await readFile(actual);
-        } catch {
-          return fail('scripts.source', 'Script source unavailable', 'unavailable');
-        }
-      }
-      if (bytes.length > (options.maxSourceBytes ?? 16 * 1024 * 1024))
-        return fail('scripts.source-size', 'Script exceeds source byte limit');
-      if ((await digest(bytes)) !== request.source.digest)
-        return fail('scripts.digest', 'Script content changed', 'conflict');
+      const prepared = await resolveScriptSource(options, request, context);
+      if (!prepared.ok) return prepared;
+      const { bytes, workspace } = prepared.value;
       const fixed = structuredClone(request),
         executionDigest = await digest(fixed as unknown as Contracts.Json);
       const deadlines = [
@@ -277,259 +233,18 @@ export function createNodeScripts(options: {
           const executeAttempt = async (): Promise<Runtime.AttemptOutcome<Scripts.Output>> => {
             const budget = shared ? ok(undefined) : reserve(c, 'maxExecutorAttempts');
             if (!budget.ok) return { kind: 'failed', error: budget.error, effect: 'not-attempted' };
-            const temporary = await mkdtemp(join(tmpdir(), 'part-script-')),
-              snapshot = join(temporary, `source${extname(fixed.source.relativePath)}`);
-            const maximum = options.maxOutputBytes ?? 1024 * 1024;
-            let processStarted = false;
-            try {
-              await writeFile(snapshot, bytes, { mode: 0o400 });
-              if (c.signal.aborted) return { kind: 'cancelled', effect: 'not-attempted' };
-              const bridgeEnvironment = fixed.bridgeGrant
-                ? options.bridge!.environment(fixed.bridgeGrant, c, fixed.source.relativePath)
-                : ok({});
-              if (!bridgeEnvironment.ok)
-                return {
-                  kind: 'failed',
-                  error: bridgeEnvironment.error,
-                  effect: 'not-attempted',
-                };
-              const child = spawn(interpreters[fixed.interpreter]!, [snapshot, ...fixed.args], {
-                cwd: workspace,
-                env: {
-                  ...(fixed.environmentProfile ? environments[fixed.environmentProfile] : {}),
-                  ...bridgeEnvironment.value,
-                },
-                stdio:
-                  fixed.capture.kind === 'channel'
-                    ? ['pipe', 'pipe', 'pipe', 'pipe']
-                    : ['pipe', 'pipe', 'pipe'],
-                detached: true,
-              });
-              processStarted = true;
-              const stdout: Buffer[] = [];
-              let channelBuffer = Buffer.alloc(0),
-                channelBytes = 0,
-                channelError = false,
-                channelResult: Contracts.Json | undefined,
-                channelReturned = false;
-              let outBytes = 0,
-                errorBytes = 0,
-                truncated = false,
-                spawnError = false,
-                killTimer: ReturnType<typeof setTimeout> | undefined;
-              const terminate = () => {
-                if (!child.pid) return;
-                try {
-                  process.kill(-child.pid, 'SIGTERM');
-                } catch {}
-                killTimer ??= setTimeout(() => {
-                  try {
-                    process.kill(-child.pid!, 'SIGKILL');
-                  } catch {}
-                }, 50);
-              };
-              c.signal.addEventListener('abort', terminate, { once: true });
-              child.on('exit', () => terminate());
-              child.on('error', () => {
-                spawnError = true;
-              });
-              child.stdin.on('error', () => {});
-              child.stdout.on('data', (chunk: Buffer) => {
-                outBytes += chunk.length;
-                if (outBytes <= maximum) stdout.push(chunk);
-                else {
-                  truncated = true;
-                  terminate();
-                }
-              });
-              child.stderr.on('data', (chunk: Buffer) => {
-                errorBytes += chunk.length;
-                if (errorBytes > maximum) {
-                  truncated = true;
-                  terminate();
-                }
-              });
-              if (fixed.capture.kind === 'channel') {
-                const capture = fixed.capture;
-                const channel = child.stdio[3] as import('node:stream').Readable;
-                channel.on('data', (chunk: Buffer) => {
-                  channelBytes += chunk.length;
-                  if (channelBytes > maximum) {
-                    truncated = true;
-                    terminate();
-                    return;
-                  }
-                  channelBuffer = Buffer.concat([channelBuffer, chunk]);
-                  let newline: number;
-                  while ((newline = channelBuffer.indexOf(10)) >= 0) {
-                    const line = channelBuffer.subarray(0, newline);
-                    channelBuffer = channelBuffer.subarray(newline + 1);
-                    try {
-                      const frame = JSON.parse(
-                        new TextDecoder('utf-8', { fatal: true }).decode(line),
-                      );
-                      if (
-                        !isJsonObject(frame) ||
-                        Object.keys(frame).some(
-                          (k) => !['protocolVersion', 'channelId', 'kind', 'payload'].includes(k),
-                        ) ||
-                        frame.protocolVersion !== 1 ||
-                        frame.channelId !== capture.channelId ||
-                        !Object.hasOwn(frame, 'payload')
-                      )
-                        throw new Error('Invalid channel frame');
-                      if (frame.kind === 'progress')
-                        c.progress.publish('part.script/channel-progress', frame.payload!);
-                      else if (
-                        frame.kind === 'result' &&
-                        !channelReturned &&
-                        Buffer.byteLength(JSON.stringify(frame.payload)) <= capture.maxBytes
-                      ) {
-                        channelResult = structuredClone(frame.payload!);
-                        channelReturned = true;
-                      } else throw new Error('Invalid channel result');
-                    } catch {
-                      channelError = true;
-                      terminate();
-                    }
-                  }
-                });
-              }
-              child.stdin.end(fixed.stdin === undefined ? undefined : JSON.stringify(fixed.stdin));
-              if (c.signal.aborted) terminate();
-              const exited = await new Promise<{ code: number | null; signal: string | null }>(
-                (resolve) => child.on('close', (code, signal) => resolve({ code, signal })),
-              );
-              c.signal.removeEventListener('abort', terminate);
-              clearTimeout(killTimer);
-              let unresolved = false;
-              if (child.pid) {
-                try {
-                  process.kill(-child.pid, 0);
-                  unresolved = true;
-                } catch {}
-              }
-              if (unresolved) {
-                try {
-                  process.kill(-child.pid!, 'SIGKILL');
-                } catch {}
-                await new Promise((resolve) => setTimeout(resolve, 30));
-                try {
-                  process.kill(-child.pid!, 0);
-                } catch {
-                  unresolved = false;
-                }
-              }
-              if (spawnError)
-                return {
-                  kind: 'failed',
-                  effect: 'not-attempted',
-                  error: fail('scripts.spawn', 'Process did not start', 'unavailable').error,
-                };
-              const effect: Contracts.EffectState =
-                fixed.effects === 'read'
-                  ? 'not-applied'
-                  : unresolved || c.signal.aborted
-                    ? 'unknown'
-                    : 'applied';
-              if (unresolved) {
-                unresolvedPid = child.pid;
-                return {
-                  kind: 'failed',
-                  effect: 'unknown',
-                  error: {
-                    code: 'part.scripts.process-tree',
-                    category: 'unavailable',
-                    message: 'Process group termination is unconfirmed',
-                    retry: 'after-reconciliation',
-                  },
-                };
-              }
-              if (c.signal.aborted) return { kind: 'cancelled', effect };
-              if (truncated)
-                return {
-                  kind: 'failed',
-                  effect,
-                  error: fail('scripts.truncated', 'Output exceeded byte limit').error,
-                };
-              let captured: Scripts.Output['captured'];
-              if (fixed.capture.kind === 'channel') {
-                if (channelError || channelBuffer.length || !channelReturned)
-                  return {
-                    kind: 'failed',
-                    effect,
-                    error: fail(
-                      'scripts.channel-result',
-                      'Expected one complete versioned channel result',
-                    ).error,
-                  };
-                captured = { kind: 'inline', value: channelResult! };
-              } else if (fixed.capture.kind !== 'none') {
-                let output: Uint8Array = Buffer.concat(stdout);
-                if (fixed.capture.kind === 'file') {
-                  const actual = await realpath(resolve(workspace, fixed.capture.relativePath)),
-                    local = relative(await realpath(workspace), actual);
-                  if (!local || local === '..' || local.startsWith('../') || isAbsolute(local))
-                    return {
-                      kind: 'failed',
-                      effect,
-                      error: fail(
-                        'scripts.capture-path',
-                        'Capture file is outside the root',
-                        'permission',
-                      ).error,
-                    };
-                  if ((await stat(actual)).size > fixed.capture.maxBytes)
-                    return {
-                      kind: 'failed',
-                      effect,
-                      error: fail('scripts.capture-size', 'Capture too large').error,
-                    };
-                  output = await readFile(actual);
-                }
-                if (output.byteLength > fixed.capture.maxBytes)
-                  return {
-                    kind: 'failed',
-                    effect,
-                    error: fail('scripts.capture-size', 'Capture too large').error,
-                  };
-                try {
-                  const value: unknown = JSON.parse(
-                    new TextDecoder('utf-8', { fatal: true }).decode(output),
-                  );
-                  if (!isJson(value)) throw Error('Invalid JSON');
-                  captured = { kind: 'inline', value };
-                } catch {
-                  return {
-                    kind: 'failed',
-                    effect,
-                    error: fail(
-                      'scripts.capture-json',
-                      'Capture must contain exactly one complete UTF-8 JSON value',
-                    ).error,
-                  };
-                }
-              }
-              return {
-                kind: 'returned',
-                value: {
-                  exitCode: exited.code,
-                  termination: exited.signal ? 'signal' : 'exited',
-                  completeness: 'complete',
-                  executionDigest,
-                  ...(captured ? { captured } : {}),
-                },
-                effect,
-              };
-            } catch {
-              return {
-                kind: 'failed',
-                effect: processStarted ? 'unknown' : 'not-attempted',
-                error: fail('scripts.execution', 'Script execution failed', 'unavailable').error,
-              };
-            } finally {
-              await rm(temporary, { recursive: true, force: true });
-            }
+
+            const result = await runScriptProcess(options, {
+              request: fixed,
+              bytes,
+              workspace,
+              executionDigest,
+              context: c,
+              interpreters,
+              environments,
+            });
+            unresolvedPid = result.unresolvedPid;
+            return result.outcome;
           };
           const borrowed = async (): Promise<Runtime.ManagedOutcome<Scripts.Output>> => {
             const result = await executeAttempt();

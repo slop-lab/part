@@ -1,5 +1,5 @@
 import { commandSchema, querySchema } from '../client/control.js';
-import { createWatchHub } from '../client/index.js';
+import { createWatchHub } from '../client/watch.js';
 import { canonical, fail, freeze, isJsonObject, ok } from '../contracts/index.js';
 import type { Client } from '../reference/client.js';
 import type { Contracts } from '../reference/contracts.js';

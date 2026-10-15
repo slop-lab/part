@@ -6,6 +6,10 @@
   by responsibility. Public paths follow their domains, including `part/workflows/code`,
   `part/scripts/node` and `part/ui/dom`; remove flat compatibility paths and `part/core`.
 - Move shared budget/effect helpers into runtime and use direct internal dependencies.
+- Separate workflow lifecycle, managed calls, output validation and state; split script
+  admission/source/process handling, composition planning/scopes and client codec/watch/controller.
+- Check architecture boundaries and unused code locally and in CI; validate every
+  public entrypoint from an isolated packed consumer.
 - Split runtime primitives, pipeline compilation/execution and reference namespaces
   into separate modules; clean build output before compilation.
 - Complete local workflow integration: nested pipelines, authenticated script bridge,

@@ -37,10 +37,16 @@ Source files are grouped by responsibility:
 - `extensions/` and `scripts/` contain hooks/skills/packages and script/bridge execution.
 - `workflows/` contains workflow engines and endpoints. Pipeline handler registration,
   value resolution, compilation and execution live in separate `pipeline/` modules.
+  The memory engine separates submission/lifecycle, managed step contexts, output
+  validation, call identities and snapshots. Its scope-rebinding helper is private.
 - `host/`, `storage/` and `client/` contain hosting, persistence and client transport.
 - `artifacts/` owns immutable byte storage; `results/` owns result validation/processing.
 - `ui/` contains optional presentation modules and styles; `testing/` contains fixtures.
 - `reference/` contains the type-only design namespaces, one module per namespace.
+
+Composition separates planning, opaque handle storage and scope ownership. The client
+separates codecs, watch state, local transport and controller state. The Node script
+host separates admission/attempt ownership, immutable source selection and process I/O.
 
 Imports use their original descriptive names. Public package paths follow the
 domain hierarchy, such as `part/workflows/code`, `part/model/providers/ollama` and
@@ -49,6 +55,12 @@ Internal modules import their actual dependencies instead of their own public ba
 Shared budget/effect logic belongs to runtime, so script and workflow engines do not
 depend on model gateways or agent drivers. Internal helper paths are not public exports.
 Builds remove stale output before compiling and copy the public stylesheet explicitly.
+`npm run check` rejects unused code, import aliases, runtime cycles, reversed layer
+dependencies, Node imports from portable entrypoints and exports that disagree with
+the source domains. Packed-consumer checks load every JavaScript entrypoint, compile
+every public declaration entrypoint and verify the stylesheet is present.
+Portable declarations compile without ambient Node types; the HTTP host's
+`IncomingMessage` callback is additionally checked with explicit Node typings.
 The hashes and paths in `evidence.json` describe the recorded pre-refactor revision;
 they are historical validation evidence, not a manifest of the current checkout.
 

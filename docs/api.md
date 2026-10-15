@@ -5,6 +5,11 @@ All concrete JavaScript APIs are generated from `src/**/*.ts`. `part/reference` 
 **type-only design reference**, including future optional contracts; it does not
 mean every namespace has an implementation.
 
+Public imports follow the source domains without compatibility aliases. Node
+applications using `part/host/http` need Node TypeScript typings because its
+authentication callback receives an `IncomingMessage`. Portable entrypoints do
+not require ambient Node types.
+
 | Export                                                                            | Implemented surface                                                                                             |
 | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `part`, `part`                                                                    | Small schema/composition/operation/boundary helpers                                                             |

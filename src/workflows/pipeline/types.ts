@@ -3,7 +3,7 @@ import type { Contracts } from '../../reference/contracts.js';
 import type { PipelineV1 } from '../../reference/pipeline-v1.js';
 import type { Runtime } from '../../reference/runtime.js';
 import type { Skills } from '../../reference/skills.js';
-import type { WorkflowServices } from '../memory/index.js';
+import type { WorkflowServices } from '../memory/types.js';
 export interface PipelineOptions {
   definitions: readonly PipelineV1.Definition[];
   schemas: readonly Contracts.Schema<Contracts.Json>[];
