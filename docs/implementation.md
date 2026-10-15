@@ -24,6 +24,12 @@ than treating every proposed declaration as a shipped guarantee.
 | Client/UI                  | Codec loopback and HTTP/SSE, normalized snapshots/deltas, IME/draft/scroll, safe Markdown, concrete DOM components, ordered slots, generic workflow actions, Inspector/Workbench/artifacts | Client/UI/workflow DOM tests, standalone preview and long-history cache benchmark |
 | Observability/cost         | Explicit manifests/redaction/retention and decimal model estimates reserved before transport                                                                                               | Optional-contract tests; no core import resource activation                       |
 
+Local provider test support includes an agent-operated loopback Chat Completions
+mock, exact fixed fixtures, operator tools/CLI and transcript-to-fixture conversion.
+The portable OpenAI-compatible adapter is verified against this local profile,
+including a real agent/function-tool loop. See [mock workflows](mock-provider.md).
+This adds local compatibility evidence, not a real-provider smoke result.
+
 ## Dependent-project readiness
 
 Dependent projects can start local development against selected alpha.2 workspace

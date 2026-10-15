@@ -164,3 +164,18 @@ artifacts/part-plugins-0.1.0-alpha.2.tgz: cfeed2240b5be632340c8022ae3f1416063411
 artifacts/part-node-0.1.0-alpha.2.tgz: 02d7b15e7cda230566c7230527f5149076f406f533ba17698d5de51cf12d7108
 artifacts/part-browser-0.1.0-alpha.2.tgz: adf20cd63693653b7a29f1ca9cbd651acef48b01821772063443707cfabb2c16
 Real provider smoke remains deferred; hosted CI was not executed.
+
+Mock-provider validation
+Recorded UTC: 2026-10-15T08:42:40.058Z
+Source revision: 032362a (implementation 1361cdf)
+npm test: 94 passed, 0 failed (10 new mock/adapter/CLI tests)
+npm run check: 4 packages, 123 source modules, 64 public entrypoints
+npm run test:consumers: 7 isolated consumers passed; Node-only consumer exercises the packaged mock API and installed CLI --help
+Fixed real agent/tool flow: exact fixture consumed; golden transcript matched
+Interactive tool flow: pending inspection -> chosen function call -> actual tool result -> chosen text; golden transcript matched
+CLI interactive-to-fixed round trip: exported decisions replayed as exact fixture
+Working-agent manual CLI verification: inspected two real pending requests for the part workspace; chose uppercase tool call, inspected HELLO result, chose final HELLO; exported fixture and shut down both processes successfully
+Negative cases: request mismatch/exhaustion/unused exchanges, separate credentials, duplicate/conflicting decisions, concurrent correlation, disconnect, timeout, capacity, shutdown, malformed/truncated SSE, HTTP error/raw wire replies and byte bounds
+JSON/SSE decoder: fragmented Unicode, fragmented function arguments, terminal frames and usage
+npm run pack:local: four tarballs and checksum sidecars updated with the mock API/adapter/CLI
+No upstream model/provider request was made. Real-provider smoke remains deferred; hosted CI was not executed.
