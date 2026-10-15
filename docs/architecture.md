@@ -69,22 +69,19 @@ the source domains. Packed-consumer checks load every JavaScript entrypoint, com
 every public declaration entrypoint and verify the stylesheet is present.
 Portable declarations compile without ambient Node types; the HTTP host's
 `IncomingMessage` callback is additionally checked with explicit Node typings.
-The hashes and paths in `evidence.json` describe the recorded pre-refactor revision;
-they are historical validation evidence, not a manifest of the current checkout.
 
 The initial provider adapter targets the documented Ollama `/api/chat` NDJSON
 subset: text, thinking, function calls, and usage. Media and foreign native content
 require explicit projection. See https://docs.ollama.com/api/chat . Live
 Ollama smoke remains unverified; fake fixtures establish only that adapter's
 implemented protocol subset. The separate OpenAI-compatible Chat Completions adapter
-has live R4U JSON/SSE and function-tool evidence; see [provider smoke](provider-smoke.md).
+has an opt-in [provider smoke test](provider-smoke.md).
 The separate portable [Responses adapter](openai-responses.md) uses explicit stateless
-input, native reasoning replay and completed-response validation, with its own live
-R4U text/tool evidence.
+input, native reasoning replay and completed-response validation.
 
-This environment's Node 26 test subprocess runner reports file-level tests only.
-The project runs `--test-isolation=none` so individual registered tests execute and
-report counts explicitly. Test fixtures own and clean up all resources.
+The project runs `--test-isolation=none` so individual registered tests execute
+and contribute to the run summary. The reporter displays failures and the summary.
+Test fixtures own and clean up all resources.
 
 The SQLite reference adapter uses `node:sqlite` (`DatabaseSync`) and explicit
 transactions with FULL synchronous mode. API source: https://nodejs.org/api/sqlite.html .

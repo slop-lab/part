@@ -210,7 +210,7 @@ node scripts/check-architecture.mjs
 real child stdio, permission decisions, cancellation races, reused provider call
 IDs, limits, backpressure, session cleanup and owned MCP processes. Isolated
 consumers exercise portable ACP without Node adapters and Node ACP without the
-plugin bundle. See [validation evidence](validation.log) for executed commands.
+plugin bundle.
 
 Protocol references: [ACP overview](https://agentclientprotocol.com/protocol/v1/overview),
 [initialization](https://agentclientprotocol.com/protocol/v1/initialization),

@@ -79,14 +79,12 @@ aliases for the former flat imports. The browser stylesheet is
 `npm run build --workspace @slop-lab/part-browser` (or another workspace name).
 
 Dependent projects can begin development against the pinned package tarballs.
-G-BASE passes for the selected reference profile, including live R4U Chat Completions
-and Responses JSON/SSE/function-tool smoke with `gpt-6-luna`. APIs remain experimental. See
+APIs remain experimental. See
 [Responses adapter](docs/openai-responses.md),
 [provider smoke](docs/provider-smoke.md),
-[gate evidence](docs/gates.md), [supported contracts](docs/api.md),
+[supported contracts](docs/api.md),
 [implementation coverage](docs/implementation.md), [architecture](docs/architecture.md),
 [the basic example](examples/basic.mjs) and [consumer fixtures](consumers).
-The recorded pre-refactor evidence is historical; current checks use the workspace layout.
 
 Core import opens no database, socket, watcher, process or timer. Plugins are trusted
 code; capability declarations do not provide OS isolation.

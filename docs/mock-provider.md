@@ -179,5 +179,5 @@ function tools, JSON/SSE and token usage. It does not implement Responses API,
 Realtime, provider-hosted tools, media or continuation tokens. Unrecognized message
 payload fields can be inspected/matched as JSON but are not executed by the mock.
 The portable adapter rejects unsupported output/content and malformed/truncated
-streams. Mock runs establish local conformance only; separate live R4U verification
-is recorded in [provider smoke](provider-smoke.md).
+streams. Mock runs establish local conformance only; use the opt-in
+[provider smoke tests](provider-smoke.md) to check a configured live endpoint.

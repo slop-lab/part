@@ -6,8 +6,6 @@ requests and tool results beside the conversation. Its example-workspace organiz
 is inspired by [edaitor](https://github.com/slop-lab/edaitor); it does not depend on
 edaitor or require an editor framework.
 
-![Function-tool example with request inspection](images/playground-desktop.png)
-
 ## Start
 
 ```sh
@@ -181,7 +179,4 @@ It starts its own ephemeral loopback server and closes it afterward. Browser bin
 are development tooling only and are never package runtime dependencies. CI configures
 this check on Node 24; local success does not imply that hosted CI has run.
 
-Local verification also exercised the real browser-to-server-to-R4U path: a Responses
-conversation completed in one request, and a Chat Completions uppercase loop completed
-in two requests with one tool execution. See [recorded evidence](playground.evidence.json).
 The checked-in browser suite stays credential-free; live provider tests are explicit.

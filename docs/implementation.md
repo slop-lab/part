@@ -1,14 +1,7 @@
 # Implementation coverage
 
-The runtime is named **part (progressive agent runtime)**. The ignored `.local/`
-source specification retains its original `car` name; implementation identifiers,
-package exports and examples use `@slop-lab/part`.
-
-This release implements the specification's initial local profiles through S3,
-including the actual code and pipeline plugins required by section 16.1. The
-source document deliberately distinguishes initial requirements from S4 and
-adapter-specific future compatibility. This file records that boundary rather
-than treating every proposed declaration as a shipped guarantee.
+The runtime is named **part (progressive agent runtime)**. This document summarizes
+the shipped local profiles and their test coverage, with remaining scope below.
 
 | Specification area         | Implemented local profile                                                                                                                                                                  | Evidence                                                                          |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
@@ -28,11 +21,9 @@ Local provider test support includes an agent-operated loopback Chat Completions
 mock, exact fixed fixtures, operator tools/CLI and transcript-to-fixture conversion.
 The portable OpenAI-compatible adapter is verified against this local profile,
 including a real agent/function-tool loop. See [mock workflows](mock-provider.md).
-The separate live R4U smoke also passed JSON/SSE text and a real function-tool loop;
-see [provider evidence](provider-smoke.md).
-The separate [Responses adapter](openai-responses.md) also passes live R4U JSON/SSE
-and function-tool smoke; fixed fixtures verify native reasoning replay and prevent
-tool execution on incomplete streams.
+Live checks are opt-in; see [provider smoke](provider-smoke.md).
+The separate [Responses adapter](openai-responses.md) has fixed fixtures that verify
+native reasoning replay and prevent tool execution on incomplete streams.
 
 The [browser playground](playground.md) composes the public runtime/client/UI packages
 into six executable scenarios, with Scripted and opt-in server-side R4U providers.
@@ -43,8 +34,8 @@ or a durable product host.
 
 The optional [ACP agent plugin](acp.md) exposes configured part agents to editor
 clients over the separate Node stdio adapter. Local official-SDK interoperability,
-permission/cancellation races, bounded transport, session-owned MCP tools and live
-R4U text smoke are verified. This does not certify a specific editor GUI or every
+permission/cancellation races, bounded transport and session-owned MCP tools are
+covered by the test suite. This does not certify a specific editor GUI or every
 ACP/MCP capability. Calling external ACP agents remains separate scope.
 
 Dependent projects can start local development against selected alpha.2 workspace
@@ -54,16 +45,12 @@ cover core-only, non-coding, SWE, public TypeScript extensions, workflow, Node-o
 adapters and browser-only UI. They validate every public code/type/CSS entrypoint
 without installing unrelated packages. There is no reverse dependency on SWE.
 
-The actual-provider/custom-endpoint smoke passed with the supplied R4U configuration
-and `gpt-6-luna`, after Chat Completions was enabled and nullable tool-call decoding
-was corrected. G-BASE passes for this selected reference profile. See
-[reproduction and evidence](provider-smoke.md). Hosted CI was not run. G-WORKFLOW has local reference-profile evidence; real external
-product compatibility must be certified per adapter/version.
+Run the opt-in [provider smoke tests](provider-smoke.md) against your configured
+endpoint. External product compatibility must be checked per adapter and version.
 
 ## Separate later scope
 
-The specification marks these as later or adapter-specific work, not guarantees of
-this local reference profile:
+The following remain later or adapter-specific work:
 
 - Arbitrary async stack replay, durable memory-code continuation, durable wait/step
   scheduling and automatic recovery of native engine stacks. Checkpoint persistence
@@ -77,6 +64,5 @@ this local reference profile:
   broad browser/device audits and production-scale persistence/history tuning.
 
 Unknown required behavior fails explicitly. See [the supported API profiles](api.md)
-for concrete limits and [gate evidence](gates.md) for the executed checks. Test
-families identify covered assertions; they do not certify every possible race or
-variation in the specification's conformance catalog.
+for concrete limits. The test suite covers specific assertions, not every possible
+input or race.

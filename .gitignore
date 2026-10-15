@@ -10,3 +10,9 @@ preview/
 .env
 .env.*
 !.env.example
+
+/docs/images/
+/docs/*.evidence
+/docs/*.evidence.json
+/docs/evidence.json
+/docs/validation.log

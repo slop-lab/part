@@ -26,7 +26,7 @@ See [provider smoke](../../docs/provider-smoke.md).
 
 `@slop-lab/part-plugins/providers/openai-responses` exports `createOpenAIResponsesAdapter`
 for stateless Responses text/runtime-function calls over JSON or SSE, with native
-reasoning replay. Live R4U `gpt-6-luna` smoke passed JSON/SSE text and a tool loop.
+reasoning replay. Use the opt-in smoke test to check a configured live endpoint.
 See [Responses usage and limits](../../docs/openai-responses.md). Media, hosted tools,
 background requests and stored conversation/continuation handles are unsupported.
 

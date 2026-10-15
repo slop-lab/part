@@ -93,11 +93,9 @@ The interactive Node mock remains a Chat Completions mock.
 
 Run the opt-in live test with `npm run smoke:responses`. It uses the existing `.env`
 R4U credentials, discovers protocol/model capabilities and caps the run at four
-short requests: JSON text, SSE text and a two-request function-tool loop. Live R4U
-verification with `gpt-6-luna` passed all three scenarios; see
-[structured evidence](responses-smoke.evidence.json). This does not certify every
-model or every Responses API capability. [Provider smoke](provider-smoke.md) explains
-request bounds and usage accounting.
+short requests: JSON text, SSE text and a two-request function-tool loop.
+[Provider smoke](provider-smoke.md) explains request bounds and usage accounting.
+Run this check against your configured model; support varies by provider and model.
 
 The wire mapping follows the official OpenAI [function-calling guide](https://developers.openai.com/api/docs/guides/function-calling)
 and [Responses streaming event reference](https://developers.openai.com/api/reference/resources/responses/streaming-events).
