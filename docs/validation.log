@@ -141,3 +141,26 @@ $ npm run measure:ui
 Actual-provider smoke: explicitly deferred by the user.
 Hosted CI: configured; not executed here.
 Integration permission profile: reviewed loopback/subprocess sandbox escalation.
+
+Workspace refactor validation
+Recorded UTC: 2026-10-15T08:17:28.948Z
+Source revision: d975d40
+Packages: @part/core, @part/plugins, @part/node, @part/browser (0.1.0-alpha.2)
+npm ci --dry-run --offline --ignore-scripts: passed (lockfile consistency only)
+npm run check: passed; 4 packages, 112 source modules, 61 public entrypoints
+npm test: 84 passed, 0 failed
+npm run test:consumers: 7 passed (core, non-coding, SWE, contracts, workflow, node, browser)
+All public code/type/CSS entrypoints checked from isolated tarballs; no unrelated packages installed
+Portable declaration consumers: types=[]; Node declaration consumer: explicit Node type roots
+Temporary-copy architecture negative fixtures: 9 passed (package reversal, Node isolation, private cross-package paths, aliases, cycles, core optional imports, driver coupling, script/model coupling, wildcard exports)
+npm run build --workspace @part/browser: passed including CSS output
+npm run preview:build: passed
+Core cold import: 3.798712 ms, heap delta 766040 bytes, new active resources [], runtime dependencies 0
+UI cache benchmark: Node/happy-dom only; 1001 items, 100 visible, 200 updates; mean update 0.608455310 ms; completed renderer calls during stream 0; completed DOM node retained
+npm run format:check and git diff --check: passed
+npm run pack:local: 4 tarballs and SHA-256 sidecars; no source files or compiler cache in archives
+artifacts/part-core-0.1.0-alpha.2.tgz: f80bca43c8c15052aab2549a426e44313fe7d79c6da3575823bb20a65b9b85b9
+artifacts/part-plugins-0.1.0-alpha.2.tgz: cfeed2240b5be632340c8022ae3f1416063411e729c7ffc230458c36fd101d28
+artifacts/part-node-0.1.0-alpha.2.tgz: 02d7b15e7cda230566c7230527f5149076f406f533ba17698d5de51cf12d7108
+artifacts/part-browser-0.1.0-alpha.2.tgz: adf20cd63693653b7a29f1ca9cbd651acef48b01821772063443707cfabb2c16
+Real provider smoke remains deferred; hosted CI was not executed.
