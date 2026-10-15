@@ -420,3 +420,17 @@ test('Body/output bounds reject invalid decisions without consuming the pending 
     await provider.close();
   }
 });
+
+test('Non-streaming OpenAI requests omit stream-only options while SSE requests request usage', async () => {
+  const adapter = createOpenAICompatibleAdapter();
+  for (const stream of [false, true]) {
+    const encoded = await adapter.encode(
+      { context: { fragments: [] }, tools: [], options: {} },
+      { model: 'part-mock', defaults: { stream } },
+    );
+    assert.equal(encoded.ok, true);
+    const body = JSON.parse(new TextDecoder().decode(encoded.value.body));
+    assert.equal(body.stream, stream);
+    assert.deepEqual(body.stream_options, stream ? { include_usage: true } : undefined);
+  }
+});

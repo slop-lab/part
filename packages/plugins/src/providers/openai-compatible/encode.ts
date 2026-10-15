@@ -60,7 +60,7 @@ export async function encodeChat(
   const body = new TextEncoder().encode(
     JSON.stringify({
       stream: true,
-      stream_options: { include_usage: true },
+      ...(options.stream === false ? {} : { stream_options: { include_usage: true } }),
       ...options,
       model: profile.model,
       messages,

@@ -7,3 +7,6 @@ coverage/
 preview/
 
 /artifacts/
+.env
+.env.*
+!.env.example
