@@ -192,6 +192,9 @@ export function startJsonRpcPeer(options: AcpStdioOptions & { cancelMethod?: str
     }
     const requestAbort = new AbortController();
     if (request) incoming.set(id, requestAbort);
+    const releaseRequest = () => {
+      if (request && incoming.get(id) === requestAbort) incoming.delete(id);
+    };
     void (async () => {
       try {
         const result = await handler.handle(
@@ -200,10 +203,10 @@ export function startJsonRpcPeer(options: AcpStdioOptions & { cancelMethod?: str
           request ? 'request' : 'notification',
           requestAbort.signal,
         );
-        if (request) incoming.delete(id);
+        releaseRequest();
         if (request && !ended) await write({ jsonrpc: '2.0', id, result });
       } catch (error) {
-        if (request) incoming.delete(id);
+        releaseRequest();
         if (request && !ended) {
           const known =
             error instanceof Error && 'code' in error && Number.isSafeInteger(error.code);
@@ -215,7 +218,7 @@ export function startJsonRpcPeer(options: AcpStdioOptions & { cancelMethod?: str
           await errorResponse(id, code, known ? error.message : 'Internal error', data);
         }
       } finally {
-        if (request) incoming.delete(id);
+        releaseRequest();
       }
     })().catch(() => {
       void close();

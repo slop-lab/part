@@ -352,6 +352,57 @@ test('Closing ACP during async session setup aborts its host signal and awaits c
   await rejected;
 });
 
+test('ACP request ID reuse during output backpressure preserves the new request cancellation signal', async () => {
+  const input = new PassThrough(),
+    writing = deferred(),
+    started = deferred(),
+    cancelled = deferred();
+  let release;
+  const output = new Writable({
+    write(_chunk, _encoding, callback) {
+      release = callback;
+      writing.resolve();
+    },
+  });
+  const host = startAcpStdio({
+    input,
+    output,
+    createHandler: () => ({
+      async handle(method, _params, _kind, signal) {
+        if (method === 'second') {
+          signal.addEventListener('abort', () => cancelled.resolve(), { once: true });
+          started.resolve();
+          await cancelled.promise;
+        }
+        return {};
+      },
+      async close() {
+        return emptyCleanup();
+      },
+    }),
+  });
+  try {
+    input.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'first' }) + '\n');
+    await writing.promise;
+    input.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'second' }) + '\n');
+    await started.promise;
+    release();
+    await setTimeout(0);
+    input.write(
+      JSON.stringify({ jsonrpc: '2.0', method: '$/cancel_request', params: { requestId: 1 } }) +
+        '\n',
+    );
+    await Promise.race([
+      cancelled.promise,
+      setTimeout(1000).then(() => {
+        throw Error('Reused request lost its cancellation signal');
+      }),
+    ]);
+  } finally {
+    await host.close();
+  }
+});
+
 function rawHost(options = {}) {
   const input = new PassThrough(),
     output = new PassThrough(),
