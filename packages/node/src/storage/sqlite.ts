@@ -1,3 +1,4 @@
+/** @public */
 import { fail, isJson, ok } from '@slop-lab/part/contracts';
 import type { Contracts } from '@slop-lab/part/reference';
 import type { LocalStore, StoreData } from '@slop-lab/part/storage/memory';

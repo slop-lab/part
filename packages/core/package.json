@@ -8,102 +8,18 @@
     "dist",
     "README.md"
   ],
+  "scripts": {
+    "build": "node ../../scripts/build.mjs core",
+    "check": "tsc -b"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./contracts": {
-      "types": "./dist/contracts/index.d.ts",
-      "default": "./dist/contracts/index.js"
-    },
-    "./runtime": {
-      "types": "./dist/runtime/index.d.ts",
-      "default": "./dist/runtime/index.js"
-    },
-    "./runtime/budgets": {
-      "types": "./dist/runtime/budgets.d.ts",
-      "default": "./dist/runtime/budgets.js"
-    },
-    "./runtime/costs": {
-      "types": "./dist/runtime/costs.d.ts",
-      "default": "./dist/runtime/costs.js"
-    },
-    "./runtime/runs": {
-      "types": "./dist/runtime/runs.d.ts",
-      "default": "./dist/runtime/runs.js"
-    },
-    "./runtime/waits": {
-      "types": "./dist/runtime/waits.d.ts",
-      "default": "./dist/runtime/waits.js"
-    },
-    "./runtime/observability": {
-      "types": "./dist/runtime/observability.d.ts",
-      "default": "./dist/runtime/observability.js"
-    },
-    "./composition": {
-      "types": "./dist/composition/index.d.ts",
-      "default": "./dist/composition/index.js"
-    },
-    "./tools": {
-      "types": "./dist/tools.d.ts",
-      "default": "./dist/tools.js"
-    },
-    "./model": {
-      "types": "./dist/model/index.d.ts",
-      "default": "./dist/model/index.js"
-    },
-    "./context": {
-      "types": "./dist/context/index.d.ts",
-      "default": "./dist/context/index.js"
-    },
-    "./context/history": {
-      "types": "./dist/context/history.d.ts",
-      "default": "./dist/context/history.js"
-    },
-    "./context/run-history": {
-      "types": "./dist/context/run-history.d.ts",
-      "default": "./dist/context/run-history.js"
-    },
-    "./context/projection": {
-      "types": "./dist/context/projection.d.ts",
-      "default": "./dist/context/projection.js"
-    },
-    "./scripts": {
-      "types": "./dist/scripts/index.d.ts",
-      "default": "./dist/scripts/index.js"
-    },
-    "./host/embedded": {
-      "types": "./dist/host/embedded.d.ts",
-      "default": "./dist/host/embedded.js"
-    },
-    "./host/resources": {
-      "types": "./dist/host/resources.d.ts",
-      "default": "./dist/host/resources.js"
-    },
-    "./host/runtime": {
-      "types": "./dist/host/runtime.d.ts",
-      "default": "./dist/host/runtime.js"
-    },
-    "./storage/memory": {
-      "types": "./dist/storage/memory.d.ts",
-      "default": "./dist/storage/memory.js"
-    },
-    "./storage/migrations": {
-      "types": "./dist/storage/migrations.d.ts",
-      "default": "./dist/storage/migrations.js"
-    },
-    "./storage/runtime": {
-      "types": "./dist/storage/runtime.d.ts",
-      "default": "./dist/storage/runtime.js"
-    },
     "./artifacts": {
       "types": "./dist/artifacts/index.d.ts",
       "default": "./dist/artifacts/index.js"
-    },
-    "./results": {
-      "types": "./dist/results/index.d.ts",
-      "default": "./dist/results/index.js"
     },
     "./client": {
       "types": "./dist/client/index.d.ts",
@@ -117,19 +33,103 @@
       "types": "./dist/client/http.d.ts",
       "default": "./dist/client/http.js"
     },
+    "./composition": {
+      "types": "./dist/composition/index.d.ts",
+      "default": "./dist/composition/index.js"
+    },
+    "./context": {
+      "types": "./dist/context/index.d.ts",
+      "default": "./dist/context/index.js"
+    },
+    "./context/history": {
+      "types": "./dist/context/history.d.ts",
+      "default": "./dist/context/history.js"
+    },
+    "./context/projection": {
+      "types": "./dist/context/projection.d.ts",
+      "default": "./dist/context/projection.js"
+    },
+    "./context/run-history": {
+      "types": "./dist/context/run-history.d.ts",
+      "default": "./dist/context/run-history.js"
+    },
+    "./contracts": {
+      "types": "./dist/contracts/index.d.ts",
+      "default": "./dist/contracts/index.js"
+    },
+    "./host/embedded": {
+      "types": "./dist/host/embedded.d.ts",
+      "default": "./dist/host/embedded.js"
+    },
+    "./host/resources": {
+      "types": "./dist/host/resources.d.ts",
+      "default": "./dist/host/resources.js"
+    },
+    "./host/runtime": {
+      "types": "./dist/host/runtime.d.ts",
+      "default": "./dist/host/runtime.js"
+    },
+    "./model": {
+      "types": "./dist/model/index.d.ts",
+      "default": "./dist/model/index.js"
+    },
     "./reference": {
       "types": "./dist/reference/index.d.ts"
+    },
+    "./results": {
+      "types": "./dist/results/index.d.ts",
+      "default": "./dist/results/index.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime/index.d.ts",
+      "default": "./dist/runtime/index.js"
+    },
+    "./runtime/budgets": {
+      "types": "./dist/runtime/budgets.d.ts",
+      "default": "./dist/runtime/budgets.js"
+    },
+    "./runtime/costs": {
+      "types": "./dist/runtime/costs.d.ts",
+      "default": "./dist/runtime/costs.js"
     },
     "./runtime/deadline": {
       "types": "./dist/runtime/deadline.d.ts",
       "default": "./dist/runtime/deadline.js"
     },
+    "./runtime/observability": {
+      "types": "./dist/runtime/observability.d.ts",
+      "default": "./dist/runtime/observability.js"
+    },
+    "./runtime/runs": {
+      "types": "./dist/runtime/runs.d.ts",
+      "default": "./dist/runtime/runs.js"
+    },
+    "./runtime/waits": {
+      "types": "./dist/runtime/waits.d.ts",
+      "default": "./dist/runtime/waits.js"
+    },
+    "./scripts": {
+      "types": "./dist/scripts/index.d.ts",
+      "default": "./dist/scripts/index.js"
+    },
     "./scripts/bridge": {
       "types": "./dist/scripts/bridge.d.ts"
+    },
+    "./storage/memory": {
+      "types": "./dist/storage/memory.d.ts",
+      "default": "./dist/storage/memory.js"
+    },
+    "./storage/migrations": {
+      "types": "./dist/storage/migrations.d.ts",
+      "default": "./dist/storage/migrations.js"
+    },
+    "./storage/runtime": {
+      "types": "./dist/storage/runtime.d.ts",
+      "default": "./dist/storage/runtime.js"
+    },
+    "./tools": {
+      "types": "./dist/tools.d.ts",
+      "default": "./dist/tools.js"
     }
-  },
-  "scripts": {
-    "build": "node ../../scripts/build.mjs core",
-    "check": "tsc -b"
   }
 }

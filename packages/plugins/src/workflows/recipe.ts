@@ -1,3 +1,4 @@
+/** @public */
 import { digest, fail, isJson, ok } from '@slop-lab/part/contracts';
 import type { Composition, Contracts, Workflows } from '@slop-lab/part/reference';
 import { callIdentity } from './memory/identity.js';

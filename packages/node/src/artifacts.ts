@@ -1,3 +1,4 @@
+/** @public */
 import { createArtifactStore } from '@slop-lab/part/artifacts';
 import { isJsonObject } from '@slop-lab/part/contracts';
 import type { Storage } from '@slop-lab/part/reference';

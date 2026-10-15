@@ -1,3 +1,4 @@
+/** @public */
 import { digest, fail, isJsonObject, schema } from '@slop-lab/part/contracts';
 import type { Contracts, Model, Runtime, Tools } from '@slop-lab/part/reference';
 import { reserve } from '@slop-lab/part/runtime';

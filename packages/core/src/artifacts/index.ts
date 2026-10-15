@@ -1,3 +1,4 @@
+/** @public */
 import { canonical, digest, fail, freeze, isJson, ok } from '../contracts/index.js';
 import type { Contracts } from '../reference/contracts.js';
 import type { Storage } from '../reference/storage.js';

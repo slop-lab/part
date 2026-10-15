@@ -1,3 +1,4 @@
+/** @public */
 import { semanticItem } from '@slop-lab/part/context';
 import { canonical, fail, freeze, ok } from '@slop-lab/part/contracts';
 import type { Context, Contracts, Packages, Skills } from '@slop-lab/part/reference';

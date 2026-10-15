@@ -1,3 +1,4 @@
+/** @public */
 import { provenance } from '@slop-lab/part/context';
 import { canonical, fail, freeze, isJson, ok } from '@slop-lab/part/contracts';
 import type { Contracts, Storage, Workflows } from '@slop-lab/part/reference';

@@ -1,3 +1,4 @@
+/** @public */
 import { canonical, fail, isJson, ok } from '../contracts/index.js';
 import type { Context } from '../reference/context.js';
 import type { Contracts } from '../reference/contracts.js';

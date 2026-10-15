@@ -1,3 +1,4 @@
+/** @public */
 import { digest, fail, isJson, ok } from '@slop-lab/part/contracts';
 import type { Contracts, Runtime, Scripts } from '@slop-lab/part/reference';
 import { createBoundary, createOperations, managedAttempt, reserve } from '@slop-lab/part/runtime';

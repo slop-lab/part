@@ -1,3 +1,4 @@
+/** @public */
 import { canonical, fail, freeze, isJson, ok } from '@slop-lab/part/contracts';
 import type { Contracts, Runtime, Workflows } from '@slop-lab/part/reference';
 /** The native owner supplies scheduling, continuation, actions and recovery semantics. */

@@ -1,3 +1,4 @@
+/** @public */
 import { canonical, digest, fail, freeze, isJson, ok } from '@slop-lab/part/contracts';
 import type { Contracts, Runtime, Workflows } from '@slop-lab/part/reference';
 import { budgetKey, createOperations } from '@slop-lab/part/runtime';

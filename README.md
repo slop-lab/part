@@ -11,7 +11,8 @@ plugins and separate Node and browser packages.
 | `@slop-lab/part-browser` | DOM/headless UI, renderers, workflow forms, Inspector/Workbench and CSS                                     | `@slop-lab/part`     |
 
 The repository root is a private npm workspace, not an installable aggregate SDK.
-Each package has explicit exports, independent build output and a local tarball.
+Each package generates explicit exports from its `@public` source entries and has
+independent build output and a local tarball.
 Plugins are grouped in one package; individual plugins do not each need a package.
 Core does not import the other packages, and browser/Node adapters communicate
 through core contracts rather than depending on each other or the plugin bundle.
@@ -30,6 +31,10 @@ Try conversation, tools, approval gates, immutable reports, validation failures 
 cancellation, with request/event inspection. Scripted mode needs no key; optional
 R4U Chat Completions and Responses run through a server that keeps credentials out
 of the browser. Use `npm run test:browser` after `npx playwright install chromium`.
+Add `/** @public */` at the top of a public TypeScript entrypoint, or `/* @public */`
+for CSS. `npm run build` updates package exports automatically; do not maintain the
+`exports` field by hand. See [build rules](docs/architecture.md#public-entrypoints).
+
 JS/MJS sources use `// @ts-check`; `npm run check:js` builds declarations and checks them
 with `jsconfig.json`. Git enforces LF line endings on every platform. Windows CI runs
 all tests and consumer fixtures, including script execution and process-tree cleanup.

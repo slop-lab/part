@@ -1,3 +1,4 @@
+/** @public */
 import { fail, isJson, ok } from '../contracts/index.js';
 import type { Contracts } from '../reference/contracts.js';
 import type { History } from '../reference/history.js';

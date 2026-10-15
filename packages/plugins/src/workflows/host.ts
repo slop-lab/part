@@ -1,3 +1,4 @@
+/** @public */
 import { fail, ok } from '@slop-lab/part/contracts';
 import type { Composition, Contracts, Workflows } from '@slop-lab/part/reference';
 export const enginesPoint: Composition.ExtensionPoint<Workflows.Engine> = {

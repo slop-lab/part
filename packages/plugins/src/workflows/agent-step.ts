@@ -1,3 +1,4 @@
+/** @public */
 import { canonical, fail, freeze, isJson, ok } from '@slop-lab/part/contracts';
 import type { Contracts, Runtime, Workflows } from '@slop-lab/part/reference';
 /** Native schedulers choose stable logical keys; this adapter owns one attached run. */

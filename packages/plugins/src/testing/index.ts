@@ -1,3 +1,4 @@
+/** @public */
 import { ok } from '@slop-lab/part/contracts';
 import { noAuth } from '@slop-lab/part/model';
 import type { Contracts, Convenience, Model } from '@slop-lab/part/reference';

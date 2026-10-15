@@ -1,3 +1,4 @@
+/** @public */
 import { fail, ok } from '../contracts/index.js';
 import type { Contracts } from '../reference/contracts.js';
 import type { Model } from '../reference/model.js';

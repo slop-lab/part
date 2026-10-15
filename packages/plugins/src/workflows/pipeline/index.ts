@@ -1,3 +1,4 @@
+/** @public */
 import { digest, fail, ok } from '@slop-lab/part/contracts';
 import type { Contracts, Skills, Workflows } from '@slop-lab/part/reference';
 import { createOperations } from '@slop-lab/part/runtime';

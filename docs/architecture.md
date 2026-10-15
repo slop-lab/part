@@ -62,13 +62,38 @@ domain hierarchy, such as `@slop-lab/part-plugins/workflows/code`, `@slop-lab/pa
 Internal modules import their actual dependencies instead of their own public barrels.
 Shared budget/effect logic belongs to runtime, so script and workflow engines do not
 depend on model gateways or agent drivers. Internal helper paths are not public exports.
-Builds remove stale output before compiling and copy the public stylesheet explicitly.
+Builds remove stale output before compiling and copy marked public assets.
 `npm run check` rejects unused code, import aliases, runtime cycles, reversed layer
 dependencies, Node imports from portable entrypoints and exports that disagree with
 the source domains. Packed-consumer checks load every JavaScript entrypoint, compile
 every public declaration entrypoint and verify the stylesheet is present.
 Portable declarations compile without ambient Node types; the HTTP host's
 `IncomingMessage` callback is additionally checked with explicit Node typings.
+
+## Public entrypoints
+
+Public entrypoints are declared in their source files, without a second list in
+package metadata. Put `/** @public */` in a leading comment of a TypeScript source,
+or `/* @public */` in a CSS source. Unmarked files remain internal.
+
+The build discovers these markers and generates each workspace package's
+`exports` before TypeScript resolves cross-package imports. It also generates all
+workspace maps for a single-package build, so bootstrapping does not depend on
+existing exports. The generated field remains in `package.json` for package
+resolution; edit the source markers instead of that field.
+
+- `src/index.ts` becomes `.`.
+- `src/domain/index.ts` becomes `./domain`.
+- `src/domain/feature.ts` becomes `./domain/feature`.
+- `src/styles.css` becomes `./styles.css` and is copied into `dist`.
+
+TypeScript entries get a declaration target. If their emitted JavaScript is empty
+because they only declare or re-export types, they have no runtime condition.
+Exports are sorted deterministically, removed markers remove exports, and ambiguous
+paths such as public `domain.ts` plus `domain/index.ts` fail the build.
+Internal helpers and the Windows supervisor source stay outside the export map.
+
+## Provider and runtime boundaries
 
 The initial provider adapter targets the documented Ollama `/api/chat` NDJSON
 subset: text, thinking, function calls, and usage. Media and foreign native content

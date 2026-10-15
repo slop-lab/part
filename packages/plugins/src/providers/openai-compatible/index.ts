@@ -1,3 +1,4 @@
+/** @public */
 import type { Model } from '@slop-lab/part/reference';
 import { createChatDecoder } from './decode.js';
 import { encodeChat } from './encode.js';

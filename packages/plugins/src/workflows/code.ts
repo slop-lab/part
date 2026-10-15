@@ -1,3 +1,4 @@
+/** @public */
 import { digest, fail, ok } from '@slop-lab/part/contracts';
 import type { Contracts, Workflows } from '@slop-lab/part/reference';
 import { createMemoryWorkflowEngine } from './memory/index.js';

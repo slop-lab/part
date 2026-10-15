@@ -1,3 +1,4 @@
+/** @public */
 import { canonical, fail, isJsonObject } from '@slop-lab/part/contracts';
 import type { Composition, Contracts, Model, Results, Runtime } from '@slop-lab/part/reference';
 import type { BridgeMethod } from './index.js';

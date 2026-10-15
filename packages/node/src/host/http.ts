@@ -1,3 +1,4 @@
+/** @public */
 import { jsonCodec } from '@slop-lab/part/client';
 import { commandSchema, querySchema } from '@slop-lab/part/client/control';
 import { fail, isJsonObject, ok } from '@slop-lab/part/contracts';

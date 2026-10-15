@@ -1,3 +1,4 @@
+/** @public */
 /** A safe bounded Markdown subset. Raw HTML is always text; no executable URLs. */
 export function createMarkdownView(document: Document): {
   element: HTMLElement;

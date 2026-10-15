@@ -1,3 +1,4 @@
+/** @public */
 import { emptyCleanup, isJsonObject } from '@slop-lab/part/contracts';
 import type { Contracts } from '@slop-lab/part/reference';
 import { mcpServers, positiveLimit, sessionParams } from './content.js';

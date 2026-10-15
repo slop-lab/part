@@ -1,3 +1,4 @@
+/** @public */
 import { fail, isJsonObject, ok } from '@slop-lab/part/contracts';
 import type { Contracts, Scripts } from '@slop-lab/part/reference';
 import type { ManagedBridge } from '@slop-lab/part/scripts/bridge';

@@ -8,6 +8,13 @@
     "dist",
     "README.md"
   ],
+  "dependencies": {
+    "@slop-lab/part": "0.1.0-alpha.2"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build.mjs browser",
+    "check": "tsc -b"
+  },
   "exports": {
     "./dom": {
       "types": "./dist/dom.d.ts",
@@ -29,6 +36,9 @@
       "types": "./dist/registry.d.ts",
       "default": "./dist/registry.js"
     },
+    "./styles.css": {
+      "default": "./dist/styles.css"
+    },
     "./workbench": {
       "types": "./dist/workbench.d.ts",
       "default": "./dist/workbench.js"
@@ -36,16 +46,6 @@
     "./workflow": {
       "types": "./dist/workflow.d.ts",
       "default": "./dist/workflow.js"
-    },
-    "./styles.css": {
-      "default": "./dist/styles.css"
     }
-  },
-  "dependencies": {
-    "@slop-lab/part": "0.1.0-alpha.2"
-  },
-  "scripts": {
-    "build": "node ../../scripts/build.mjs browser",
-    "check": "tsc -b"
   }
 }

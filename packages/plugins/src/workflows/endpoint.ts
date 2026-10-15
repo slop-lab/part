@@ -1,3 +1,4 @@
+/** @public */
 import { createWatchHub } from '@slop-lab/part/client';
 import { commandSchema, querySchema } from '@slop-lab/part/client/control';
 import { canonical, fail, freeze, isJsonObject, ok } from '@slop-lab/part/contracts';

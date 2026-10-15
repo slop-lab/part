@@ -2,6 +2,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import ts from 'typescript';
+import { publicEntrypoints, exportMap } from './package-exports.mjs';
 
 const root = process.cwd();
 const failures = [];
@@ -190,6 +191,10 @@ for (const pkg of packages) {
       : { '@slop-lab/part': byName.get('@slop-lab/part').manifest.version };
   if (JSON.stringify(pkg.manifest.dependencies ?? {}) !== JSON.stringify(expectedDependencies))
     failures.push(`${pkg.path}: dependencies must follow the core/plugin/environment boundary`);
+  if (
+    JSON.stringify(pkg.manifest.exports) !== JSON.stringify(exportMap(publicEntrypoints(pkg.path)))
+  )
+    failures.push(`${pkg.path}: exports must be generated from @public sources by the build`);
   const targets = new Set();
   for (const [name, entry] of Object.entries(pkg.manifest.exports)) {
     entries++;

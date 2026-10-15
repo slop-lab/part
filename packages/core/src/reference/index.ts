@@ -1,3 +1,4 @@
+/** @public */
 /**
  * part — progressive agent runtime, contract reference 0.2 (2026-10-14).
  * Type-only design contracts, split by namespace from the local specification.

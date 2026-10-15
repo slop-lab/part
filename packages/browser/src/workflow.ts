@@ -1,3 +1,4 @@
+/** @public */
 import { isJson, isJsonObject } from '@slop-lab/part/contracts';
 import type { Client, Contracts, Projection, UI } from '@slop-lab/part/reference';
 export function createWorkflowView(options: {

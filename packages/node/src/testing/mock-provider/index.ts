@@ -1,3 +1,4 @@
+/** @public */
 export { createMockProviderClient, readMockSession } from './client.js';
 export { fixtureFromTranscript, readFixture, readReply } from './protocol.js';
 export { startMockProvider } from './server.js';

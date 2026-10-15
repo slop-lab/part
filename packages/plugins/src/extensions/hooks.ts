@@ -1,3 +1,4 @@
+/** @public */
 import { canonical, fail, isJsonObject, ok } from '@slop-lab/part/contracts';
 import type { Contracts, Hooks, Runtime, Scripts } from '@slop-lab/part/reference';
 export function createScriptHooks(

@@ -1,3 +1,4 @@
+/** @public */
 import { createPlanner, createScopeManager } from '@slop-lab/part/composition';
 import {
   createContextCompiler,

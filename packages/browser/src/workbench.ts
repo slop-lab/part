@@ -1,3 +1,4 @@
+/** @public */
 import type { ChatOptions } from './dom.js';
 import { createChat } from './dom.js';
 import type { ArtifactReader } from './inspector.js';

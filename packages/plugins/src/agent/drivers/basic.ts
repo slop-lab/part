@@ -1,3 +1,4 @@
+/** @public */
 import { messageItem } from '@slop-lab/part/context';
 import { emptyCleanup, fail, isJson, isJsonObject, schema } from '@slop-lab/part/contracts';
 import type { Context, Contracts, Driver, Model, Runtime } from '@slop-lab/part/reference';

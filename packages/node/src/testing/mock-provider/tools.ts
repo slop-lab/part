@@ -1,3 +1,4 @@
+/** @public */
 import { isJsonObject, jsonSchema, schema } from '@slop-lab/part/contracts';
 import { functionTool } from '@slop-lab/part/tools';
 import { readReply } from './protocol.js';

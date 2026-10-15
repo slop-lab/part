@@ -1,3 +1,4 @@
+/* @public */
 :where(.part-ui) {
   --part-font: system-ui, sans-serif;
   --part-content-width: 52rem;

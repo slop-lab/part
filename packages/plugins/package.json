@@ -8,7 +8,18 @@
     "dist",
     "README.md"
   ],
+  "dependencies": {
+    "@slop-lab/part": "0.1.0-alpha.2"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build.mjs plugins",
+    "check": "tsc -b"
+  },
   "exports": {
+    "./acp": {
+      "types": "./dist/acp/index.d.ts",
+      "default": "./dist/acp/index.js"
+    },
     "./agent": {
       "types": "./dist/agent/index.d.ts",
       "default": "./dist/agent/index.js"
@@ -16,10 +27,6 @@
     "./agent/drivers/basic": {
       "types": "./dist/agent/drivers/basic.d.ts",
       "default": "./dist/agent/drivers/basic.js"
-    },
-    "./providers/ollama": {
-      "types": "./dist/providers/ollama.d.ts",
-      "default": "./dist/providers/ollama.js"
     },
     "./extensions/hooks": {
       "types": "./dist/extensions/hooks.d.ts",
@@ -29,6 +36,18 @@
       "types": "./dist/extensions/skills.d.ts",
       "default": "./dist/extensions/skills.js"
     },
+    "./providers/ollama": {
+      "types": "./dist/providers/ollama.d.ts",
+      "default": "./dist/providers/ollama.js"
+    },
+    "./providers/openai-compatible": {
+      "types": "./dist/providers/openai-compatible/index.d.ts",
+      "default": "./dist/providers/openai-compatible/index.js"
+    },
+    "./providers/openai-responses": {
+      "types": "./dist/providers/openai-responses/index.d.ts",
+      "default": "./dist/providers/openai-responses/index.js"
+    },
     "./scripts/bridge": {
       "types": "./dist/scripts/bridge/index.d.ts",
       "default": "./dist/scripts/bridge/index.js"
@@ -36,6 +55,10 @@
     "./scripts/bridge/services": {
       "types": "./dist/scripts/bridge/services.d.ts",
       "default": "./dist/scripts/bridge/services.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
     },
     "./workflows/agent-step": {
       "types": "./dist/workflows/agent-step.d.ts",
@@ -72,29 +95,6 @@
     "./workflows/recipe": {
       "types": "./dist/workflows/recipe.d.ts",
       "default": "./dist/workflows/recipe.js"
-    },
-    "./testing": {
-      "types": "./dist/testing/index.d.ts",
-      "default": "./dist/testing/index.js"
-    },
-    "./providers/openai-compatible": {
-      "types": "./dist/providers/openai-compatible/index.d.ts",
-      "default": "./dist/providers/openai-compatible/index.js"
-    },
-    "./providers/openai-responses": {
-      "types": "./dist/providers/openai-responses/index.d.ts",
-      "default": "./dist/providers/openai-responses/index.js"
-    },
-    "./acp": {
-      "types": "./dist/acp/index.d.ts",
-      "default": "./dist/acp/index.js"
     }
-  },
-  "dependencies": {
-    "@slop-lab/part": "0.1.0-alpha.2"
-  },
-  "scripts": {
-    "build": "node ../../scripts/build.mjs plugins",
-    "check": "tsc -b"
   }
 }

@@ -1,3 +1,4 @@
+/** @public */
 import { digest, fail, freeze, ok } from '@slop-lab/part/contracts';
 import type { Contracts, Packages } from '@slop-lab/part/reference';
 import { lstat, readdir, readFile, realpath } from 'node:fs/promises';
