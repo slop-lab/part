@@ -22,7 +22,8 @@
     "mock:provider": "node packages/node/dist/testing/mock-provider/cli.js",
     "example:mock:fixed": "npm run build && node examples/mock-provider/fixed.mjs",
     "smoke:provider": "npm run build && node --env-file=.env scripts/smoke-provider.mjs",
-    "smoke:responses": "npm run build && node --env-file=.env scripts/smoke-provider.mjs responses"
+    "smoke:responses": "npm run build && node --env-file=.env scripts/smoke-provider.mjs responses",
+    "test:browser": "npm run preview:build && node scripts/test-playground-browser.mjs"
   },
   "engines": {
     "node": ">=22.18"
@@ -31,6 +32,7 @@
     "@types/node": "^22.0.0",
     "esbuild": "^0.28.2",
     "happy-dom": "^21.0.1",
+    "playwright": "1.64.1",
     "prettier": "^3.9.10",
     "typescript": "^5.9.0"
   }

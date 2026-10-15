@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>part · Runtime playground</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script defer src="/app.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to workspace</a>
+    <header class="app-header">
+      <a class="brand" href="/"
+        ><span class="brand-mark">p.</span
+        ><span>part <small>progressive agent runtime</small></span></a
+      >
+      <div class="header-right">
+        <span class="connection" id="connection" role="status">Connecting</span
+        ><button id="reconnect" class="quiet">Reconnect</button
+        ><button id="guide-open" class="quiet">Guide ↗</button>
+      </div>
+    </header>
+    <div class="app-layout">
+      <aside class="sidebar" aria-label="Examples">
+        <div class="sidebar-heading">
+          <span class="eyebrow">THE PLAYGROUND</span>
+          <h2>Try the moving parts.</h2>
+          <p>Small examples. Real runtime contracts.</p>
+        </div>
+        <nav id="examples" aria-label="Example scenarios"></nav>
+        <div class="sidebar-bottom">
+          <span class="eyebrow">YOUR SESSION</span>
+          <p>Memory only · private to this browser session.</p>
+          <button id="clear" class="quiet">Clear session ↺</button>
+        </div>
+      </aside>
+      <main id="main" class="workspace">
+        <div class="workspace-toolbar">
+          <span class="breadcrumb"
+            >Examples <span>/</span> <span id="breadcrumb">Conversation</span></span
+          >
+          <div class="appearance">
+            <label><input id="cards" type="checkbox" checked /> Rich cards</label
+            ><label><input id="theme" type="checkbox" /> Dark</label>
+          </div>
+        </div>
+        <section class="intro" aria-labelledby="example-title">
+          <span class="eyebrow" id="example-tag">STREAMING</span>
+          <h1 id="example-title">Conversation</h1>
+          <p id="example-description"></p>
+          <div class="try-row">
+            <button id="try-example" class="primary">Try this example <span>↗</span></button
+            ><span id="expectation"></span>
+          </div>
+        </section>
+        <section class="conversation-panel" aria-label="Conversation workspace">
+          <div class="panel-heading">
+            <h2>Conversation <span class="count" id="turn-count">0 runs</span></h2>
+            <button id="stop" class="stop" disabled>■ Stop run</button>
+          </div>
+          <div class="provider-bar">
+            <label
+              >Provider
+              <select id="provider" aria-label="Model provider"></select></label
+            ><label id="model-label"
+              >Model
+              <input id="model" aria-label="Model name" maxlength="120" value="gpt-6-luna" /></label
+            ><span id="provider-hint">No key. No network model calls.</span>
+          </div>
+          <div id="chat"></div>
+          <p class="notice" id="notice" role="status" aria-live="polite"></p>
+        </section>
+        <footer class="workspace-footer">
+          <span>Built with part's public agent, tools, HTTP/SSE client and browser components.</span
+          ><span id="run-status">Ready to explore</span>
+        </footer>
+      </main>
+      <aside class="inspector" aria-label="Runtime inspector">
+        <div class="inspector-heading">
+          <span class="eyebrow">UNDER THE SURFACE</span>
+          <h2>Runtime inspector</h2>
+          <p>See the request. Follow the work.</p>
+        </div>
+        <div class="inspector-tabs" role="tablist" aria-label="Inspector views">
+          <button
+            id="tab-requests"
+            role="tab"
+            aria-selected="true"
+            aria-controls="inspect-requests"
+          >
+            Requests</button
+          ><button id="tab-events" role="tab" aria-selected="false" aria-controls="inspect-events">
+            Events</button
+          ><button id="tab-note" role="tab" aria-selected="false" aria-controls="inspect-note">
+            Note</button
+          ><button id="tab-items" role="tab" aria-selected="false" aria-controls="inspect-items">
+            Items
+          </button>
+        </div>
+        <section id="inspect-requests" role="tabpanel" aria-labelledby="tab-requests">
+          <p class="empty-inspector">
+            Run an example to inspect the model's input, tools and request digest.
+          </p>
+        </section>
+        <section id="inspect-events" role="tabpanel" aria-labelledby="tab-events" hidden></section>
+        <section id="inspect-note" role="tabpanel" aria-labelledby="tab-note" hidden>
+          <span class="eyebrow">SESSION NOTE</span>
+          <pre id="note-content">No note saved yet.</pre>
+        </section>
+        <section id="inspect-items" role="tabpanel" aria-labelledby="tab-items" hidden>
+          <div id="item-inspector"></div>
+        </section>
+        <div class="inspector-footnote">
+          <span class="status-dot"></span> Provider credentials stay on the server.
+        </div>
+      </aside>
+    </div>
+    <dialog id="guide" aria-labelledby="guide-title">
+      <div class="dialog-heading">
+        <span class="eyebrow">GET STARTED</span
+        ><button id="guide-close" class="quiet" aria-label="Close guide">✕</button>
+      </div>
+      <h2 id="guide-title">A workspace for trying part.</h2>
+      <p>
+        Choose an example, edit the prompt, then send it. The scripted provider makes every example
+        repeatable without an API key.
+      </p>
+      <ol>
+        <li>
+          <strong>Requests</strong> shows exact encoded model input and digest, without
+          authentication headers.
+        </li>
+        <li><strong>Events</strong> follows tool execution, approvals and final run state.</li>
+        <li><strong>Note</strong> changes only after you approve a save_note call.</li>
+        <li>
+          <strong>Items</strong> uses the public Inspector. Open a report and choose Load artifact
+          to read its immutable bytes.
+        </li>
+      </ol>
+      <p>
+        Try Stop during a long response. Reconnect and page refresh restore server memory; closing
+        the tab only stops observation. Clear session resets conversation context, notes and reports
+        after the active run ends.
+      </p>
+      <h3>Use your provider</h3>
+      <p>
+        Set R4U_API_KEY and R4U_BASE_URL in the workspace .env, then restart. Select Chat
+        Completions or Responses and enter a model available to your route. Sending a message makes
+        real provider requests. Each run permits at most four model requests and 512 requested
+        output tokens per request.
+      </p>
+      <p>
+        Rich cards and Dark change presentation without restarting runs. Full documentation:
+        <code>docs/playground.md</code>.
+      </p>
+      <p class="guide-credit">
+        Example-workspace organization inspired by
+        <a href="https://github.com/slop-lab/edaitor" target="_blank" rel="noreferrer">edaitor ↗</a
+        >.
+      </p>
+    </dialog>
+  </body>
+</html>

@@ -1,0 +1,62 @@
+[
+  {
+    "id": "conversation",
+    "number": "01",
+    "title": "Conversation",
+    "tag": "Streaming",
+    "description": "Send a message, watch text arrive, and inspect the exact model request. Completed turns stay in this session's model context.",
+    "prompt": "Explain how a progressive agent runtime works.",
+    "expected": "A streamed Markdown reply and a new request in the inspector.",
+    "icon": "↗"
+  },
+  {
+    "id": "tools",
+    "number": "02",
+    "title": "Function tools",
+    "tag": "Model → tool → model",
+    "description": "Let the agent call uppercase through the real tool dispatcher. Inspect the arguments, result and follow-up model request.",
+    "prompt": "Make this uppercase: small steps, visible progress.",
+    "expected": "One uppercase tool execution followed by a final response.",
+    "icon": "⌘"
+  },
+  {
+    "id": "approval",
+    "number": "03",
+    "title": "Approval gate",
+    "tag": "Awaited middleware",
+    "description": "The save_note tool waits for your decision. Approve to update the session note, or reject and verify that nothing was written.",
+    "prompt": "Ship a small version, learn from real usage, and iterate.",
+    "expected": "An approval card before a memory-only note write.",
+    "icon": "◇"
+  },
+  {
+    "id": "artifact",
+    "number": "04",
+    "title": "Report artifact",
+    "tag": "Immutable output",
+    "description": "Build a small Markdown report as a finalized in-memory artifact. Open it in the inspector or download a copy.",
+    "prompt": "Create a report about the benefits of small, explicit runtime contracts.",
+    "expected": "A tool result and an immutable report with a content digest.",
+    "icon": "▤"
+  },
+  {
+    "id": "failure",
+    "number": "05",
+    "title": "Validation failure",
+    "tag": "Before execution",
+    "description": "The scripted model deliberately sends an invalid tool argument. The dispatcher rejects it before execution. Use the valid-tool example to compare.",
+    "prompt": "Try an invalid uppercase argument.",
+    "expected": "A failed run, a validation error, and zero executed tools. Scripted provider only.",
+    "icon": "!"
+  },
+  {
+    "id": "cancellation",
+    "number": "06",
+    "title": "Cancellation",
+    "tag": "Owned work",
+    "description": "Start a longer response and stop it while it streams. Refresh or reconnect to inspect the cancelled run; closing observation alone does not cancel it.",
+    "prompt": "Walk through the lifecycle of a managed run, slowly.",
+    "expected": "Partial text followed by a cancelled state when you choose Stop.",
+    "icon": "Ⅱ"
+  }
+]
