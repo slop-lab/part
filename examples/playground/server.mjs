@@ -1,4 +1,4 @@
-import { createServer, request as httpRequest } from 'node:http';
+import { createServer, request } from 'node:http';
 import { once } from 'node:events';
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
@@ -51,7 +51,7 @@ export async function startPlayground({ port = 4173, environment = {}, delayScal
   );
   if (!hosted.ok) throw Error('Could not start the SDK HTTP host');
   let origin;
-  const server = createServer(async (request, response) => {
+  const server = createServer(async (incoming, response) => {
     const json = (status, body) => {
       response.writeHead(status, {
         'content-type': 'application/json',
@@ -61,20 +61,20 @@ export async function startPlayground({ port = 4173, environment = {}, delayScal
     };
     try {
       if (
-        request.headers.host !== new URL(origin).host ||
-        (request.headers.origin && request.headers.origin !== origin) ||
-        request.headers['sec-fetch-site'] === 'cross-site'
+        incoming.headers.host !== new URL(origin).host ||
+        (incoming.headers.origin && incoming.headers.origin !== origin) ||
+        incoming.headers['sec-fetch-site'] === 'cross-site'
       )
         return json(403, { error: 'Use the local playground origin.' });
-      const path = new URL(request.url, origin).pathname;
+      const path = new URL(incoming.url, origin).pathname;
       response.setHeader('x-content-type-options', 'nosniff');
       response.setHeader('referrer-policy', 'same-origin');
       response.setHeader(
         'content-security-policy',
         "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
       );
-      if (request.method === 'GET' && path === '/api/bootstrap') {
-        let session = findSession(request);
+      if (incoming.method === 'GET' && path === '/api/bootstrap') {
+        let session = findSession(incoming);
         if (!session) {
           if (sessions.size >= 16)
             return json(503, { error: 'Session capacity reached. Restart the playground server.' });
@@ -96,7 +96,7 @@ export async function startPlayground({ port = 4173, environment = {}, delayScal
         });
       }
       const asset = assets.get(path);
-      if (request.method === 'GET' && asset) {
+      if (incoming.method === 'GET' && asset) {
         response.writeHead(200, { 'content-type': asset.type, 'cache-control': 'no-store' });
         response.end(asset.bytes);
         return;
@@ -106,9 +106,9 @@ export async function startPlayground({ port = 4173, environment = {}, delayScal
         response.end();
         return;
       }
-      const session = findSession(request);
+      const session = findSession(incoming);
       if (!session) return json(403, { error: 'Open the playground before using its API.' });
-      if (request.method === 'GET' && /^\/api\/artifacts\/[0-9a-f-]{36}$/.test(path)) {
+      if (incoming.method === 'GET' && /^\/api\/artifacts\/[0-9a-f-]{36}$/.test(path)) {
         const artifact = await session.artifact(path.split('/').at(-1));
         if (!artifact) return json(404, { error: 'Artifact not found in this session.' });
         response.writeHead(200, {
@@ -120,18 +120,18 @@ export async function startPlayground({ port = 4173, environment = {}, delayScal
         return;
       }
       if (
-        request.method !== 'POST' ||
+        incoming.method !== 'POST' ||
         !['/api/commands', '/api/queries', '/api/events'].includes(path)
       )
         return json(404, { error: 'Not found' });
       // Reuse the public SDK host and HTTP/SSE client on the same browser origin.
-      const upstream = httpRequest(
+      const upstream = request(
         new URL(path.slice(4), hosted.value.url),
         {
           method: 'POST',
           headers: {
             'content-type': 'application/json',
-            cookie: request.headers.cookie,
+            cookie: incoming.headers.cookie,
             'x-playground-host': hostToken,
           },
         },
@@ -148,7 +148,7 @@ export async function startPlayground({ port = 4173, environment = {}, delayScal
         else response.end();
       });
       response.on('close', () => upstream.destroy());
-      request.pipe(upstream);
+      incoming.pipe(upstream);
     } catch {
       if (!response.headersSent) json(500, { error: 'Playground request failed' });
       else response.end();

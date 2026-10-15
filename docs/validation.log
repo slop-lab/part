@@ -249,3 +249,27 @@ f80bca43c8c15052aab2549a426e44313fe7d79c6da3575823bb20a65b9b85b9  part-core-0.1.
 11dbc8736d060bffe7001e32dc4d9d3830dcf18083caa2de094c4b3f306cf729  part-plugins-0.1.0-alpha.2.tgz
 003435bc3f554023b81c18b1cc347bbb88f539869d2b50e2b59c21b54e1e62f5  part-node-0.1.0-alpha.2.tgz
 adf20cd63693653b7a29f1ca9cbd651acef48b01821772063443707cfabb2c16  part-browser-0.1.0-alpha.2.tgz
+
+Interactive browser playground validation
+Implementation revision: 1eb66aa (subsequent import-name cleanup has no behavior change)
+Reference inspected: https://github.com/slop-lab/edaitor at c2eb16e929a99a9d9660900ea5c669b0daa2a167; example-workspace organization only, no code dependency
+Replaced timer-only browser mock with public agent/tool/context/artifact APIs on Node and the public HTTP/SSE host/client plus Chat/Inspector in the browser
+Six scripted scenarios: conversation, function tools, approval gate, report artifact, validation failure and cancellation
+npm test: 109 passed, 0 failed (4 new playground runtime tests)
+Runtime evidence: command dedupe/conflicts, same-owner approve/reject/cancel, no tool entry on invalid input or rejected approval, exact request digest and tool result, bounded visible-text history, session artifact ownership, clear and shutdown/observer semantics
+npm run preview:build: passed, including strict portable TypeScript and browser bundle boundary check
+PLAYWRIGHT_BROWSERS_PATH=/tmp/part-browser-check/browsers PART_SCREENSHOTS=/tmp/part-playground-screenshots npm run test:browser: passed
+Chromium 156.0.8078.4: all six scenarios, renderer-fallback approval, artifact load/download, cancel during stream, reconnect without cancellation, refresh, separate browser sessions, draft retention, Guide and 390/768/1440 px layouts
+Browser checks: unauthenticated API/cross-origin rejection; server-only key absent from bootstrap and JavaScript; scripted requests only even with provider fixture configuration
+Visual inspection: light desktop and dark mobile screenshots; corrected inherited dark-text contrast and chronological tool/final-response display
+Live browser verification UTC: 2026-10-15T16:17:00.699Z
+R4U Responses conversation: completed, 1 model request, final usage 403 input / 7 output tokens
+R4U Chat Completions function-tool loop: completed, 2 model requests, 1 uppercase execution, final usage 432 input / 13 output tokens
+Live usage covers each run's final model response, not aggregate billing; no keys or configured endpoints recorded
+Browser page errors: none
+npm run test:consumers: 7 isolated packed consumers passed
+node scripts/check-architecture.mjs: passed (4 packages, 127 source modules, 65 public entrypoints)
+npm run format:check and git diff --check: passed
+Source guide: docs/playground.md; structured results: docs/playground.evidence.json; scripted desktop screenshot: docs/images/playground-desktop.png
+CI now configures Chromium on Node 24; hosted CI was not executed
+Scope: bounded memory playground, not durable history, a workflow engine, production authentication or a complete cross-browser/device/a11y audit

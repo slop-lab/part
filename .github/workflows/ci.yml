@@ -18,5 +18,9 @@ jobs:
       - run: npm test
       - run: npm run test:consumers
       - run: npm run preview:build
+      - run: npx playwright install --with-deps chromium
+        if: matrix.node == 24
+      - run: node scripts/test-playground-browser.mjs
+        if: matrix.node == 24
       - run: npm run measure
       - run: npm run measure:ui

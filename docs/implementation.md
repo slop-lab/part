@@ -34,6 +34,11 @@ The separate [Responses adapter](openai-responses.md) also passes live R4U JSON/
 and function-tool smoke; fixed fixtures verify native reasoning replay and prevent
 tool execution on incomplete streams.
 
+The [browser playground](playground.md) composes the public runtime/client/UI packages
+into six executable scenarios, with Scripted and opt-in server-side R4U providers.
+It uses bounded memory history and approval middleware; it is not a workflow engine
+or a durable product host.
+
 ## Dependent-project readiness
 
 Dependent projects can start local development against selected alpha.2 workspace

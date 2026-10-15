@@ -6,7 +6,7 @@ plugins and separate Node and browser packages.
 | Package         | Responsibility                                                                                     | Runtime dependencies |
 | --------------- | -------------------------------------------------------------------------------------------------- | -------------------- |
 | `@part/core`    | Contracts, composition, operations, model/tool ports, context, storage ports and client protocol   | None                 |
-| `@part/plugins` | Agent presets/drivers, Ollama provider, workflows, hooks/skills, script bridge and test fixtures   | `@part/core`         |
+| `@part/plugins` | Agent presets/drivers, model providers, workflows, hooks/skills, script bridge and test fixtures   | `@part/core`         |
 | `@part/node`    | POSIX script processes, loopback bridge, HTTP host, SQLite, file artifacts and directory snapshots | `@part/core`         |
 | `@part/browser` | DOM/headless UI, renderers, workflow forms, Inspector/Workbench and CSS                            | `@part/core`         |
 
@@ -25,8 +25,12 @@ npm run measure
 npm run preview
 ```
 
-The preview opens at `http://127.0.0.1:4173` with simulated streaming, owner
-cancellation and custom cards. Seven isolated consumer fixtures cover core-only,
+The [browser playground](docs/playground.md) opens at `http://127.0.0.1:4173`.
+Try conversation, tools, approval gates, immutable reports, validation failures and
+cancellation, with request/event inspection. Scripted mode needs no key; optional
+R4U Chat Completions and Responses run through a server that keeps credentials out
+of the browser. Use `npm run test:browser` after `npx playwright install chromium`.
+Seven isolated consumer fixtures cover core-only,
 non-coding, SWE, contracts, workflow, Node and browser installations. Every public
 entrypoint is checked from separately packed packages. Portable declarations do
 not require Node types; Node HTTP host declarations are checked with explicit

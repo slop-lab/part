@@ -23,7 +23,7 @@ See [implementation coverage](implementation.md) and [support limits](api.md).
 | G07  | Packed consumer-owned semantic lowerer/action/renderer; DOM components and ordered slots                                                    | Verified                                                                                    |
 | G08  | Two distinct drivers and independent Map-based boundary source experiment                                                                   | Verified nominal/single-use comparison                                                      |
 | G09  | Actual codec loopback plus authenticated HTTP/SSE command/query/watch                                                                       | Verified                                                                                    |
-| G10  | Themed Chat, IME/draft, stream/tool/cancel, safe Markdown/card/components/artifacts and headless paths                                      | Verified DOM profile and 1,001-item/200-update cache benchmark; real browser audit separate |
+| G10  | Themed Chat, IME/draft, stream/tool/cancel, safe Markdown/cards/artifacts, headless and Chromium playground                                 | Verified DOM/Chromium scenarios and cache benchmark; broader browser/device audits separate |
 | G11  | Memory/SQLite atomic journal/state, reopen, crash-intent recovery, migration and durable artifacts                                          | Verified local profile                                                                      |
 | G12  | Exact alpha.2 consumers and lockfiles, changelog/migration/support docs, local checks and CI matrix                                         | Verified locally; hosted CI not run                                                         |
 
@@ -63,7 +63,9 @@ Integration tests need loopback socket/subprocess permissions. They were execute
 with reviewed workspace sandbox escalation, use temporary local roots and require
 no provider credentials. The separate opt-in `npm run smoke:provider` uses `.env`
 and passed the selected R4U JSON/SSE/function-tool profile. Hosted CI was not run;
-Ollama live-provider and actual browser/device validation remain separate.
+Ollama live-provider validation remains separate. The [browser playground](playground.md)
+has local Chromium interaction and responsive-layout evidence; this is not a complete
+browser/device/accessibility audit.
 
 [Validation log](validation.log) records commands and outcomes. [Candidate evidence](evidence.json)
 records the pre-refactor environment, code revision/digests and measurements.

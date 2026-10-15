@@ -2,6 +2,11 @@
 
 ## 0.1.0-alpha.2 (unreleased)
 
+- Replace the static chat preview with a six-scenario browser playground using real
+  managed agents, tools, approval waits, artifacts and HTTP/SSE. Add server-only
+  opt-in R4U providers, request/event inspection, memory sessions and responsive themes.
+- Add a documented Chromium interaction suite and playground ownership regressions.
+
 - Add the portable `@part/plugins/providers/openai-responses` adapter for stateless
   JSON/SSE text, runtime function calls and native reasoning replay. Validate final
   snapshots before tool execution, with exact fixtures and live R4U smoke.
