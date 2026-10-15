@@ -3,12 +3,12 @@
 Progressive agent runtime: a small environment-independent core with optional
 plugins and separate Node and browser packages.
 
-| Package                  | Responsibility                                                                                     | Runtime dependencies |
-| ------------------------ | -------------------------------------------------------------------------------------------------- | -------------------- |
-| `@slop-lab/part`         | Contracts, composition, operations, model/tool ports, context, storage ports and client protocol   | None                 |
-| `@slop-lab/part-plugins` | Agent presets/drivers, model providers, workflows, hooks/skills, script bridge and test fixtures   | `@slop-lab/part`     |
-| `@slop-lab/part-node`    | POSIX script processes, loopback bridge, HTTP host, SQLite, file artifacts and directory snapshots | `@slop-lab/part`     |
-| `@slop-lab/part-browser` | DOM/headless UI, renderers, workflow forms, Inspector/Workbench and CSS                            | `@slop-lab/part`     |
+| Package                  | Responsibility                                                                                              | Runtime dependencies |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------- | -------------------- |
+| `@slop-lab/part`         | Contracts, composition, operations, model/tool ports, context, storage ports and client protocol            | None                 |
+| `@slop-lab/part-plugins` | Agent presets/drivers, model providers, workflows, hooks/skills, script bridge and test fixtures            | `@slop-lab/part`     |
+| `@slop-lab/part-node`    | Cross-platform script processes, loopback bridge, HTTP host, SQLite, file artifacts and directory snapshots | `@slop-lab/part`     |
+| `@slop-lab/part-browser` | DOM/headless UI, renderers, workflow forms, Inspector/Workbench and CSS                                     | `@slop-lab/part`     |
 
 The repository root is a private npm workspace, not an installable aggregate SDK.
 Each package has explicit exports, independent build output and a local tarball.
@@ -32,8 +32,8 @@ R4U Chat Completions and Responses run through a server that keeps credentials o
 of the browser. Use `npm run test:browser` after `npx playwright install chromium`.
 JS/MJS sources use `// @ts-check`; `npm run check:js` builds declarations and checks them
 with `jsconfig.json`. Git enforces LF line endings on every platform. Windows CI runs
-the portable tests and all consumer fixtures; tests requiring the POSIX process host
-are skipped on Windows with an explicit reason.
+all tests and consumer fixtures, including script execution and process-tree cleanup.
+`npm test` hides successful test names and prints failures plus the full run summary.
 
 Seven isolated consumer fixtures cover core-only,
 non-coding, SWE, contracts, workflow, Node and browser installations. Every public

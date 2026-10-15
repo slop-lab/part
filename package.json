@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "npm run build && node --test --test-isolation=none tests/*.test.mjs",
+    "test": "npm run build && node --test --test-isolation=none --test-reporter=./scripts/test-reporter.mjs tests/*.test.mjs",
     "check": "npm run check:js && node scripts/check-architecture.mjs",
     "example": "npm run build && node examples/basic.mjs",
     "test:consumers": "npm run build && node scripts/test-consumers.mjs",
