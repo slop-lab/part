@@ -3,7 +3,7 @@ import { startPlayground } from '../examples/playground/server.mjs';
 try {
   process.loadEnvFile(new URL('../.env', import.meta.url));
 } catch (error) {
-  if (error.code !== 'ENOENT') throw error;
+  if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
 }
 const port = Number(process.env.PART_PREVIEW_PORT ?? 4173);
 if (!Number.isInteger(port) || port < 0 || port > 65535) throw Error('Invalid PART_PREVIEW_PORT');

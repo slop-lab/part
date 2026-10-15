@@ -1,9 +1,9 @@
 // @ts-check
-import { performance } from 'node:perf_hooks';
-import { Window } from 'happy-dom';
-import { createWatchHub, createLocalPort, createController } from '@slop-lab/part/client/index.js';
 import { createChat } from '@slop-lab/part-browser/dom.js';
+import { createController, createLocalPort, createWatchHub } from '@slop-lab/part/client/index.js';
 import { localContext, ok } from '@slop-lab/part/contracts/index.js';
+import { Window } from 'happy-dom';
+import { performance } from 'node:perf_hooks';
 const window =
     /** @type {globalThis.Window & typeof globalThis & { happyDOM: import('happy-dom').Window['happyDOM'] }} */ (
       /** @type {unknown} */ (new Window())
@@ -102,7 +102,7 @@ try {
     result.completedRendererCallsDuringStream ||
     !result.completedNodeRetained ||
     result.visibleItems > 100 ||
-    client.getPart('live', 'text').text.length !== updates
+    client.getPart('live', 'text')?.text.length !== updates
   )
     process.exitCode = 1;
 } finally {

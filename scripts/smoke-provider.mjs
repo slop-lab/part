@@ -1,12 +1,11 @@
 // @ts-check
-import { expectProperty } from '../fixtures/assertions.mjs';
-import assert from 'node:assert/strict';
 import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
 import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible/index.js';
 import { createOpenAIResponsesAdapter } from '@slop-lab/part-plugins/providers/openai-responses/index.js';
-import { bearerAuth, createFetchTransport } from '@slop-lab/part/model/index.js';
 import { schema, stringSchema } from '@slop-lab/part/contracts/index.js';
+import { bearerAuth, createFetchTransport } from '@slop-lab/part/model/index.js';
 import { functionTool } from '@slop-lab/part/tools.js';
+import assert from 'node:assert/strict';
 
 // Opt-in only: never run as part of the credential-free test suite.
 async function main() {
@@ -36,6 +35,7 @@ async function main() {
     signal: AbortSignal.timeout(15000),
   });
   assert.equal(capabilityResponse.status, 200, 'R4U capability discovery failed');
+  /** @type {{routes: {id: string, protocols: string[]}[]}} */
   const { routes } = await capabilityResponse.json();
   const route = process.env.R4U_ROUTE
     ? routes?.find((entry) => entry.id === process.env.R4U_ROUTE)
@@ -53,20 +53,28 @@ async function main() {
     signal: AbortSignal.timeout(15000),
   });
   assert.equal(listing.status, 200, 'Model discovery failed');
-  const models = (await listing.json()).data;
+  /** @type {unknown} */
+  const modelListing = await listing.json();
+  assert.ok(modelListing && typeof modelListing === 'object' && 'data' in modelListing);
+  const models = modelListing.data;
   assert.ok(Array.isArray(models), 'Expected model list');
   const model = process.env.R4U_MODEL ?? 'gpt-6-luna';
   assert.ok(
-    models.some((entry) => entry.id === model),
+    models.some(
+      (entry) => entry !== null && typeof entry === 'object' && 'id' in entry && entry.id === model,
+    ),
     'Set R4U_MODEL to an available text/tool model',
   );
   let requests = 0;
   const cases = [];
   for (const scenario of ['text-json', 'text-sse', 'tool-sse']) {
     const stream = scenario !== 'text-json';
+    /** @type {string[]} */
     const toolCalls = [];
+    /** @type {{status: number, contentType: string | undefined}[]} */
     const deliveries = [];
     const start = requests;
+    /** @type {import("@slop-lab/part/reference/index.js").Contracts.Result<import("@slop-lab/part/reference/index.js").Convenience.Agent<string | readonly import("@slop-lab/part/reference/index.js").Context.SemanticItem[], import("@slop-lab/part/reference/index.js").Model.Response>>} */
     const agent = createAgent({
       limits: {
         maxModelInvocations: scenario === 'tool-sse' ? 2 : 1,
@@ -93,12 +101,15 @@ async function main() {
         adapter,
         transport: createFetchTransport({
           allowedOrigins: [base.origin],
-          async fetch(url, init) {
+          async fetch(url, init = {}) {
             assert.ok(++requests <= 4, 'Smoke request limit exceeded');
             const response = await fetch(url, {
               ...init,
               headers: { ...init.headers, ...headers },
-              signal: AbortSignal.any([init.signal, AbortSignal.timeout(90000)].filter(Boolean)),
+              signal: AbortSignal.any([
+                ...(init.signal ? [init.signal] : []),
+                AbortSignal.timeout(90000),
+              ]),
             });
             deliveries.push({
               status: response.status,
@@ -125,6 +136,7 @@ async function main() {
                     value.text === 'hello',
                 ),
                 output: stringSchema,
+                /** @returns {string} */
                 execute: ({ text }) => {
                   toolCalls.push(text);
                   return text.toUpperCase();
@@ -150,14 +162,11 @@ async function main() {
           : 'Reply with exactly HELLO.',
       );
       // Report only structured codes, never upstream error bodies or credentials.
-      assert.ok(
-        result.ok,
-        `${scenario}: ${expectProperty(result, 'error')?.code ?? 'execution failed'}`,
-      );
+      assert.ok(result.ok, `${scenario}: ${!result.ok ? result.error.code : 'execution failed'}`);
       assert.equal(
         result.value.phase,
         'completed',
-        `${scenario}: ${expectProperty(result.value, 'error')?.code ?? result.value.phase}; HTTP ${deliveries.map((entry) => entry.status).join(',')}`,
+        `${scenario}: ${result.value.phase !== 'completed' ? (result.value.error?.code ?? result.value.phase) : 'completed'}; HTTP ${deliveries.map((entry) => entry.status).join(',')}`,
       );
       const response = result.value.result;
       const text = response.content
@@ -176,7 +185,7 @@ async function main() {
         'Unexpected response protocol',
       );
       assert.ok(
-        response.usage.inputTokens > 0 && response.usage.outputTokens > 0,
+        (response.usage.inputTokens ?? 0) > 0 && (response.usage.outputTokens ?? 0) > 0,
         'Missing token usage',
       );
       cases.push({

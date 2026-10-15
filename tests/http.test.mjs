@@ -1,20 +1,20 @@
 // @ts-check
-import { expectProperty } from '../fixtures/assertions.mjs';
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { createServer } from 'node:http';
-import { once } from 'node:events';
-import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
-import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
-import { createFetchTransport, noAuth } from '@slop-lab/part/model/index.js';
-import { createOllamaAdapter } from '@slop-lab/part-plugins/providers/ollama.js';
-import { createEmbeddedEndpoint } from '@slop-lab/part/host/embedded.js';
 import { startHttpHost } from '@slop-lab/part-node/host/http.js';
+import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
+import { createOllamaAdapter } from '@slop-lab/part-plugins/providers/ollama.js';
+import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
 import { createHttpPort } from '@slop-lab/part/client/http.js';
-import { localContext, ok, fail } from '@slop-lab/part/contracts/index.js';
+import { fail, localContext, ok } from '@slop-lab/part/contracts/index.js';
+import { createEmbeddedEndpoint } from '@slop-lab/part/host/embedded.js';
+import { createFetchTransport, noAuth } from '@slop-lab/part/model/index.js';
+import assert from 'node:assert/strict';
+import { once } from 'node:events';
+import { createServer } from 'node:http';
+import test from 'node:test';
+import { expectProperty, present } from '../fixtures/assertions.mjs';
 const context = localContext();
 test('G03: provider adapter uses a real HTTP custom endpoint with a local fake response', async () => {
-  /** @type {Record<string, any>} */
+  /** @type {{model: string, messages: {content: string}[]} | undefined} */
   let body;
   const server = createServer(async (request, response) => {
     const chunks = [];
@@ -52,7 +52,7 @@ test('G03: provider adapter uses a real HTTP custom endpoint with a local fake r
       'local endpoint',
     );
     assert.ok(body);
-    assert.equal(body.messages[0].content, 'local test');
+    assert.equal(present(body.messages[0]).content, 'local test');
     assert.ok(body);
     assert.equal(body.model, 'fake-model');
   } finally {
@@ -101,10 +101,11 @@ test('HTTP/SSE commands, queries, snapshots and owner authentication', async () 
     const run = await port.query({
       queryId: 'part.run/get',
       version: 1,
-      input: expectProperty(expectProperty(delivered, 'receipt'), 'operation').id,
+      input: present(expectProperty(expectProperty(delivered, 'receipt'), 'operation')).id,
     });
     assert.equal(expectProperty(expectProperty(run, 'value'), 'phase'), 'completed');
     await watch.close();
+    assert.ok(iterator.return);
     await iterator.return();
   } finally {
     await watch?.close();

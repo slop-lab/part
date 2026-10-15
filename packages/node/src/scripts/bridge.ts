@@ -8,7 +8,12 @@ export interface ScriptBridgeEnvironment {
     grantId: string,
     context: Contracts.InvocationContext,
     audience?: string,
-  ): Contracts.Result<Readonly<Record<string, string>>>;
+  ): Contracts.Result<{
+    readonly PART_BRIDGE_URL: string;
+    readonly PART_BRIDGE_GRANT: string;
+    readonly PART_BRIDGE_AUDIENCE: string;
+    readonly PART_BRIDGE_CREDENTIAL: string;
+  }>;
 }
 /** Explicit loopback listener; the public grant ID cannot authenticate a request. */
 export async function startScriptBridge(

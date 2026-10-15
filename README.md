@@ -37,7 +37,10 @@ and `"./*": "./*"` for all files, without rewriting workspace metadata.
 See [build rules](docs/architecture.md#package-builds).
 
 JS/MJS sources use `// @ts-check`; `npm run check:js` builds declarations and checks them
-with `jsconfig.json`. Git enforces LF line endings on every platform. Windows CI runs
+with `jsconfig.json`: strict typing, checked index access, unused-code checks and full
+dependency declaration checks. `fixtures/type-contracts.mjs` guards against untyped
+metadata, unchecked lookups and invalid test-double methods. Git enforces LF line
+endings on every platform. Windows CI runs
 all tests and consumer fixtures, including script execution and process-tree cleanup.
 `npm test` hides successful test names and prints failures plus the full run summary.
 

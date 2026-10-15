@@ -1,22 +1,18 @@
 // @ts-check
-import { expectProperty, json, stub } from '../fixtures/assertions.mjs';
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { Window } from 'happy-dom';
-import { build } from 'esbuild';
+import { createChat } from '@slop-lab/part-browser/dom.js';
+import { createComposer } from '@slop-lab/part-browser/headless.js';
 import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
 import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
-import { createEmbeddedEndpoint } from '@slop-lab/part/host/embedded.js';
-import {
-  createLocalPort,
-  createWatchHub,
-  createController,
-  jsonCodec,
-} from '@slop-lab/part/client/index.js';
-import { createComposer } from '@slop-lab/part-browser/headless.js';
-import { createChat } from '@slop-lab/part-browser/dom.js';
+import { createController, createLocalPort, createWatchHub } from '@slop-lab/part/client/index.js';
 import { localContext } from '@slop-lab/part/contracts/index.js';
+import { createEmbeddedEndpoint } from '@slop-lab/part/host/embedded.js';
+import { build } from 'esbuild';
+import { Window } from 'happy-dom';
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { deferred, expectProperty, present, stub } from '../fixtures/assertions.mjs';
 const context = localContext();
+/** @param {string} text @param {string} id */
 const command = (text, id = crypto.randomUUID()) => ({
   protocolVersion: 1,
   commandId: id,
@@ -25,7 +21,7 @@ const command = (text, id = crypto.randomUUID()) => ({
   input: text,
   idempotencyKey: id,
 });
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const delay = /** @param {number} ms */ (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 test('G09/G10: in-process and codec loopback have command/query/watch parity', async () => {
   for (const codecLoopback of [false, true]) {
     const model = fakeModel([{ text: 'reply' }]),
@@ -46,13 +42,13 @@ test('G09/G10: in-process and codec loopback have command/query/watch parity', a
     const snapshot = await port.query({
       queryId: 'part.run/get',
       version: 1,
-      input: expectProperty(expectProperty(delivery, 'receipt'), 'operation').id,
+      input: present(expectProperty(expectProperty(delivery, 'receipt'), 'operation')).id,
     });
     assert.equal(expectProperty(expectProperty(snapshot, 'value'), 'phase'), 'completed');
     const latest = controller.getItem(
-      `${expectProperty(expectProperty(delivery, 'receipt'), 'operation').id}/assistant`,
+      `${present(expectProperty(expectProperty(delivery, 'receipt'), 'operation')).id}/assistant`,
     );
-    assert.equal(latest.fallback.text, 'reply');
+    assert.equal(present(latest).fallback.text, 'reply');
     assert.equal(
       expectProperty(await port.command({ ...request, input: 'changed' }), 'receipt').kind,
       'rejected',
@@ -83,8 +79,8 @@ test('DU05/DU06/DU08: snapshot subscription includes intervening updates and aut
   hub.upsert(item);
   hub.delta({ itemId: 'private', partId: 'text', generation: 'g', offset: 0, text: '안녕' });
   await delay(0);
-  assert.equal(controller.getItem('private').fallback.label, 'Safe');
-  assert.equal(controller.getPart('private', 'text').offset, 2);
+  assert.equal(present(controller.getItem('private')).fallback.label, 'Safe');
+  assert.equal(present(controller.getPart('private', 'text')).offset, 2);
   assert.equal(
     hub.delta({ itemId: 'private', partId: 'text', generation: 'g', offset: 0, text: 'duplicate' })
       .ok,
@@ -116,21 +112,20 @@ test('DU07: not-sent and delivery-unknown are distinct; disconnect does not canc
   assert.equal(unknown.recovery, 'same-key-retry');
   assert.equal(count, 1);
   assert.equal(
-    (await port.command({ ...command('x'), input: /** @type {any} */ (() => {}) })).kind,
+    // @ts-expect-error Functions are deliberately invalid wire input.
+    (await port.command({ ...command('x'), input: () => {} })).kind,
     'not-sent',
   );
   assert.equal(count, 1);
 });
 test('DU09: composing Enter cannot submit and late success preserves a new draft', async () => {
-  let count = 0,
-    /** @type {(...args: any[]) => void} */ release;
+  let count = 0;
+  const gate = deferred();
   const composer = createComposer({
     command: (draft) => command(draft.text),
     invoke: async (request) => {
       count++;
-      await new Promise((r) => {
-        release = r;
-      });
+      await gate.promise;
       return {
         kind: 'receipt',
         receipt: {
@@ -149,7 +144,7 @@ test('DU09: composing Enter cannot submit and late success preserves a new draft
   composer.setComposing(false);
   const pending = composer.submit('button');
   composer.setDraft({ text: 'new', references: [], revision: 2 });
-  release();
+  gate.resolve();
   await pending;
   assert.equal(composer.getDraft().text, 'new');
 });
@@ -202,7 +197,9 @@ test('G10/X05/X06: DOM Chat supports custom cards, safe fallback, IME, CSS and c
         target: 'chat',
         render: (item) => {
           const node = document.createElement('p');
-          node.textContent = expectProperty(item.payload, 'summary');
+          const summary = expectProperty(item.payload, 'summary');
+          assert.ok(typeof summary === 'string');
+          node.textContent = summary;
           return node;
         },
       },
@@ -218,10 +215,12 @@ test('G10/X05/X06: DOM Chat supports custom cards, safe fallback, IME, CSS and c
   });
   assert.equal(fallback.element.textContent.includes('Safe fallback'), true);
   const textarea = chat.element.querySelector('textarea');
-  textarea.value = '한';
-  textarea.dispatchEvent(new window.Event('input'));
-  textarea.dispatchEvent(new window.Event('compositionstart'));
-  textarea.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', isComposing: true }));
+  present(textarea).value = '한';
+  present(textarea).dispatchEvent(new window.Event('input'));
+  present(textarea).dispatchEvent(new window.Event('compositionstart'));
+  present(textarea).dispatchEvent(
+    new window.KeyboardEvent('keydown', { key: 'Enter', isComposing: true }),
+  );
   assert.equal(chat.composer.getDraft().text, '한');
   await chat.dispose();
   await fallback.dispose();
@@ -254,7 +253,7 @@ test('C01/C10: browser entrypoint excludes storage, executor, provider and crede
       paths.some((p) => p.includes(excluded)),
       false,
     );
-  assert.equal(result.outputFiles[0].text.includes('node:sqlite'), false);
+  assert.equal(present(result.outputFiles[0]).text.includes('node:sqlite'), false);
 });
 
 test('G10: themed Chat sends to the real embedded agent, streams text and cancels through the owner action', async () => {
@@ -262,11 +261,11 @@ test('G10: themed Chat sends to the real embedded agent, streams text and cancel
       /** @type {globalThis.Window & typeof globalThis & { happyDOM: import('happy-dom').Window['happyDOM'] }} */ (
         /** @type {unknown} */ (new Window())
       ),
-    model = fakeModel([{ text: 'streamed response' }]);
+    model = { ...fakeModel([{ text: 'streamed response' }]) };
   const transport = model.transport;
-  // @ts-expect-error Deliberately attempt mutation to verify snapshot isolation.
   model.transport = {
     ...transport,
+    /** @param {Parameters<typeof transport.send>} args */
     async send(...args) {
       const result = await transport.send(args[0], args[1], args[2], args[3]);
       if (result.ok === false) return result;
@@ -299,12 +298,12 @@ test('G10: themed Chat sends to the real embedded agent, streams text and cancel
   window.document.body.append(chat.element);
   try {
     const textarea = chat.element.querySelector('textarea');
-    textarea.value = 'stream please';
-    textarea.dispatchEvent(new window.Event('input'));
+    present(textarea).value = 'stream please';
+    present(textarea).dispatchEvent(new window.Event('input'));
     await chat.composer.submit('api');
     for (let i = 0; i < 100 && !chat.element.querySelector('article button'); i++) await delay(2);
     const cancel = chat.element.querySelector('article button');
-    assert.equal(cancel.textContent, 'part.run/cancel');
+    assert.equal(present(cancel).textContent, 'part.run/cancel');
     await delay(15);
     /** @type {HTMLElement} */ (cancel).click();
     for (let i = 0; i < 100 && !chat.element.textContent.includes('Cancelled'); i++) await delay(2);

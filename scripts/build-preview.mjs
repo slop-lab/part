@@ -1,7 +1,7 @@
 // @ts-check
 import { build } from 'esbuild';
-import { readFileSync, mkdirSync, writeFileSync, copyFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 execFileSync(
   process.execPath,
   ['node_modules/typescript/bin/tsc', '-p', 'examples/playground/tsconfig.json'],
@@ -20,7 +20,9 @@ if (Object.keys(bundle.metafile.inputs).some((path) => /packages\/(node|plugins)
   throw Error('Server implementations must not enter the browser bundle');
 mkdirSync('preview', { recursive: true });
 copyFileSync('examples/playground/index.html', 'preview/index.html');
-writeFileSync('preview/app.js', bundle.outputFiles[0].text);
+const output = bundle.outputFiles[0];
+if (!output) throw Error('Browser bundle is empty');
+writeFileSync('preview/app.js', output.text);
 writeFileSync(
   'preview/styles.css',
   readFileSync('packages/browser/dist/styles.css', 'utf8') +

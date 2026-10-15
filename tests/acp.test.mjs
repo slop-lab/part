@@ -1,27 +1,31 @@
 // @ts-check
-import { expectProperty } from '../fixtures/assertions.mjs';
-import test from 'node:test';
+import { client, methods, ndJsonStream } from '@agentclientprotocol/sdk';
+import { startAcpStdio } from '@slop-lab/part-node/acp/index.js';
+import { connectAcpMcpServers } from '@slop-lab/part-node/acp/mcp.js';
+import { createAcpAgent } from '@slop-lab/part-plugins/acp/index.js';
+import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
+import { emptyCleanup, ok, schema, stringSchema } from '@slop-lab/part/contracts/index.js';
+import { functionTool } from '@slop-lab/part/tools.js';
 import assert from 'node:assert/strict';
-import { PassThrough, Readable, Writable } from 'node:stream';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { connectAcpMcpServers } from '@slop-lab/part-node/acp/mcp.js';
+import { PassThrough, Writable } from 'node:stream';
+import test from 'node:test';
 import { setTimeout } from 'node:timers/promises';
-import { client, methods, ndJsonStream } from '@agentclientprotocol/sdk';
-import { createAcpAgent } from '@slop-lab/part-plugins/acp/index.js';
-import { startAcpStdio } from '@slop-lab/part-node/acp/index.js';
-import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
-import { functionTool } from '@slop-lab/part/tools.js';
-import { emptyCleanup, ok, schema, stringSchema } from '@slop-lab/part/contracts/index.js';
+import { fileURLToPath } from 'node:url';
+import { byteStream } from '../examples/acp/streams.mjs';
+import { deferred, expectProperty, present } from '../fixtures/assertions.mjs';
 
 const textSchema = schema(
   'acp/text',
   /** @param {unknown} value @returns {value is {text: string}} */ (value) =>
-    value && typeof value === 'object' && 'text' in value && typeof value.text === 'string',
+    value !== null &&
+    typeof value === 'object' &&
+    'text' in value &&
+    typeof value.text === 'string',
 );
 const parameters = {
   type: 'object',
@@ -29,24 +33,16 @@ const parameters = {
   required: ['text'],
   additionalProperties: false,
 };
-const deferred = () => {
-  /** @type {(value?: any) => void} */
-  let resolve;
-  /** @type {(reason?: unknown) => void} */
-  let reject;
-  const promise = new Promise((yes, no) => {
-    resolve = yes;
-    reject = no;
-  });
-  return { promise, resolve, reject };
-};
+/** @param {import("@agentclientprotocol/sdk").ClientContext} cx */
 const initialize = (cx) =>
   cx.request(methods.agent.initialize, { protocolVersion: 1, clientCapabilities: {} });
+/** @param {import("@agentclientprotocol/sdk").ClientContext} cx */
 const newSession = (cx) =>
   cx.request(methods.agent.session.new, { cwd: process.cwd(), mcpServers: [] });
+/** @param {import("@agentclientprotocol/sdk").ClientContext} cx @param {string} sessionId @param {string} text */
 const prompt = (cx, sessionId, text = 'hello') =>
   cx.request(methods.agent.session.prompt, { sessionId, prompt: [{ type: 'text', text }] });
-/** @param {string[]} executions @param {import('@slop-lab/part/reference/index.js').Tools.Definition['effects']} [effects] */
+/** @param {string[]} executions @param {import('@slop-lab/part/reference/index.js').Tools.Definition<unknown, unknown>['effects']} [effects] */
 function toolOptions(executions, effects = 'write') {
   return {
     model: fakeModel([
@@ -69,8 +65,8 @@ function toolOptions(executions, effects = 'write') {
     toolSchemas: { save_note: parameters },
   };
 }
-/** @param {{configureSession?: import('@slop-lab/part-plugins/acp/index.js').AcpAgentOptions['configureSession'], permission?: (params: import('@agentclientprotocol/sdk').RequestPermissionRequest, signal: AbortSignal) => import('@agentclientprotocol/sdk').RequestPermissionResponse | Promise<import('@agentclientprotocol/sdk').RequestPermissionResponse>, options?: Partial<import('@slop-lab/part-plugins/acp/index.js').AcpAgentOptions>, transport?: Partial<Parameters<typeof startAcpStdio>[0]>}} settings
- * @param {Function} run
+/** @param {{configureSession: import('@slop-lab/part-plugins/acp/index.js').AcpAgentOptions['configureSession'], permission?: (params: import('@agentclientprotocol/sdk').RequestPermissionRequest, signal: AbortSignal) => import('@agentclientprotocol/sdk').RequestPermissionResponse | Promise<import('@agentclientprotocol/sdk').RequestPermissionResponse>, options?: Partial<import('@slop-lab/part-plugins/acp/index.js').AcpAgentOptions>, transport?: Partial<Parameters<typeof startAcpStdio>[0]>}} settings
+ * @param {(cx: import("@agentclientprotocol/sdk").ClientContext, state: {updates: import("@agentclientprotocol/sdk").SessionNotification[], requests: import("@agentclientprotocol/sdk").RequestPermissionRequest[], host: ReturnType<typeof startAcpStdio>}) => Promise<void>} run
  */
 async function withSdk(
   {
@@ -83,7 +79,9 @@ async function withSdk(
 ) {
   const input = new PassThrough(),
     output = new PassThrough(),
+    /** @type {import("@agentclientprotocol/sdk").SessionNotification[]} */
     updates = [],
+    /** @type {import("@agentclientprotocol/sdk").RequestPermissionRequest[]} */
     requests = [];
   const host = startAcpStdio({
     ...transport,
@@ -100,7 +98,7 @@ async function withSdk(
       .onNotification(methods.client.session.update, (ctx) => {
         updates.push(ctx.params);
       })
-      .connectWith(ndJsonStream(Writable.toWeb(input), Readable.toWeb(output)), (cx) =>
+      .connectWith(ndJsonStream(Writable.toWeb(input), byteStream(output)), (cx) =>
         run(cx, { updates, requests, host }),
       );
   } finally {
@@ -110,7 +108,9 @@ async function withSdk(
 }
 
 test('Official ACP SDK initializes, receives text and embedded context, and preserves isolated session histories', async () => {
+  /** @type {ReturnType<typeof fakeModel>[]} */
   const models = [],
+    /** @type {import("@slop-lab/part-plugins/acp/index.js").AcpSessionSetup[]} */
     setups = [];
   await withSdk(
     {
@@ -124,15 +124,19 @@ test('Official ACP SDK initializes, receives text and embedded context, and pres
     async (cx, { updates }) => {
       const info = await initialize(cx);
       assert.equal(info.protocolVersion, 1);
-      assert.equal(info.agentCapabilities.loadSession, false);
-      assert.equal(info.agentCapabilities.promptCapabilities.image, false);
+      assert.equal(present(info.agentCapabilities).loadSession, false);
+      assert.equal(present(present(info.agentCapabilities).promptCapabilities).image, false);
       const first = await newSession(cx),
         second = await newSession(cx);
       assert.notEqual(first.sessionId, second.sessionId);
       assert.equal((await prompt(cx, first.sessionId)).stopReason, 'end_turn');
       const streamed = updates
         .filter((item) => item.sessionId === first.sessionId)
-        .map((item) => item.update.content?.text ?? '')
+        .map(({ update }) =>
+          update.sessionUpdate === 'agent_message_chunk' && update.content.type === 'text'
+            ? update.content.text
+            : '',
+        )
         .join('');
       assert.equal(streamed, 'Hello ☃');
       await cx.request(methods.agent.session.prompt, {
@@ -144,22 +148,27 @@ test('Official ACP SDK initializes, receives text and embedded context, and pres
           },
         ],
       });
-      const history = JSON.parse(new TextDecoder().decode(models[0].requests[1].body)).messages;
-      assert.equal(history[0].content, 'hello');
-      assert.equal(history[1].content, 'Hello ☃');
-      assert.match(history[2].content, /Embedded note/);
+      /** @type {{content: string}[]} */
+      const history = JSON.parse(
+        new TextDecoder().decode(present(present(models[0]).requests[1]).body),
+      ).messages;
+      assert.equal(present(history[0]).content, 'hello');
+      assert.equal(present(history[1]).content, 'Hello ☃');
+      assert.match(present(history[2]).content, /Embedded note/);
       await prompt(cx, second.sessionId, 'isolated');
       assert.equal(
-        JSON.parse(new TextDecoder().decode(models[1].requests[0].body)).messages.length,
+        JSON.parse(new TextDecoder().decode(present(present(models[1]).requests[0]).body)).messages
+          .length,
         1,
       );
-      assert.equal(setups[0].cwd, process.cwd());
+      assert.equal(present(setups[0]).cwd, process.cwd());
     },
   );
 });
 
 test('Official SDK permission decisions gate writes and produce stable tool call transitions', async () => {
   for (const choice of ['allow-once', 'reject-once', 'unexpected']) {
+    /** @type {string[]} */
     const executions = [];
     await withSdk(
       {
@@ -180,8 +189,8 @@ test('Official SDK permission decisions gate writes and produce stable tool call
           );
         assert.deepEqual(executions, choice === 'allow-once' ? ['hello'] : []);
         assert.equal(requests.length, 1);
-        assert.equal(requests[0].options[0].kind, 'allow_once');
-        const tools = updates.map((item) => item.update).filter((item) => item.toolCallId);
+        assert.equal(present(present(requests[0]).options[0]).kind, 'allow_once');
+        const tools = updates.map((item) => item.update).filter((item) => 'toolCallId' in item);
         assert.equal(new Set(tools.map((item) => item.toolCallId)).size, 1);
         assert.deepEqual(
           tools.map((item) => item.status),
@@ -193,9 +202,16 @@ test('Official SDK permission decisions gate writes and produce stable tool call
 });
 
 test('ACP cancellation releases an unanswered permission request; late allow cannot execute the tool', async () => {
+  /** @type {string[]} */
   const executions = [],
-    asked = deferred(),
-    decision = deferred();
+    asked =
+      /** @type {PromiseWithResolvers<import("@agentclientprotocol/sdk").RequestPermissionRequest>} */ (
+        deferred()
+      ),
+    decision =
+      /** @type {PromiseWithResolvers<import("@agentclientprotocol/sdk").RequestPermissionResponse>} */ (
+        deferred()
+      );
   await withSdk(
     {
       configureSession: () => toolOptions(executions),
@@ -220,7 +236,7 @@ test('ACP cancellation releases an unanswered permission request; late allow can
       decision.resolve({ outcome: { outcome: 'selected', optionId: 'allow-once' } });
       await setTimeout(10);
       assert.deepEqual(executions, []);
-      assert.ok(updates.some((item) => item.update.status === 'failed'));
+      assert.ok(updates.some((item) => 'status' in item.update && item.update.status === 'failed'));
       assert.equal((await prompt(cx, session.sessionId, 'continue')).stopReason, 'end_turn');
     },
   );
@@ -228,6 +244,7 @@ test('ACP cancellation releases an unanswered permission request; late allow can
 
 test('ACP read tools skip permission by default and all-tools policy requests it', async () => {
   for (const permissions of /** @type {const} */ (['writes', 'all'])) {
+    /** @type {string[]} */
     const executions = [];
     await withSdk(
       { configureSession: () => toolOptions(executions, 'read'), options: { permissions } },
@@ -243,6 +260,7 @@ test('ACP read tools skip permission by default and all-tools policy requests it
 });
 
 test('ACP fails unsupported inputs and bounded admission before model execution', async () => {
+  /** @type {ReturnType<typeof fakeModel>[]} */
   const models = [];
   await withSdk(
     {
@@ -297,7 +315,7 @@ test('ACP fails unsupported inputs and bounded admission before model execution'
         }),
         (error) => expectProperty(error, 'code') === -32602,
       );
-      assert.equal(models[0].requests.length, 0);
+      assert.equal(present(models[0]).requests.length, 0);
       await prompt(cx, session.sessionId, 'valid');
       await assert.rejects(
         prompt(cx, session.sessionId),
@@ -317,9 +335,13 @@ test('ACP fails unsupported inputs and bounded admission before model execution'
 
 test('ACP permission timeout fails closed and cancel notifications bypass request capacity', async () => {
   for (const timeout of [false, true]) {
+    /** @type {string[]} */
     const executions = [],
       asked = deferred(),
-      decision = deferred();
+      decision =
+        /** @type {PromiseWithResolvers<import("@agentclientprotocol/sdk").RequestPermissionResponse>} */ (
+          deferred()
+        );
     await withSdk(
       {
         configureSession: () => toolOptions(executions),
@@ -355,7 +377,10 @@ test('ACP permission timeout fails closed and cancel notifications bypass reques
 });
 
 test('Closing ACP during async session setup aborts its host signal and awaits cleanup', async () => {
-  const configured = deferred(),
+  const configured =
+      /** @type {PromiseWithResolvers<import("@slop-lab/part-plugins/acp/index.js").AcpSessionSetup>} */ (
+        deferred()
+      ),
     release = deferred();
   const agent = createAcpAgent({
     connection: {
@@ -388,7 +413,8 @@ test('ACP request ID reuse during output backpressure preserves the new request 
     writing = deferred(),
     started = deferred(),
     cancelled = deferred();
-  let /** @type {(...args: any[]) => void} */ release;
+  /** @type {((error?: Error | null) => void) | undefined} */
+  let release;
   const output = new Writable({
     write(_chunk, _encoding, callback) {
       release = callback;
@@ -403,7 +429,7 @@ test('ACP request ID reuse during output backpressure preserves the new request 
       async handle(method, _params, _kind, signal) {
         if (method === 'second') {
           assert.ok(cancelled.resolve);
-          signal.addEventListener('abort', () => cancelled.resolve(), { once: true });
+          present(signal).addEventListener('abort', () => cancelled.resolve(), { once: true });
           assert.ok(started.resolve);
           started.resolve();
           await cancelled.promise;
@@ -420,7 +446,7 @@ test('ACP request ID reuse during output backpressure preserves the new request 
     await writing.promise;
     input.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'second' }) + '\n');
     await started.promise;
-    release();
+    present(release)();
     await setTimeout(0);
     input.write(
       JSON.stringify({ jsonrpc: '2.0', method: '$/cancel_request', params: { requestId: 1 } }) +
@@ -437,16 +463,20 @@ test('ACP request ID reuse during output backpressure preserves the new request 
   }
 });
 
+/** @param {Partial<Parameters<typeof startAcpStdio>[0]>} options */
 function rawHost(options = {}) {
   const input = new PassThrough(),
     output = new PassThrough(),
+    /** @type {Record<string, import("@slop-lab/part/reference/index.js").Contracts.Json>[]} */
     messages = [],
+    /** @type {((value: Record<string, import("@slop-lab/part/reference/index.js").Contracts.Json>) => void)[]} */
     waiters = [];
   let buffered = '';
   output.on('data', (chunk) => {
     buffered += chunk;
     while (buffered.includes('\n')) {
       const index = buffered.indexOf('\n');
+      /** @type {Record<string, import("@slop-lab/part/reference/index.js").Contracts.Json>} */
       const value = JSON.parse(buffered.slice(0, index));
       buffered = buffered.slice(index + 1);
       messages.push(value);
@@ -506,7 +536,7 @@ test('ACP NDJSON handles byte-split Unicode, malformed JSON, invalid envelopes a
 test('ACP transport bounds oversized frames and releases stalled output during close', async () => {
   const raw = rawHost({ maxFrameBytes: 16 });
   raw.input.write('x'.repeat(17));
-  assert.equal((await raw.host.closed).errors[0].code, 'part.acp.input');
+  assert.equal(present((await raw.host.closed).errors[0]).code, 'part.acp.input');
   raw.output.destroy();
   const input = new PassThrough(),
     output = new Writable({ write() {} });
@@ -546,7 +576,7 @@ test('The ACP example interoperates with the official SDK over actual child-proc
         outcome: { outcome: 'selected', optionId: 'allow-once' },
       }))
       .connectWith(
-        ndJsonStream(Writable.toWeb(child.stdin), Readable.toWeb(child.stdout)),
+        ndJsonStream(Writable.toWeb(child.stdin), byteStream(child.stdout)),
         async (cx) => {
           await initialize(cx);
           const session = await newSession(cx);
@@ -563,9 +593,13 @@ test('The ACP example interoperates with the official SDK over actual child-proc
 });
 
 test('ACP session close cancels outstanding permission work and releases session capacity', async () => {
+  /** @type {string[]} */
   const executions = [],
     asked = deferred(),
-    permission = deferred();
+    permission =
+      /** @type {PromiseWithResolvers<import("@agentclientprotocol/sdk").RequestPermissionResponse>} */ (
+        deferred()
+      );
   await withSdk(
     {
       configureSession: () => toolOptions(executions),
@@ -578,7 +612,7 @@ test('ACP session close cancels outstanding permission work and releases session
     },
     async (cx) => {
       const info = await initialize(cx);
-      assert.deepEqual(info.agentCapabilities.sessionCapabilities.close, {});
+      assert.deepEqual(present(present(info.agentCapabilities).sessionCapabilities).close, {});
       const session = await newSession(cx),
         pending = prompt(cx, session.sessionId);
       await asked.promise;
@@ -606,7 +640,9 @@ test('ACP stdio MCP servers install dispatcher tools, require permission and rep
   try {
     for (const decision of ['allow-once', 'reject-once']) {
       const marker = join(directory, decision),
+        /** @type {Awaited<ReturnType<typeof connectAcpMcpServers>>[]} */
         connections = [],
+        /** @type {ReturnType<typeof fakeModel>[]} */
         models = [];
       await withSdk(
         {
@@ -646,10 +682,19 @@ test('ACP stdio MCP servers install dispatcher tools, require permission and rep
           if (decision === 'allow-once') {
             assert.equal((await prompt(cx, session.sessionId)).stopReason, 'end_turn');
             assert.equal(await readFile(marker, 'utf8'), 'called\n');
-            const history = JSON.parse(new TextDecoder().decode(models[0].requests[1].body));
-            assert.match(history.messages.at(-1).content, /HELLO/);
-            assert.match(history.messages.at(-1).content, /"hostSecretPresent":false/);
-            assert.ok(updates.some((item) => item.update.rawOutput?.effect === 'unknown'));
+            /** @type {{messages: {content: string}[]}} */
+            const history = JSON.parse(
+              new TextDecoder().decode(present(present(models[0]).requests[1]).body),
+            );
+            assert.match(present(history.messages.at(-1)).content, /HELLO/);
+            assert.match(present(history.messages.at(-1)).content, /"hostSecretPresent":false/);
+            assert.ok(
+              updates.some(
+                (item) =>
+                  'rawOutput' in item.update &&
+                  expectProperty(item.update.rawOutput, 'effect') === 'unknown',
+              ),
+            );
           } else {
             await assert.rejects(
               prompt(cx, session.sessionId),
@@ -663,7 +708,7 @@ test('ACP stdio MCP servers install dispatcher tools, require permission and rep
           }
           assert.equal(requests.length, 1); // Untrusted readOnlyHint never bypasses permission.
           await cx.request(methods.agent.session.close, { sessionId: session.sessionId });
-          assert.deepEqual((await connections[0].close()).unresolved, []);
+          assert.deepEqual((await present(connections[0]).close()).unresolved, []);
         },
       );
     }
@@ -699,6 +744,7 @@ test('ACP MCP launch policy rejects unauthorized commands before starting a serv
 test('Official SDK request cancellation cancels the permission UI without accepting a late decision', async () => {
   const asked = deferred(),
     dismissed = deferred(),
+    /** @type {string[]} */
     executions = [];
   await withSdk(
     {
@@ -755,7 +801,7 @@ test('ACP output timeout closes a stalled peer instead of hanging a turn indefin
   });
   input.write('{"jsonrpc":"2.0","id":1,"method":"wait","params":{}}\n');
   const report = await host.closed;
-  assert.equal(report.errors[0].code, 'part.acp.output');
+  assert.equal(present(report.errors[0]).code, 'part.acp.output');
   output.destroy();
 });
 
@@ -796,6 +842,7 @@ test('ACP retains incomplete cleanup evidence from failed session setup', async 
 });
 
 test('ACP tool IDs remain distinct when a provider reuses its call ID across prompt turns', async () => {
+  /** @type {string[]} */
   const executions = [];
   await withSdk(
     {
@@ -808,28 +855,31 @@ test('ACP tool IDs remain distinct when a provider reuses its call ID across pro
           { text: 'two saved' },
         ]);
         const original = options.model.adapter;
-        // @ts-expect-error Deliberately attempt mutation to verify snapshot isolation.
-        options.model.adapter = {
-          ...original,
-          createDecoder(response) {
-            const created = original.createDecoder(response);
-            return created.ok
-              ? ok({
-                  ...created.value,
-                  finish() {
-                    const decoded = created.value.finish();
-                    return decoded.ok
-                      ? ok({
-                          ...decoded.value,
-                          toolCalls: decoded.value.toolCalls.map((call) => ({
-                            ...call,
-                            id: 'provider-reused-id',
-                          })),
-                        })
-                      : decoded;
-                  },
-                })
-              : created;
+        options.model = {
+          ...options.model,
+          adapter: {
+            ...original,
+            /** @param {Parameters<typeof original.createDecoder>[0]} response */
+            createDecoder(response) {
+              const created = original.createDecoder(response);
+              return created.ok
+                ? ok({
+                    ...created.value,
+                    finish() {
+                      const decoded = created.value.finish();
+                      return decoded.ok
+                        ? ok({
+                            ...decoded.value,
+                            toolCalls: decoded.value.toolCalls.map((call) => ({
+                              ...call,
+                              id: 'provider-reused-id',
+                            })),
+                          })
+                        : decoded;
+                    },
+                  })
+                : created;
+            },
           },
         };
         return options;
@@ -842,7 +892,7 @@ test('ACP tool IDs remain distinct when a provider reuses its call ID across pro
       await prompt(cx, session.sessionId, 'two');
       const ids = updates
         .filter((item) => item.update.sessionUpdate === 'tool_call')
-        .map((item) => item.update.toolCallId);
+        .map((item) => expectProperty(item.update, 'toolCallId'));
       assert.equal(ids.length, 2);
       assert.notEqual(ids[0], ids[1]);
       assert.deepEqual(executions, ['one', 'two']);

@@ -1,13 +1,14 @@
 // @ts-check
-import test from 'node:test';
+import { createNodeScripts } from '@slop-lab/part-node/scripts/index.js';
+import { digest, localContext } from '@slop-lab/part/contracts/index.js';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { digest, localContext } from '@slop-lab/part/contracts/index.js';
-import { createNodeScripts } from '@slop-lab/part-node/scripts/index.js';
+import test from 'node:test';
 import { expectProperty } from '../fixtures/assertions.mjs';
 
+/** @param {number} ms */
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** @param {string} root @param {string} source @param {Partial<import('@slop-lab/part/reference/index.js').Scripts.Request>} [options] */

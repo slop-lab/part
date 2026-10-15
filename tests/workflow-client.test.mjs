@@ -1,22 +1,23 @@
 // @ts-check
-import { expectProperty, json } from '../fixtures/assertions.mjs';
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { Window } from 'happy-dom';
-import { localContext, jsonSchema, ok, fail, digest } from '@slop-lab/part/contracts/index.js';
+import { createWorkflowView } from '@slop-lab/part-browser/workflow.js';
 import { createCodeEngine, defineCodeWorkflow } from '@slop-lab/part-plugins/workflows/code.js';
+import { createWorkflowEndpoint } from '@slop-lab/part-plugins/workflows/endpoint.js';
+import { createWorkflowHost } from '@slop-lab/part-plugins/workflows/host.js';
+import { callIdentity } from '@slop-lab/part-plugins/workflows/memory/index.js';
 import {
   createPipelineEngine,
   installStepHandler,
 } from '@slop-lab/part-plugins/workflows/pipeline/index.js';
-import { createWorkflowHost } from '@slop-lab/part-plugins/workflows/host.js';
-import { createWorkflowEndpoint } from '@slop-lab/part-plugins/workflows/endpoint.js';
+import { createController, createLocalPort, jsonCodec } from '@slop-lab/part/client/index.js';
+import { digest, fail, jsonSchema, localContext, ok } from '@slop-lab/part/contracts/index.js';
 import { createSuspensions } from '@slop-lab/part/runtime/waits.js';
-import { callIdentity } from '@slop-lab/part-plugins/workflows/memory/index.js';
-import { createLocalPort, createController, jsonCodec } from '@slop-lab/part/client/index.js';
-import { createWorkflowView } from '@slop-lab/part-browser/workflow.js';
+import { Window } from 'happy-dom';
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { expectProperty, json, present } from '../fixtures/assertions.mjs';
 const context = localContext();
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const delay = /** @param {number} ms */ (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+/** @param {() => boolean | Promise<boolean>} predicate */
 async function until(predicate) {
   for (let i = 0; i < 300; i++) {
     if (await predicate()) return;
@@ -24,6 +25,7 @@ async function until(predicate) {
   }
   throw Error('Condition did not arrive');
 }
+/** @param {{id: string}} definition @param {string} format @param {string} hash @returns {import("@slop-lab/part/reference/index.js").Workflows.DefinitionRef} */
 const ref = (definition, format, hash) => ({
   id: definition.id,
   format,
@@ -31,6 +33,7 @@ const ref = (definition, format, hash) => ({
   digest: hash,
   source: { owner: 'test', native: {} },
 });
+/** @param {import("@slop-lab/part/reference/index.js").PipelineV1.Definition} definition @param {import("@slop-lab/part/reference/index.js").PipelineV1.InstalledStepHandler[]} handlers */
 async function startPipeline(definition, handlers = []) {
   const engine = expectProperty(
     createPipelineEngine({
@@ -44,7 +47,7 @@ async function startPipeline(definition, handlers = []) {
   const prepared = await engine.prepare(
     {
       engineId: engine.descriptor.id,
-      definition: ref(definition, 'part.pipeline', await digest(definition)),
+      definition: ref(definition, 'part.pipeline', await digest(json(definition))),
       profileId: 'default',
       requiredCapabilities: [],
       requiredControl: 'runner-enforced',
@@ -63,6 +66,7 @@ async function startPipeline(definition, handlers = []) {
   );
   return expectProperty(await engine.get(expectProperty(started, 'ref'), context), 'value');
 }
+/** @param {string} id @param {import("@slop-lab/part/reference/index.js").Contracts.Json} value @returns {import("@slop-lab/part/reference/index.js").PipelineV1.Step} */
 const assertion = (id, value) => ({
   id,
   after: [],
@@ -70,6 +74,7 @@ const assertion = (id, value) => ({
   value: { literal: value },
   equals: value,
 });
+/** @param {import("@slop-lab/part/reference/index.js").PipelineV1.Step[]} steps @returns {import("@slop-lab/part/reference/index.js").PipelineV1.Definition} */
 const pipeline = (steps) => ({
   id: 'nested',
   format: 'part.pipeline',
@@ -77,7 +82,7 @@ const pipeline = (steps) => ({
   input: jsonSchema.ref,
   output: jsonSchema.ref,
   steps,
-  result: { step: steps[0].id, pointer: '' },
+  result: { step: present(steps[0]).id, pointer: '' },
 });
 test('Pipeline lexical branches, bounded repeat and ordered parallel results execute required blocks', async () => {
   let iterations = 0;
@@ -92,6 +97,7 @@ test('Pipeline lexical branches, bounded repeat and ordered parallel results exe
     replay: 'never',
     execute: async () => ok(++iterations),
   });
+  /** @type {Extract<import("@slop-lab/part/reference/index.js").PipelineV1.Step, {kind: "repeat"}>} */
   const repeat = {
     id: 'repeat',
     after: [],
@@ -154,7 +160,7 @@ test('Pipeline cancel-and-join aborts sibling managed steps; per-step timeout pr
     execute: async (_input, _config, _identity, context) => {
       slowStarted = true;
       await new Promise((resolve) => {
-        if (context.signal.aborted) resolve();
+        if (context.signal.aborted) resolve(undefined);
         else context.signal.addEventListener('abort', resolve, { once: true });
       });
       cancelled = true;
@@ -175,6 +181,7 @@ test('Pipeline cancel-and-join aborts sibling managed steps; per-step timeout pr
       return ok(null);
     },
   });
+  /** @type {Extract<import("@slop-lab/part/reference/index.js").PipelineV1.Step, {kind: "extension"}>} */
   const slowStep = {
     id: 'slow',
     after: [],
@@ -198,6 +205,7 @@ test('Pipeline cancel-and-join aborts sibling managed steps; per-step timeout pr
       return fail('test.failure', 'Required branch failed');
     },
   });
+  /** @type {Extract<import("@slop-lab/part/reference/index.js").PipelineV1.Step, {kind: "extension"}>} */
   const failStep = {
     id: 'fail',
     after: [],
@@ -320,18 +328,19 @@ test('Generic workflow endpoint and default DOM show waits, invoke owner respons
     const textarea = /** @type {HTMLTextAreaElement} */ (
       view.element.querySelector('textarea[aria-label="JSON input for part.workflow/respond"]')
     );
+    /** @type {{ticketId: string, revision: string, response: boolean}} */
     const response = JSON.parse(expectProperty(textarea, 'value'));
     response.response = true;
     textarea.value = JSON.stringify(response);
     textarea.dispatchEvent(new window.Event('input'));
-    textarea
-      .closest('form')
-      .dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+    present(textarea.closest('form')).dispatchEvent(
+      new window.Event('submit', { bubbles: true, cancelable: true }),
+    );
     await until(() => view.element.textContent.includes('State: succeeded'));
     assert.equal(applied, 1);
     assert.ok(view.element.querySelector('[aria-label="Workflow result"]'));
     const item = controller.getItem(started.receipt.operation.id);
-    assert.equal(Object.hasOwn(Object(item.payload), 'nativeState'), false);
+    assert.equal(Object.hasOwn(Object(present(item).payload), 'nativeState'), false);
     assert.equal(
       (
         await endpoint.query(

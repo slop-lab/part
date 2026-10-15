@@ -1,9 +1,9 @@
 // @ts-check
 import { createHash } from 'node:crypto';
-import { npmSync } from './npm.mjs';
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { npmSync } from './npm.mjs';
 const destination = resolve('artifacts');
 mkdirSync(destination, { recursive: true });
 const result = npmSync(
@@ -22,7 +22,9 @@ const result = npmSync(
 );
 if (result.error) throw result.error;
 if (result.status !== 0) throw Error(result.stderr);
-for (const item of JSON.parse(result.stdout)) {
+/** @type {{name: string, version: string, filename: string, files: {path: string}[]}[]} */
+const packed = JSON.parse(result.stdout);
+for (const item of packed) {
   if (
     item.files.some(
       (file) =>

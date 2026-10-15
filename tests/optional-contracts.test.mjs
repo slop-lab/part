@@ -1,38 +1,39 @@
 // @ts-check
-import { expectProperty, json, stub } from '../fixtures/assertions.mjs';
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { Window } from 'happy-dom';
-import {
-  localContext,
-  jsonSchema,
-  schema,
-  ok,
-  fail,
-  digest,
-} from '@slop-lab/part/contracts/index.js';
-import { createMemoryStore } from '@slop-lab/part/storage/memory.js';
-import { createNamespaceMigrations } from '@slop-lab/part/storage/migrations.js';
-import { createCheckpointStore } from '@slop-lab/part-plugins/workflows/checkpoints.js';
-import { createNodeScripts } from '@slop-lab/part-node/scripts/index.js';
 import { createMarkdownView } from '@slop-lab/part-browser/markdown.js';
 import { createRendererRegistry, orderSlots } from '@slop-lab/part-browser/registry.js';
-import { createObservability } from '@slop-lab/part/runtime/observability.js';
-import { createHistory } from '@slop-lab/part/context/history.js';
-import { createChatHistoryAttachment } from '@slop-lab/part/context/run-history.js';
-import { createRunService, installDriver } from '@slop-lab/part/runtime/runs.js';
+import { createNodeScripts } from '@slop-lab/part-node/scripts/index.js';
 import { createBasicDriver } from '@slop-lab/part-plugins/agent/drivers/basic.js';
-import { createPlanner } from '@slop-lab/part/composition/index.js';
-import { createOperations, createBudget, budgetKey } from '@slop-lab/part/runtime/index.js';
-import { createModelGateway } from '@slop-lab/part/model/index.js';
 import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
-import { createContextCompiler, provenance } from '@slop-lab/part/context/index.js';
+import { createCheckpointStore } from '@slop-lab/part-plugins/workflows/checkpoints.js';
 import { createRecipeEngine } from '@slop-lab/part-plugins/workflows/recipe.js';
+import { createPlanner } from '@slop-lab/part/composition/index.js';
+import { createHistory } from '@slop-lab/part/context/history.js';
+import { createContextCompiler } from '@slop-lab/part/context/index.js';
+import { createChatHistoryAttachment } from '@slop-lab/part/context/run-history.js';
+import {
+  digest,
+  fail,
+  jsonSchema,
+  localContext,
+  ok,
+  schema,
+} from '@slop-lab/part/contracts/index.js';
+import { createModelGateway } from '@slop-lab/part/model/index.js';
+import { createOperations } from '@slop-lab/part/runtime/index.js';
+import { createObservability } from '@slop-lab/part/runtime/observability.js';
+import { createRunService, installDriver } from '@slop-lab/part/runtime/runs.js';
+import { createMemoryStore } from '@slop-lab/part/storage/memory.js';
+import { createNamespaceMigrations } from '@slop-lab/part/storage/migrations.js';
+import { Window } from 'happy-dom';
+import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import test from 'node:test';
+import { expectProperty, json, present, stub } from '../fixtures/assertions.mjs';
 const context = localContext();
-const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+const delay = /** @param {number} ms */ (ms) => new Promise((r) => setTimeout(r, ms));
+/** @template T @param {T} result @returns {import("@slop-lab/part/reference/index.js").Runtime.ManagedOutcome<T>} */
 const outcome = (result) => ({
   phase: /** @type {const} */ ('completed'),
   result,
@@ -44,6 +45,7 @@ test('Versioned result channel separates stdout logs/progress and rejects partia
   const root = await mkdtemp(join(tmpdir(), 'part-channel-'));
   try {
     const source = `const fs=require('fs'); console.log('diagnostic'); fs.writeSync(3,JSON.stringify({protocolVersion:1,channelId:'result',kind:'progress',payload:{step:1}})+'\\n'); fs.writeSync(3,JSON.stringify({protocolVersion:1,channelId:'result',kind:'result',payload:{ok:true}})+'\\n');`;
+    /** @param {string} body */
     const run = async (body) => {
       await writeFile(join(root, 'source.cjs'), body);
       const scripts = createNodeScripts({ root, interpreters: { node: process.execPath } });
@@ -99,7 +101,10 @@ test('Namespace migration publishes atomically and failed transformations leave 
   const migrated = schema(
     'test/migrated',
     /** @param {unknown} value @returns {value is {next: number}} */ (value) =>
-      value && typeof expectProperty(value, 'next') === 'number',
+      value !== null &&
+      typeof value === 'object' &&
+      'next' in value &&
+      typeof value.next === 'number',
   );
   const bad = createNamespaceMigrations(store, {
     namespace: address.namespace,
@@ -117,7 +122,10 @@ test('Namespace migration publishes atomically and failed transformations leave 
   });
   assert.equal((await bad.read(address, context)).ok, false);
   assert.equal((await bad.migrate([address], context)).ok, false);
-  assert.equal(expectProperty(await store.read(address, context), 'value').value.schemaVersion, 1);
+  assert.equal(
+    present(expectProperty(await store.read(address, context), 'value')).value.schemaVersion,
+    1,
+  );
   const good = createNamespaceMigrations(store, {
     namespace: address.namespace,
     owner: 'test',
@@ -133,9 +141,12 @@ test('Namespace migration publishes atomically and failed transformations leave 
     ],
   });
   assert.equal((await good.migrate([address], context)).ok, true);
-  assert.deepEqual(expectProperty(await good.read(address, context), 'value').value.value, {
-    next: 1,
-  });
+  assert.deepEqual(
+    present(expectProperty(await good.read(address, context), 'value')).value.value,
+    {
+      next: 1,
+    },
+  );
 });
 test('Checkpoint storage binds engine/definition, enforces CAS and keeps native scheduling with its owner', async () => {
   const checkpoints = createCheckpointStore(createMemoryStore());
@@ -153,7 +164,7 @@ test('Checkpoint storage binds engine/definition, enforces CAS and keeps native 
   const created = await checkpoints.commit('absent', checkpoint, context);
   assert.equal(created.ok, true);
   const read = await checkpoints.read(ref, context);
-  assert.equal(expectProperty(read, 'value').revision, created.value.revision);
+  assert.equal(present(expectProperty(read, 'value')).revision, created.value.revision);
   assert.equal((await checkpoints.commit('absent', checkpoint, context)).ok, false);
   assert.equal(
     (
@@ -197,6 +208,7 @@ test('Safe Markdown caches completed blocks and renderer/slot registries enforce
     ).id,
     'app',
   );
+  /** @param {string} id */
   const slot = (id) => ({ id, slot: 'composer.actions', render: () => null });
   assert.deepEqual(
     expectProperty(orderSlots([{ ...slot('a'), after: ['b'] }, slot('b')]), 'value').map(
@@ -349,7 +361,8 @@ test('Run history attachment appends immutable messages, rejects stale heads and
     context,
   );
   assert.equal((await expectProperty(second, 'value').done).phase, 'completed');
-  const messages = JSON.parse(new TextDecoder().decode(model.requests[1].body)).messages;
+  /** @type {{content: string}[]} */
+  const messages = JSON.parse(new TextDecoder().decode(present(model.requests[1]).body)).messages;
   assert.deepEqual(
     messages.map((m) => m.content),
     ['first input', 'first response', 'second input'],
@@ -384,7 +397,10 @@ test('Recipe retries explicit read-only validation, but never retries failed or 
     maxAttempts: 2,
     retry: 'read-only-validation',
   };
-  const composition = stub({ localToken: {}, inspection: { revision: '1' } });
+  const composition = expectProperty(
+    createPlanner().resolve({ components: [], config: {} }),
+    'value',
+  );
   const operations = createOperations();
   const engine = expectProperty(
     createRecipeEngine({
@@ -394,6 +410,7 @@ test('Recipe retries explicit read-only validation, but never retries failed or 
       services: {
         operations,
         runs: stub({
+          /** @param {import("@slop-lab/part/reference/index.js").Runtime.RunRequest<unknown>} _request @param {import("@slop-lab/part/reference/index.js").Contracts.InvocationContext} c */
           start: (_request, c) =>
             operations.begin(
               { kind: 'part/run', childPolicy: 'attached', retryOwner: 'test' },
@@ -588,7 +605,7 @@ test('DOM components, ordered slots, inspector and artifact viewers use only pub
   assert.equal(custom, 1);
   assert.ok(chat.element.textContent.indexOf('first') < chat.element.textContent.indexOf('last'));
   assert.equal(reads, 0);
-  inspector.element.querySelector('button').click();
+  present(inspector.element.querySelector('button')).click();
   await delay(1);
   assert.equal(reads, 1);
   assert.equal(inspector.element.querySelector('script'), null);
@@ -640,7 +657,7 @@ test('Script source/workspace resolvers pin packaged bytes and capture only decl
     assert.equal(
       (
         await scripts.execute(
-          { ...request, workspace: { ...request.workspace, id: 'denied' } },
+          { ...request, workspace: { ...present(request.workspace), id: 'denied' } },
           context,
         )
       ).ok,
@@ -655,6 +672,7 @@ test('Script source/workspace resolvers pin packaged bytes and capture only decl
       ).ok,
       false,
     );
+    // @ts-expect-error Deliberately invalid request must fail runtime validation.
     assert.equal((await scripts.execute(null, context)).ok, false);
   } finally {
     await rm(root, { recursive: true, force: true });

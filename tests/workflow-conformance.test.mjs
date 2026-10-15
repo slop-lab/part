@@ -1,27 +1,29 @@
 // @ts-check
-import { stub, expectProperty, json } from '../fixtures/assertions.mjs';
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { localContext, ok, fail, jsonSchema, digest } from '@slop-lab/part/contracts/index.js';
-import { createOperations, createBudget, budgetKey } from '@slop-lab/part/runtime/index.js';
-import { createPlanner } from '@slop-lab/part/composition/index.js';
-import { createBasicDriver } from '@slop-lab/part-plugins/agent/drivers/basic.js';
-import { createRunService, installDriver } from '@slop-lab/part/runtime/runs.js';
-import { createModelGateway } from '@slop-lab/part/model/index.js';
-import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
-import { createContextCompiler } from '@slop-lab/part/context/index.js';
 import { createNodeScripts } from '@slop-lab/part-node/scripts/index.js';
-import { createResults } from '@slop-lab/part/results/index.js';
-import { createSuspensions } from '@slop-lab/part/runtime/waits.js';
+import { createBasicDriver } from '@slop-lab/part-plugins/agent/drivers/basic.js';
+import { createScriptHooks } from '@slop-lab/part-plugins/extensions/hooks.js';
+import { createScriptBridge } from '@slop-lab/part-plugins/scripts/bridge/index.js';
+import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
 import { createCodeEngine, defineCodeWorkflow } from '@slop-lab/part-plugins/workflows/code.js';
 import { callIdentity } from '@slop-lab/part-plugins/workflows/memory/index.js';
-import { createScriptBridge } from '@slop-lab/part-plugins/scripts/bridge/index.js';
-import { createScriptHooks } from '@slop-lab/part-plugins/extensions/hooks.js';
+import { createPlanner } from '@slop-lab/part/composition/index.js';
+import { createContextCompiler } from '@slop-lab/part/context/index.js';
+import { digest, fail, jsonSchema, localContext, ok } from '@slop-lab/part/contracts/index.js';
+import { createModelGateway } from '@slop-lab/part/model/index.js';
+import { createResults } from '@slop-lab/part/results/index.js';
+import { budgetKey, createBudget, createOperations } from '@slop-lab/part/runtime/index.js';
+import { createRunService, installDriver } from '@slop-lab/part/runtime/runs.js';
+import { createSuspensions } from '@slop-lab/part/runtime/waits.js';
+import assert from 'node:assert/strict';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import test from 'node:test';
+import { expectProperty, json, present, stub } from '../fixtures/assertions.mjs';
+import { singleService } from '../fixtures/contracts.mjs';
 const context = localContext();
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const delay = /** @param {number} ms */ (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+/** @param {() => boolean | Promise<boolean>} predicate */
 async function until(predicate) {
   for (let i = 0; i < 300; i++) {
     if (await predicate()) return;
@@ -119,7 +121,7 @@ test('GW03/GW06: actual script -> managed child agent -> typed result -> approva
       retry: 'never',
     };
     const composed = composition();
-    /** @type {import('@slop-lab/part/reference/index.js').Runtime.WaitTicket} */
+    /** @type {import('@slop-lab/part/reference/index.js').Runtime.WaitTicket | undefined} */
     let ticket;
     let applied = 0;
     const code = await defineCodeWorkflow({
@@ -148,6 +150,11 @@ test('GW03/GW06: actual script -> managed child agent -> typed result -> approva
           request,
         );
         if (review.phase !== 'completed') return fail('test.agent', 'Agent failed');
+        const text = expectProperty(
+          expectProperty(expectProperty(review.result, 'content'), 0),
+          'text',
+        );
+        assert.ok(typeof text === 'string');
         /** @type {import('@slop-lab/part/reference/index.js').Results.Submission} */
         const submission = {
           submissionId: 'result',
@@ -155,7 +162,7 @@ test('GW03/GW06: actual script -> managed child agent -> typed result -> approva
           data: {
             kind: 'inline',
             value: {
-              text: expectProperty(expectProperty(review.result, 'content')[0], 'text'),
+              text,
               input,
             },
           },
@@ -335,19 +342,28 @@ test('GW08: hook timeout/failure policies, matcher, scope and concurrent once ad
     assert.equal(reports.length, 1);
     assert.equal(expectProperty(await hooks.fire(point.id, 'match', context), 'value').length, 0);
     let executed = 0;
+    /** @type {Pick<import("@slop-lab/part/reference/index.js").Scripts.Service, "execute">} */
     const counting = {
       async execute() {
         executed++;
         await delay(5);
-        return ok({
-          done: Promise.resolve({
-            phase: 'completed',
-            result: { exitCode: 0, captured: { kind: 'inline', value: { kind: 'allow' } } },
-            effect: 'not-applied',
-            commit: [],
-            unsettledChildren: [],
+        return ok(
+          stub({
+            done: Promise.resolve({
+              phase: 'completed',
+              result: {
+                exitCode: 0,
+                termination: 'exited',
+                completeness: 'complete',
+                executionDigest: 'fixture',
+                captured: { kind: 'inline', value: { kind: 'allow' } },
+              },
+              effect: 'not-applied',
+              commit: [],
+              unsettledChildren: [],
+            }),
           }),
-        });
+        );
       },
     };
     const once = expectProperty(createScriptHooks([point], stub(counting)), 'value');
@@ -375,11 +391,9 @@ test('GW09: bridge expiry/revocation propagate cancellation and never widen pare
   const owner = localContext({
     scope: { kind: 'runtime', id: 'bridge-owner' },
     signal: controller.signal,
-    services: stub({
-      get: (key) => (key.id === budgetKey.id ? ok(upstream) : fail('missing', 'Missing service')),
-    }),
+    services: singleService(budgetKey, upstream),
   });
-  /** @type {import('@slop-lab/part/reference/index.js').Runtime.ExecutionHandle<any>} */
+  /** @type {import('@slop-lab/part/reference/index.js').Runtime.ExecutionHandle<unknown> | undefined} */
   let child;
   const bridge = createScriptBridge({
     'run.start': {
@@ -490,16 +504,18 @@ test('Pinned pipeline skill binding contributes explicit user instructions and r
       snapshots = expectProperty(await source.discover([skillRoot], context), 'value'),
       skills = createSkills(source, snapshots);
     const descriptor = expectProperty(await skills.list(context), 'value')[0];
-    /** @type {import('@slop-lab/part/reference/index.js').Skills.Activation} */
+    /** @type {import('@slop-lab/part/reference/index.js').Skills.Activation | undefined} */
     let activated;
     let release = 0;
     const tracked = {
       list: skills.list,
+      /** @param {Parameters<typeof skills.activate>} args */
       async activate(...args) {
         const result = await skills.activate(args[0], args[1]);
         if (result.ok) activated = result.value;
         return result;
       },
+      /** @param {Parameters<typeof skills.deactivate>} args */
       async deactivate(...args) {
         release++;
         return skills.deactivate(args[0], args[1]);
@@ -549,7 +565,7 @@ test('Pinned pipeline skill binding contributes explicit user instructions and r
           kind: 'agent',
           profile: 'local',
           input: { input: '' },
-          skills: [{ id: descriptor.id, digest: descriptor.package.digest }],
+          skills: [{ id: present(descriptor).id, digest: present(descriptor).package.digest }],
         },
       ],
       result: { step: 'agent', pointer: '' },
@@ -607,7 +623,8 @@ test('Pinned pipeline skill binding contributes explicit user instructions and r
     assert.equal(release, 1);
     assert.ok(activated);
     assert.equal((await skills.deactivate(activated.id, context)).ok, false);
-    const messages = JSON.parse(new TextDecoder().decode(model.requests[0].body)).messages;
+    /** @type {{role: string, content: string}[]} */
+    const messages = JSON.parse(new TextDecoder().decode(present(model.requests[0]).body)).messages;
     assert.ok(
       messages.some(
         (message) =>
@@ -678,7 +695,7 @@ test('Bridge service adapter executes the configured gateway and exposes only it
     };
     const receipt = await bridge.invoke(request, owner);
     assert.equal(receipt.kind, 'accepted');
-    /** @type {import('@slop-lab/part/reference/index.js').Contracts.CommandReceipt<any>} */
+    /** @type {import('@slop-lab/part/reference/index.js').Contracts.CommandReceipt<import("@slop-lab/part/reference/index.js").Contracts.Json> | undefined} */
     let read;
     await until(async () => {
       read = await bridge.invoke(
@@ -690,10 +707,22 @@ test('Bridge service adapter executes the configured gateway and exposes only it
         },
         owner,
       );
-      return Object.hasOwn(expectProperty(read, 'result'), 'outcome');
+      return Object.hasOwn(Object(expectProperty(read, 'result')), 'outcome');
     });
     assert.ok(read);
-    assert.equal(expectProperty(read, 'result').outcome.result.content[0].text, 'bridge response');
+    assert.equal(
+      expectProperty(
+        expectProperty(
+          expectProperty(
+            expectProperty(expectProperty(expectProperty(read, 'result'), 'outcome'), 'result'),
+            'content',
+          ),
+          0,
+        ),
+        'text',
+      ),
+      'bridge response',
+    );
     assert.equal(model.requests.length, 1);
     const foreign = localContext({ scope: { kind: 'runtime', id: 'different-root' } });
     const other = expectProperty(

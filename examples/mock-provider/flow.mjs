@@ -1,12 +1,14 @@
 // @ts-check
-import { expectProperty } from '../../fixtures/assertions.mjs';
 import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
 import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible/index.js';
+import { schema, stringSchema } from '@slop-lab/part/contracts/index.js';
 import { bearerAuth, createFetchTransport } from '@slop-lab/part/model/index.js';
 import { functionTool } from '@slop-lab/part/tools.js';
-import { schema, stringSchema } from '@slop-lab/part/contracts/index.js';
+import { expectProperty } from '../../fixtures/assertions.mjs';
 export const prompt = 'Uppercase hello using the uppercase tool.';
+/** @param {import("@slop-lab/part-node/testing/mock-provider/index.js").MockSession} session */
 export function createMockFlow(session) {
+  /** @type {{tool: string, input: {text: string}, output: string}[]} */
   const toolExecutions = [];
   const agent = createAgent({
     model: {

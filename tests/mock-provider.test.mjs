@@ -1,29 +1,32 @@
 // @ts-check
-import { expectProperty, stub } from '../fixtures/assertions.mjs';
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { readFile, mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { spawn, execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import { parseObject, parseJSON } from '../fixtures/contracts.mjs';
 import {
-  startMockProvider,
   createMockProviderClient,
-  readMockSession,
   readFixture,
+  readMockSession,
+  startMockProvider,
 } from '@slop-lab/part-node/testing/mock-provider/index.js';
 import { createMockProviderTools } from '@slop-lab/part-node/testing/mock-provider/tools.js';
 import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible/index.js';
-import { createToolDispatcher } from '@slop-lab/part/tools.js';
 import { localContext } from '@slop-lab/part/contracts/index.js';
+import { createToolDispatcher } from '@slop-lab/part/tools.js';
+import assert from 'node:assert/strict';
+import { execFile, spawn } from 'node:child_process';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import test from 'node:test';
+import { promisify } from 'node:util';
 import { createMockFlow } from '../examples/mock-provider/flow.mjs';
+import { expectProperty, present, stub } from '../fixtures/assertions.mjs';
+/** @param {string} name */
 const load = async (name) =>
-  JSON.parse(await readFile(new URL(`../fixtures/mock-provider/${name}`, import.meta.url), 'utf8'));
+  parseJSON(await readFile(new URL(`../fixtures/mock-provider/${name}`, import.meta.url), 'utf8'));
 const project = { id: 'part/mock-tool-flow' };
 const request = { model: 'part-mock', messages: [{ role: 'user', content: 'hello' }] };
 /** @type {import('@slop-lab/part-node/testing/mock-provider/index.js').MockReply} */
 const answer = { kind: 'completion', content: 'hello' };
+/** @param {import("@slop-lab/part-node/testing/mock-provider/index.js").MockSession} session @param {import("@slop-lab/part-node/testing/mock-provider/index.js").MockChatRequest} body @param {AbortSignal} [signal] */
 const post = (session, body = request, signal) =>
   fetch(`${session.baseURL}/chat/completions`, {
     method: 'POST',
@@ -31,11 +34,13 @@ const post = (session, body = request, signal) =>
     body: JSON.stringify(body),
     signal,
   });
+/** @param {import("@slop-lab/part-node/testing/mock-provider/index.js").MockProviderClient} client */
 async function pending(client) {
   const records = await client.pending(1000);
   assert.ok(records.length);
   return records[0];
 }
+/** @param {import("@slop-lab/part/reference/index.js").Tools.Dispatcher} dispatcher @param {string} id @param {import("@slop-lab/part/reference/index.js").Contracts.Json} args */
 async function dispatch(dispatcher, id, args) {
   const started = await dispatcher.dispatch(
     {
@@ -87,20 +92,20 @@ test('Interactive requests wait for project-bound operator tools; full tool flow
     });
     const first = await pending(client);
     assert.equal(settled, false);
-    assert.deepEqual(first.project, project);
+    assert.deepEqual(present(first).project, project);
     const inspection = await dispatch(created.value, 'mock_provider_inspect', {
-      requestId: first.id,
+      requestId: present(first).id,
     });
-    assert.equal(inspection.request.model, 'part-mock');
+    assert.equal(expectProperty(expectProperty(inspection, 'request'), 'model'), 'part-mock');
     await dispatch(created.value, 'mock_provider_respond', {
-      requestId: first.id,
+      requestId: present(first).id,
       decisionId: 'operator/choose-uppercase-tool',
       reply: await load('choose-tool.reply.json'),
     });
     const second = await pending(client);
-    assert.equal(second.request.messages.at(-1).role, 'tool');
+    assert.equal(expectProperty(present(second).request.messages.at(-1), 'role'), 'tool');
     await dispatch(created.value, 'mock_provider_respond', {
-      requestId: second.id,
+      requestId: present(second).id,
       decisionId: 'operator/summarize-tool-result',
       reply: await load('final.reply.json'),
     });
@@ -163,13 +168,13 @@ test('Control and model credentials are separate; decisions are correlated and i
       () => client.respond(record.id, 'decision', { kind: 'completion', content: 7 }),
       /400/,
     );
-    const first = await client.respond(record.id, 'decision', answer);
-    assert.deepEqual(await client.respond(record.id, 'decision', answer), first);
+    const first = await client.respond(present(record).id, 'decision', answer);
+    assert.deepEqual(await client.respond(present(record).id, 'decision', answer), first);
     await assert.rejects(
-      () => client.respond(record.id, 'decision', { ...answer, content: 'changed' }),
+      () => client.respond(present(record).id, 'decision', { ...answer, content: 'changed' }),
       /409/,
     );
-    await assert.rejects(() => client.respond(record.id, 'different', answer), /409/);
+    await assert.rejects(() => client.respond(present(record).id, 'different', answer), /409/);
     assert.equal((await (await running).json()).choices[0].message.content, 'hello');
     await client.verify();
     assert.throws(
@@ -193,19 +198,19 @@ test('Concurrent interactive responses stay with their request IDs; shutdown rel
       await new Promise((resolve) => setTimeout(resolve, 5));
     const records = await client.pending();
     assert.equal(records.length, 2);
-    await client.respond(records[1].id, 'second', {
+    await client.respond(present(records[1]).id, 'second', {
       kind: 'completion',
       content: 'second response',
     });
-    await client.respond(records[0].id, 'first', answer);
+    await client.respond(present(records[0]).id, 'first', answer);
     assert.equal((await (await first).json()).choices[0].message.content, 'hello');
     assert.equal((await (await second).json()).choices[0].message.content, 'second response');
     const third = post(provider.session);
     const record = await pending(client);
     await provider.close();
     assert.equal((await third).status, 503);
-    assert.equal(provider.inspect(record.id).state, 'closed');
-    assert.throws(() => provider.respond(record.id, 'late', answer), /closed/);
+    assert.equal(provider.inspect(present(record).id).state, 'closed');
+    assert.throws(() => provider.respond(present(record).id, 'late', answer), /closed/);
   } finally {
     await provider.close();
   }
@@ -225,15 +230,15 @@ test('Disconnect, timeout, capacity and malformed requests remain explicit and c
     const record = await pending(client);
     abort.abort();
     await cancelled;
-    for (let n = 0; provider.inspect(record.id).state === 'pending' && n < 50; n++)
+    for (let n = 0; provider.inspect(present(record).id).state === 'pending' && n < 50; n++)
       await new Promise((resolve) => setTimeout(resolve, 5));
-    assert.equal(provider.inspect(record.id).state, 'cancelled');
-    assert.throws(() => provider.respond(record.id, 'late', answer), /cancelled/);
+    assert.equal(provider.inspect(present(record).id).state, 'cancelled');
+    assert.throws(() => provider.respond(present(record).id, 'late', answer), /cancelled/);
     const timed = post(provider.session);
     const timeoutRecord = await pending(client);
     assert.equal((await post(provider.session)).status, 503);
     assert.equal((await timed).status, 504);
-    assert.equal(provider.inspect(timeoutRecord.id).state, 'timed-out');
+    assert.equal(provider.inspect(present(timeoutRecord).id).state, 'timed-out');
     assert.throws(() => provider.verify(), /verification/);
     assert.equal((await post(provider.session, { ...request, n: 2 })).status, 400);
     assert.equal(
@@ -251,6 +256,7 @@ test('Disconnect, timeout, capacity and malformed requests remain explicit and c
 });
 test('JSON and SSE replies support function calls and Unicode; malformed or truncated streams fail closed', async () => {
   const adapter = createOpenAICompatibleAdapter();
+  /** @param {import("@slop-lab/part/reference/index.js").Contracts.Json} delta @param {string | null} finish_reason */
   const event = (delta, finish_reason = null) => ({
     id: 'c',
     object: 'chat.completion.chunk',
@@ -283,7 +289,7 @@ test('JSON and SSE replies support function calls and Unicode; malformed or trun
   const result = decoder.finish();
   assert.equal(result.ok, true);
   assert.equal(expectProperty(result.value.content[0], 'text'), 'snowman ☃');
-  assert.deepEqual(result.value.toolCalls[0].arguments, { text: 'hello' });
+  assert.deepEqual(present(result.value.toolCalls[0]).arguments, { text: 'hello' });
   const partial = expectProperty(
     adapter.createDecoder({ headers: { 'content-type': 'text/event-stream' } }),
     'value',
@@ -327,8 +333,9 @@ test('CLI starts a session, exposes pending requests, accepts a chosen reply and
   });
   child.stdout.resume();
   const exited = new Promise((resolve) => child.on('exit', (code) => resolve(code)));
+  /** @param {string[]} args */
   const run = async (...args) =>
-    JSON.parse(
+    parseJSON(
       (await promisify(execFile)(process.execPath, [cli, ...args, '--session', sessionPath]))
         .stdout,
     );
@@ -336,7 +343,7 @@ test('CLI starts a session, exposes pending requests, accepts a chosen reply and
     let session;
     for (let n = 0; !session && n < 100; n++) {
       try {
-        session = JSON.parse(await readFile(sessionPath, 'utf8'));
+        session = readMockSession(parseJSON(await readFile(sessionPath, 'utf8')));
       } catch {
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
@@ -344,20 +351,20 @@ test('CLI starts a session, exposes pending requests, accepts a chosen reply and
     assert.ok(session, stderr);
     const running = post(session);
     const records = await run('pending', '--wait-ms', '1000');
-    assert.equal(records[0].project.id, 'cli/project');
-    await run(
-      'respond',
-      '--id',
-      records[0].id,
-      '--decision-id',
-      'cli/answer',
-      '--text',
-      'chosen by operator',
-    );
+    assert.ok(Array.isArray(records));
+    const record = present(records[0]);
+    assert.equal(expectProperty(expectProperty(record, 'project'), 'id'), 'cli/project');
+    const id = expectProperty(record, 'id');
+    assert.ok(typeof id === 'string');
+    await run('respond', '--id', id, '--decision-id', 'cli/answer', '--text', 'chosen by operator');
     assert.equal((await (await running).json()).choices[0].message.content, 'chosen by operator');
     assert.deepEqual(await run('verify'), { ok: true });
     const frozen = await run('fixture');
-    const replay = await startMockProvider({ mode: 'fixed', project, fixture: frozen });
+    const replay = await startMockProvider({
+      mode: 'fixed',
+      project,
+      fixture: readFixture(frozen),
+    });
     try {
       assert.equal(
         (await (await post(replay.session)).json()).choices[0].message.content,
@@ -427,11 +434,15 @@ test('Body/output bounds reject invalid decisions without consuming the pending 
     const running = post(provider.session);
     const record = await pending(client);
     assert.throws(
-      () => provider.respond(record.id, 'large', { kind: 'completion', content: 'x'.repeat(1000) }),
+      () =>
+        provider.respond(present(record).id, 'large', {
+          kind: 'completion',
+          content: 'x'.repeat(1000),
+        }),
       /byte limit/,
     );
-    assert.equal(provider.inspect(record.id).state, 'pending');
-    await client.respond(record.id, 'small', answer);
+    assert.equal(provider.inspect(present(record).id).state, 'pending');
+    await client.respond(present(record).id, 'small', answer);
     assert.equal((await running).status, 200);
     await client.verify();
   } finally {
@@ -447,7 +458,7 @@ test('Non-streaming OpenAI requests omit stream-only options while SSE requests 
       stub({ model: 'part-mock', defaults: { stream } }),
     );
     assert.equal(encoded.ok, true);
-    const body = JSON.parse(new TextDecoder().decode(encoded.value.body));
+    const body = parseObject(new TextDecoder().decode(encoded.value.body));
     assert.equal(body.stream, stream);
     assert.deepEqual(body.stream_options, stream ? { include_usage: true } : undefined);
   }

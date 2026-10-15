@@ -1,6 +1,7 @@
 // @ts-check
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
+import { readPackageMetadata } from './package-metadata.mjs';
 
 /** @param {string} directory @returns {string[]} */
 export function packageFiles(directory) {
@@ -35,13 +36,13 @@ export function copyPackageAssets(directory) {
  * @param {string} directory Workspace package root.
  */
 export function writePackageMetadata(directory) {
-  const { scripts, devDependencies, workspaces, exports, files, bin, ...metadata } = JSON.parse(
-    readFileSync(join(directory, 'package.json'), 'utf8'),
-  );
+  const { scripts, devDependencies, workspaces, exports, files, bin, ...metadata } =
+    readPackageMetadata(join(directory, 'package.json'));
   const output = join(directory, 'dist');
   const root = existsSync(join(output, 'index.js'))
     ? { '.': { types: './index.d.ts', default: './index.js' } }
     : {};
+  /** @param {string} path */
   const rewriteBin = (path) => {
     if (!path.startsWith('./dist/')) throw Error(`Package executable must live in dist: ${path}`);
     return './' + path.slice('./dist/'.length);

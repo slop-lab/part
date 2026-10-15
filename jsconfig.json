@@ -6,10 +6,13 @@
     "allowJs": true,
     "checkJs": true,
     "noEmit": true,
-    "strict": false,
-    "skipLibCheck": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": false,
     "types": ["node"],
-    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+    "lib": ["ES2024", "DOM", "DOM.Iterable", "DOM.AsyncIterable"],
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": [
     "scripts/**/*.js",

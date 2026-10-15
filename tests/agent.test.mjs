@@ -1,20 +1,20 @@
 // @ts-check
-import { expectProperty } from '../fixtures/assertions.mjs';
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { createAgent, contextPoint } from '@slop-lab/part-plugins/agent/index.js';
-import { functionTool } from '@slop-lab/part/tools.js';
-import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
-import { schema, stringSchema, ok, fail } from '@slop-lab/part/contracts/index.js';
 import {
   createBasicDriver,
   createValidatingDriver,
 } from '@slop-lab/part-plugins/agent/drivers/basic.js';
+import { contextPoint, createAgent } from '@slop-lab/part-plugins/agent/index.js';
+import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
 import { createContextCompiler } from '@slop-lab/part/context/index.js';
+import { fail, ok, schema, stringSchema } from '@slop-lab/part/contracts/index.js';
+import { functionTool } from '@slop-lab/part/tools.js';
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { expectProperty, present } from '../fixtures/assertions.mjs';
 const input = schema(
   'test/text',
   /** @param {unknown} v @returns {v is {text: string}} */ (v) =>
-    v && typeof v === 'object' && 'text' in v && typeof v.text === 'string',
+    v !== null && typeof v === 'object' && 'text' in v && typeof v.text === 'string',
 );
 const toolSchemas = {
   echo: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] },
@@ -49,9 +49,10 @@ test('G02: minimal non-coding input -> model -> function tool -> result', async 
   assert.equal(expectProperty(result.value.result.content[0], 'text'), 'finished');
   assert.equal(count, 1);
   assert.equal(model.requests.length, 2);
-  const second = JSON.parse(new TextDecoder().decode(model.requests[1].body));
-  assert.equal(second.messages.at(-1).role, 'tool');
-  assert.equal(second.messages.at(-1).content, '"hello"');
+  /** @type {{messages: {role: string, content: string}[]}} */
+  const second = JSON.parse(new TextDecoder().decode(present(model.requests[1]).body));
+  assert.equal(present(second.messages.at(-1)).role, 'tool');
+  assert.equal(present(second.messages.at(-1)).content, '"hello"');
   await agent.dispose();
 });
 test('C02/C08: runtime configuration and model request histories remain isolated', async () => {
@@ -71,7 +72,10 @@ test('C02/C08: runtime configuration and model request histories remain isolated
     expectProperty(expectProperty(expectProperty(r, 'value'), 'result').content[0], 'text'),
     'right',
   );
-  assert.equal(JSON.parse(new TextDecoder().decode(left.requests[0].body)).model, 'fixture');
+  assert.equal(
+    JSON.parse(new TextDecoder().decode(present(left.requests[0]).body)).model,
+    'fixture',
+  );
   assert.equal(a.inspectComposition().revision, revision);
   await Promise.all([a.dispose(), b.dispose()]);
 });
@@ -85,13 +89,17 @@ test('G08/E11: a second driver can reject completion after provider stop', async
   const agent = expectProperty(createAgent({ model, driver }), 'value');
   const result = await agent.generate('input');
   assert.equal(expectProperty(result, 'value').phase, 'failed');
-  assert.equal(expectProperty(expectProperty(result, 'value'), 'error').code, 'part.validator');
+  assert.equal(
+    present(expectProperty(expectProperty(result, 'value'), 'error')).code,
+    'part.validator',
+  );
   await agent.dispose();
 });
 test('G06/G07: replacing the middle context service preserves the convenience agent', async () => {
   let calls = 0;
   const original = expectProperty(createContextCompiler(), 'value'),
     replacement = {
+      /** @param {Parameters<typeof original.compile>} args */
       compile: async (...args) => {
         calls++;
         return original.compile(args[0], args[1]);
@@ -194,7 +202,7 @@ test('C07: preset and expanded manual composition execute through the same publi
   );
   assert.equal(
     expectProperty(
-      expectProperty(expectProperty(await handle.done, 'result'), 'content')[0],
+      expectProperty(expectProperty(expectProperty(await handle.done, 'result'), 'content'), 0),
       'text',
     ),
     expectProperty(
@@ -210,7 +218,7 @@ test('C07: preset and expanded manual composition execute through the same publi
 test('C09: context-owned registry accepts a new semantic type without replacing the compiler', async () => {
   const { lowerersPoint } = await import('@slop-lab/part/context/index.js');
   const { emptyCleanup } = await import('@slop-lab/part/contracts/index.js');
-  /** @type {import('@slop-lab/part/reference/index.js').Context.Lowerer} */
+  /** @type {import('@slop-lab/part/reference/index.js').Context.Lowerer<unknown>} */
   const lowerer = {
     id: 'third-party/lowerer',
     accepts: { id: 'third-party/item', version: 1 },
@@ -262,7 +270,7 @@ test('C09: context-owned registry accepts a new semantic type without replacing 
   ]);
   assert.equal(expectProperty(result, 'value').phase, 'completed');
   assert.equal(
-    JSON.parse(new TextDecoder().decode(model.requests[0].body)).messages[0].content,
+    JSON.parse(new TextDecoder().decode(present(model.requests[0]).body)).messages[0].content,
     'third-party',
   );
   await agent.dispose();

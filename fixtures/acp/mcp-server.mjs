@@ -1,10 +1,13 @@
 // @ts-check
-import { createInterface } from 'node:readline';
+import assert from 'node:assert/strict';
 import { appendFileSync } from 'node:fs';
+import { createInterface } from 'node:readline';
 const lines = createInterface({ input: process.stdin });
 for await (const line of lines) {
+  /** @type {unknown} */
   const message = JSON.parse(line);
-  if (!Object.hasOwn(message, 'id')) continue;
+  assert.ok(message !== null && typeof message === 'object');
+  if (!('id' in message) || !('method' in message)) continue;
   let result;
   if (message.method === 'initialize')
     result = {
@@ -30,7 +33,13 @@ for await (const line of lines) {
     };
   if (message.method === 'tools/call') {
     if (process.env.PART_MCP_MARKER) appendFileSync(process.env.PART_MCP_MARKER, 'called\n');
-    const text = message.params.arguments.text.toUpperCase();
+    assert.ok('params' in message && message.params !== null && typeof message.params === 'object');
+    const params = message.params;
+    assert.ok(
+      'arguments' in params && params.arguments !== null && typeof params.arguments === 'object',
+    );
+    assert.ok('text' in params.arguments && typeof params.arguments.text === 'string');
+    const text = params.arguments.text.toUpperCase();
     result = {
       content: [{ type: 'text', text }],
       structuredContent: { result: text, hostSecretPresent: !!process.env.PART_MCP_NOT_INHERITED },

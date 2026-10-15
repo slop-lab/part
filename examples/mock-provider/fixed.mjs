@@ -1,8 +1,9 @@
 // @ts-check
+import { readFixture, startMockProvider } from '@slop-lab/part-node/testing/mock-provider/index.js';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { startMockProvider, readFixture } from '@slop-lab/part-node/testing/mock-provider/index.js';
 import { createMockFlow } from './flow.mjs';
+/** @param {string} name */
 const load = async (name) =>
   JSON.parse(
     await readFile(new URL(`../../fixtures/mock-provider/${name}`, import.meta.url), 'utf8'),

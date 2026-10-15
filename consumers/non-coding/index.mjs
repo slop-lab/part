@@ -1,15 +1,18 @@
 // @ts-check
-import { expectProperty } from '../../fixtures/assertions.mjs';
-import assert from 'node:assert/strict';
-import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
 import { createAcpAgent } from '@slop-lab/part-plugins/acp/index.js';
-import { functionTool } from '@slop-lab/part/tools.js';
-import { schema, stringSchema } from '@slop-lab/part/contracts/index.js';
+import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
 import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
+import { schema, stringSchema } from '@slop-lab/part/contracts/index.js';
+import { functionTool } from '@slop-lab/part/tools.js';
+import assert from 'node:assert/strict';
+import { expectProperty } from '../../fixtures/assertions.mjs';
 const input = schema(
   'consumer/text',
   /** @param {unknown} value @returns {value is {text: string}} */ (value) =>
-    value && typeof value === 'object' && 'text' in value && typeof value.text === 'string',
+    value !== null &&
+    typeof value === 'object' &&
+    'text' in value &&
+    typeof value.text === 'string',
 );
 const model = fakeModel([
   { toolCalls: [{ name: 'uppercase', arguments: { text: 'hello' } }] },
@@ -41,6 +44,7 @@ assert.equal(
   'HELLO',
 );
 await created.value.dispose();
+/** @type {{method: string, params: import("@slop-lab/part/reference/index.js").Contracts.Json}[]} */
 const updates = [];
 const acp = createAcpAgent({
   connection: {
@@ -66,7 +70,12 @@ assert.equal(
   'end_turn',
 );
 assert.equal(
-  updates.map((entry) => entry.params.update.content?.text ?? '').join(''),
+  updates
+    .map(({ params }) => {
+      const update = expectProperty(params, 'update');
+      return expectProperty(expectProperty(update, 'content'), 'text') ?? '';
+    })
+    .join(''),
   'Portable ACP',
 );
 const cleanup = await acp.close();

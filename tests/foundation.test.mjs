@@ -1,25 +1,27 @@
 // @ts-check
-import { stub, expectProperty } from '../fixtures/assertions.mjs';
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import {
-  localContext,
-  ok,
-  fail,
-  jsonSchema,
-  stringSchema,
-  canonical,
-} from '@slop-lab/part/contracts/index.js';
 import { createPlanner, createScopeManager } from '@slop-lab/part/composition/index.js';
 import {
-  createOperations,
+  canonical,
+  fail,
+  jsonSchema,
+  localContext,
+  ok,
+  stringSchema,
+} from '@slop-lab/part/contracts/index.js';
+import {
+  budgetKey,
   createBoundary,
-  managedAttempt,
   createBudget,
+  createOperations,
   createProgress,
+  managedAttempt,
 } from '@slop-lab/part/runtime/index.js';
 import { createSuspensions } from '@slop-lab/part/runtime/waits.js';
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { deferred, expectProperty, present } from '../fixtures/assertions.mjs';
+import { singleService } from '../fixtures/contracts.mjs';
+const delay = /** @param {number} ms */ (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 /** @template T @param {T} result @returns {import('@slop-lab/part/reference/index.js').Runtime.ManagedOutcome<T>} */
 const completed = (result) => ({
   phase: 'completed',
@@ -50,7 +52,14 @@ const point = {
   kind: 'registry',
   scope: 'runtime',
 };
-/** @returns {import('@slop-lab/part/reference/index.js').Composition.ComponentFactory} */
+/**
+ * @param {string} id
+ * @param {import('@slop-lab/part/reference/index.js').Composition.ComponentFactory['register']} register
+ * @param {import('@slop-lab/part/reference/index.js').Composition.ComponentDescriptor['requires']} requires
+ * @param {import('@slop-lab/part/reference/index.js').Composition.ComponentDescriptor['provides']} provides
+ * @param {Partial<import('@slop-lab/part/reference/index.js').Composition.ComponentLifecycle>} lifecycle
+ * @returns {import('@slop-lab/part/reference/index.js').Composition.ComponentFactory}
+ */
 const component = (id, register, requires = [], provides = [], lifecycle = {}) => ({
   descriptor: { id, version: '1', scope: 'runtime', surfaces: ['test'], requires, provides },
   register,
@@ -65,8 +74,10 @@ const component = (id, register, requires = [], provides = [], lifecycle = {}) =
 });
 
 test('X08: codecs reject lossy wire values, sparse arrays, custom array properties, and cycles', () => {
+  const codec = present(jsonSchema.codec);
   const cyclic = {};
   cyclic.self = cyclic;
+  /** @type {unknown[]} */
   const custom = [];
   Object.assign(custom, { secret: 'lost' });
   for (const value of [
@@ -82,9 +93,9 @@ test('X08: codecs reject lossy wire values, sparse arrays, custom array properti
     new AbortController().signal,
   ])
     // @ts-expect-error Invalid JSON values must be rejected by the codec.
-    assert.equal(jsonSchema.codec.encode(value).ok, false);
+    assert.equal(codec.encode(value).ok, false);
   const data = { z: [1, null], a: true };
-  assert.deepEqual(expectProperty(jsonSchema.codec.decode(data), 'value'), data);
+  assert.deepEqual(expectProperty(present(jsonSchema.codec).decode(data), 'value'), data);
   assert.equal(canonical(data), '{"a":true,"z":[1,null]}');
 });
 test('C03-C05: missing dependencies, duplicate keys, replacement, deterministic ordering and cycles', () => {
@@ -100,6 +111,7 @@ test('C03-C05: missing dependencies, duplicate keys, replacement, deterministic 
     }).ok,
     false,
   );
+  /** @type {import("@slop-lab/part/reference/index.js").Composition.ComponentFactory["register"]} */
   const register = (r) => {
     r.declare(point);
     r.contribute({ id: 'z', point: { ...point }, key: 'z', value: 1 });
@@ -108,7 +120,7 @@ test('C03-C05: missing dependencies, duplicate keys, replacement, deterministic 
   };
   const resolved = planner.resolve({ components: [component('a', register)], config: {} });
   assert.equal(resolved.ok, true);
-  assert.deepEqual(resolved.value.inspection.orderedBindings[0].contributions, ['z', 'a']);
+  assert.deepEqual(present(resolved.value.inspection.orderedBindings[0]).contributions, ['z', 'a']);
   assert.equal(
     planner.resolve({
       components: [component('a', register)],
@@ -155,8 +167,10 @@ test('C03-C05: missing dependencies, duplicate keys, replacement, deterministic 
   );
 });
 test('C06: initialization failure disposes created modules in reverse order', async () => {
+  /** @type {string[]} */
   const log = [],
-    cleanup = (id) => async () => {
+    /** @param {string} id */
+    cleanup = /** @param {string} id */ (id) => async () => {
       log.push(id);
       return { released: [], unresolved: [], errors: [] };
     };
@@ -177,7 +191,7 @@ test('E01-E02: execution proceeds without subscribers and closing observation do
   let count = 0;
   const created = await operations.begin(
     spec,
-    async (c) => {
+    async () => {
       await delay(10);
       count++;
       return completed(42);
@@ -185,6 +199,7 @@ test('E01-E02: execution proceeds without subscribers and closing observation do
     context,
   );
   const iterator = expectProperty(created, 'value').observe()[Symbol.asyncIterator]();
+  assert.ok(iterator.return);
   await iterator.return();
   assert.equal(expectProperty(await expectProperty(created, 'value').done, 'result'), 42);
   assert.equal(count, 1);
@@ -192,20 +207,16 @@ test('E01-E02: execution proceeds without subscribers and closing observation do
 });
 test('E04/E09: unacknowledged cancellation remains abandoned when late results arrive', async () => {
   const operations = createOperations({ cancellationGraceMs: 5 });
-  let /** @type {(...args: any[]) => void} */ release;
-  const created = await operations.begin(
-    spec,
-    () =>
-      new Promise((resolve) => {
-        release = resolve;
-      }),
-    context,
-  );
+  const gate =
+    /** @type {PromiseWithResolvers<import("@slop-lab/part/reference/index.js").Runtime.ManagedOutcome<number>>} */ (
+      deferred()
+    );
+  const created = await operations.begin(spec, () => gate.promise, context);
   await delay(0);
   await expectProperty(created, 'value').requestCancel('test');
   assert.equal((await expectProperty(created, 'value').done).phase, 'abandoned');
   assert.equal(expectProperty(created, 'value').snapshot().cancel.state, 'partial');
-  release(completed(1));
+  gate.resolve(completed(1));
   await delay(0);
   assert.equal(expectProperty(created, 'value').snapshot().phase, 'abandoned');
 });
@@ -228,13 +239,13 @@ test('E06: successful parents cannot leave uncooperative attached children', asy
   assert.equal((await expectProperty(parent, 'value').done).unsettledChildren.length, 1);
 });
 test('E07/E08/E10: prepare blocks execution and settle failure preserves applied effects', async () => {
-  let count = 0,
-    /** @type {(...args: any[]) => void} */ release;
+  let count = 0;
+  const gate =
+    /** @type {PromiseWithResolvers<import("@slop-lab/part/reference/index.js").Contracts.Result<void>>} */ (
+      deferred()
+    );
   const boundary = createBoundary({
-    prepare: () =>
-      new Promise((resolve) => {
-        release = resolve;
-      }),
+    prepare: () => gate.promise,
     settle: async () => fail('storage', 'Disk failed', 'internal'),
   });
   const pending = managedAttempt(
@@ -248,7 +259,7 @@ test('E07/E08/E10: prepare blocks execution and settle failure preserves applied
   );
   await delay(0);
   assert.equal(count, 0);
-  release(ok(undefined));
+  gate.resolve(ok(undefined));
   const result = await pending;
   assert.equal(count, 1);
   assert.equal(result.phase, 'failed');
@@ -339,13 +350,13 @@ test('synchronous composition hashing matches native SHA-256', async () => {
 test('E03: cancellation during awaited prepare prevents the next executor attempt', async () => {
   const controller = new AbortController(),
     c = localContext({ signal: controller.signal });
-  let /** @type {(...args: any[]) => void} */ release,
-    count = 0;
+  let count = 0;
+  const gate =
+    /** @type {PromiseWithResolvers<import("@slop-lab/part/reference/index.js").Contracts.Result<void>>} */ (
+      deferred()
+    );
   const boundary = createBoundary({
-    prepare: () =>
-      new Promise((resolve) => {
-        release = resolve;
-      }),
+    prepare: () => gate.promise,
   });
   const pending = managedAttempt(
     boundary,
@@ -358,7 +369,7 @@ test('E03: cancellation during awaited prepare prevents the next executor attemp
   );
   await delay(0);
   controller.abort();
-  release(ok(undefined));
+  gate.resolve(ok(undefined));
   const outcome = await pending;
   assert.equal(count, 0);
   assert.equal(outcome.effect, 'not-attempted');
@@ -366,7 +377,7 @@ test('E03: cancellation during awaited prepare prevents the next executor attemp
 test('E05: attached operations inherit deadlines and share concurrent reservations', async () => {
   const operations = createOperations(),
     budget = createBudget({ maxConcurrentOperations: 1 }),
-    c = localContext({ services: stub({ get: () => ok(budget) }) });
+    c = localContext({ services: singleService(budgetKey, budget) });
   let entered = 0;
   const first = expectProperty(
     await operations.begin(
@@ -442,7 +453,7 @@ test('factory replacement preserves dependent service construction and exposes c
       dependencies: [{ id: servicePoint.id, contractVersion: 1, scope: 'runtime' }],
       create: async (_config, c) =>
         ok({
-          value: c.services.get(servicePoint).value,
+          value: expectProperty(c.services.get(servicePoint), 'value'),
           dispose: async () => ({ released: [], unresolved: [], errors: [] }),
         }),
     });
@@ -512,7 +523,7 @@ test('E05: a child cannot widen its parent deadline', async () => {
 test('Attached work from a separately configured service joins the parent supervisor', async () => {
   const owner = createOperations({ cancellationGraceMs: 5 }),
     separate = createOperations({ cancellationGraceMs: 100 });
-  /** @type {import('@slop-lab/part/reference/index.js').Runtime.ExecutionHandle<any>} */
+  /** @type {import('@slop-lab/part/reference/index.js').Runtime.ExecutionHandle<unknown> | undefined} */
   let child;
   const parent = await owner.begin(
     { kind: 'test/parent', childPolicy: 'attached', retryOwner: 'test' },
@@ -538,7 +549,7 @@ test('Attached work from a separately configured service joins the parent superv
   const outcome = await expectProperty(parent, 'value').done;
   assert.equal(outcome.phase, 'abandoned');
   assert.ok(child);
-  assert.equal(outcome.unsettledChildren[0].id, child.ref.id);
+  assert.equal(present(outcome.unsettledChildren[0]).id, child.ref.id);
   assert.ok(child);
   assert.equal(owner.get(child.ref).ok, true);
 });

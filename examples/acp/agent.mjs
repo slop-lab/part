@@ -1,22 +1,23 @@
 // @ts-check
-import { createAcpAgent } from '@slop-lab/part-plugins/acp/index.js';
 import { startAcpStdio } from '@slop-lab/part-node/acp/index.js';
 import { connectAcpMcpServers } from '@slop-lab/part-node/acp/mcp.js';
-import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
-import { createOpenAIResponsesAdapter } from '@slop-lab/part-plugins/providers/openai-responses/index.js';
+import { createAcpAgent } from '@slop-lab/part-plugins/acp/index.js';
 import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible/index.js';
-import { bearerAuth, createFetchTransport } from '@slop-lab/part/model/index.js';
+import { createOpenAIResponsesAdapter } from '@slop-lab/part-plugins/providers/openai-responses/index.js';
+import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
 import { schema, stringSchema } from '@slop-lab/part/contracts/index.js';
+import { bearerAuth, createFetchTransport } from '@slop-lab/part/model/index.js';
 import { functionTool } from '@slop-lab/part/tools.js';
 
 try {
   process.loadEnvFile(new URL('../../.env', import.meta.url));
 } catch (error) {
-  if (error.code !== 'ENOENT') throw error;
+  if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
 }
 const provider = process.env.PART_ACP_PROVIDER ?? 'scripted';
 if (!['scripted', 'responses', 'chat'].includes(provider))
   throw Error('PART_ACP_PROVIDER must be scripted, responses or chat');
+/** @returns {import("@slop-lab/part/reference/index.js").Convenience.ConfiguredModel} */
 function configuredModel() {
   if (provider === 'scripted')
     return fakeModel([
@@ -25,7 +26,9 @@ function configuredModel() {
       { text: 'The note was approved and saved in this process memory.' },
       { text: 'The ACP example has completed its scripted turns. Start a new session to repeat.' },
     ]);
-  const base = new URL(process.env.R4U_BASE_URL);
+  const { R4U_BASE_URL: baseUrl, R4U_API_KEY: key } = process.env;
+  if (!baseUrl || !key) throw Error('Configure R4U_API_KEY and R4U_BASE_URL');
+  const base = new URL(baseUrl);
   if (
     !process.env.R4U_API_KEY ||
     !['http:', 'https:'].includes(base.protocol) ||
@@ -54,17 +57,20 @@ function configuredModel() {
       capabilities: { revision: '1', entries: [] },
     },
     adapter,
-    auth: bearerAuth(async () => process.env.R4U_API_KEY),
+    auth: bearerAuth(async () => key),
     transport: createFetchTransport({
       allowedOrigins: [base.origin],
-      fetch(url, init) {
+      fetch(url, init = {}) {
         return fetch(url, {
           ...init,
           headers: {
             ...init.headers,
             ...(process.env.R4U_ROUTE ? { 'X-Router4u-Route': process.env.R4U_ROUTE } : {}),
           },
-          signal: AbortSignal.any([init.signal, AbortSignal.timeout(90000)].filter(Boolean)),
+          signal: AbortSignal.any([
+            ...(init.signal ? [init.signal] : []),
+            AbortSignal.timeout(90000),
+          ]),
         });
       },
     }),
@@ -89,7 +95,7 @@ const host = startAcpStdio({
               input: schema(
                 'acp/note',
                 /** @param {unknown} value @returns {value is {text: string}} */ (value) =>
-                  value &&
+                  value !== null &&
                   typeof value === 'object' &&
                   'text' in value &&
                   typeof value.text === 'string' &&

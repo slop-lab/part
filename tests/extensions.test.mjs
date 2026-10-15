@@ -1,22 +1,22 @@
 // @ts-check
-import { expectProperty } from '../fixtures/assertions.mjs';
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import {
-  ok,
-  fail,
-  localContext,
-  stringSchema,
-  jsonSchema,
-  schema,
-  digest,
-} from '@slop-lab/part/contracts/index.js';
-import { functionTool, createToolDispatcher } from '@slop-lab/part/tools.js';
-import { createContextCompiler, messageItem, semanticItem } from '@slop-lab/part/context/index.js';
-import { createModelGateway, noAuth } from '@slop-lab/part/model/index.js';
 import { createOllamaAdapter } from '@slop-lab/part-plugins/providers/ollama.js';
+import { createContextCompiler, messageItem, semanticItem } from '@slop-lab/part/context/index.js';
+import {
+  digest,
+  fail,
+  jsonSchema,
+  localContext,
+  ok,
+  stringSchema,
+} from '@slop-lab/part/contracts/index.js';
+import { createModelGateway, noAuth } from '@slop-lab/part/model/index.js';
 import { createSuspensions } from '@slop-lab/part/runtime/waits.js';
+import { createToolDispatcher, functionTool } from '@slop-lab/part/tools.js';
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { expectProperty, present } from '../fixtures/assertions.mjs';
 const context = localContext();
+/** @param {string} id @param {(plan: import("@slop-lab/part/reference/index.js").Tools.CallPlan) => import("@slop-lab/part/reference/index.js").Tools.Decision} decide @param {import("@slop-lab/part/reference/index.js").Tools.Middleware["resume"]} [resume] @returns {import("@slop-lab/part/reference/index.js").Tools.Middleware} */
 const decision = (id, decide, resume) => ({
   id,
   version: '1',
@@ -28,9 +28,11 @@ const call = (arguments_ = 'hello', toolId = 'echo') => ({
   toolId,
   arguments: arguments_,
 });
+/** @param {import("@slop-lab/part/reference/index.js").Tools.Dispatcher} dispatcher @param {Parameters<import("@slop-lab/part/reference/index.js").Tools.Dispatcher["dispatch"]>[0]} request */
 const run = async (dispatcher, request) => {
   const h = await dispatcher.dispatch(request, context);
-  return h.ok === true ? h.value.done : h;
+  assert.equal(h.ok, true);
+  return h.value.done;
 };
 
 test('MT05/MT06/MT07: deny, substitute, argument rewrite and redirect revalidation', async () => {
@@ -82,7 +84,7 @@ test('MT05/MT06/MT07: deny, substitute, argument rewrite and redirect revalidati
     }),
     'value',
   );
-  assert.equal((await run(substituted, call())).result.value, 'fake');
+  assert.equal(expectProperty(await run(substituted, call()), 'result').value, 'fake');
   assert.equal(count, 0);
   const invalid = expectProperty(
     createToolDispatcher({
@@ -135,7 +137,7 @@ test('MT05/MT06/MT07: deny, substitute, argument rewrite and redirect revalidati
     }),
     'value',
   );
-  assert.equal((await run(redirected, call())).result.value, 'other:moved');
+  assert.equal(expectProperty(await run(redirected, call()), 'result').value, 'other:moved');
   assert.equal(count, 1);
   const badRedirect = expectProperty(
     createToolDispatcher({
@@ -258,7 +260,10 @@ test('X01-X04: custom semantic lowering supports multiple fragments, versions an
   const compiled = await compiler.compile(request, context);
   assert.equal(compiled.ok, true);
   assert.equal(compiled.value.fragments.length, 2);
-  assert.equal(compiled.value.sourceVersions[0].observed, expectProperty(item.source, 'digest'));
+  assert.equal(
+    present(compiled.value.sourceVersions[0]).observed,
+    expectProperty(item.source, 'digest'),
+  );
   assert.deepEqual(item, original);
   assert.equal(
     (await expectProperty(createContextCompiler(), 'value').compile(request, context)).ok,
@@ -340,8 +345,9 @@ test('MT04: inspection digest matches bytes after final request transform', asyn
     defaults: {},
     capabilities: { revision: '1', entries: [] },
   };
+  /** @type {Uint8Array | undefined} */
   let actual;
-  /** @type {import('@slop-lab/part/reference/index.js').Model.RequestInspection} */
+  /** @type {import('@slop-lab/part/reference/index.js').Model.RequestInspection | undefined} */
   let inspected;
   const gateway = expectProperty(
     createModelGateway({
@@ -382,7 +388,7 @@ test('MT04: inspection digest matches bytes after final request transform', asyn
   );
   assert.equal((await handle.done).phase, 'completed');
   assert.ok(inspected);
-  assert.equal(inspected.actualDigest, await digest(actual));
+  assert.equal(inspected.actualDigest, await digest(present(actual)));
   assert.ok(inspected);
   assert.equal(inspected.publicPayload, undefined);
 });
@@ -408,6 +414,6 @@ test('X06: inspector targets confer no authority and unknown projections never e
   assert.equal(denied.ok, false);
   assert.equal(reads, 0);
   const fallback = await projection.read(target, audience, context);
-  assert.equal(expectProperty(fallback, 'value')[0].payload, null);
+  assert.equal(present(expectProperty(fallback, 'value')[0]).payload, null);
   assert.equal(JSON.stringify(fallback).includes('must not escape'), false);
 });

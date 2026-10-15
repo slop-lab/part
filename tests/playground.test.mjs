@@ -1,11 +1,12 @@
 // @ts-check
-import { expectProperty } from '../fixtures/assertions.mjs';
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { createPlaygroundSession } from '../examples/playground/runtime.mjs';
 import { localContext } from '@slop-lab/part/contracts/index.js';
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { createPlaygroundSession } from '../examples/playground/runtime.mjs';
+import { expectProperty, present } from '../fixtures/assertions.mjs';
 
-const command = (actionId, input = null, target) => ({
+/** @template [T=null] @param {string} actionId @param {T} input @param {import("@slop-lab/part/reference/index.js").Contracts.EntityRef} [target] */
+const command = (actionId, input = /** @type {T} */ (null), target) => ({
   protocolVersion: 1,
   commandId: crypto.randomUUID(),
   actionId,
@@ -13,8 +14,27 @@ const command = (actionId, input = null, target) => ({
   input,
   ...(target ? { target } : {}),
 });
+/** @param {import('../examples/playground/runtime.mjs').TraceEvent} event */
+function messages(event) {
+  const body = expectProperty(event.data, 'body');
+  const items = expectProperty(body, 'messages');
+  assert.ok(Array.isArray(items));
+  return items.map((item) => {
+    assert.ok(
+      item !== null &&
+        typeof item === 'object' &&
+        'role' in item &&
+        typeof item.role === 'string' &&
+        'content' in item &&
+        typeof item.content === 'string',
+    );
+    return { role: item.role, content: item.content };
+  });
+}
+/** @param {ReturnType<typeof createPlaygroundSession>} session @param {string} scenario @param {string} prompt */
 const start = (session, scenario, prompt = 'hello') =>
   session.endpoint.command(command('part.run/start', { scenario, provider: 'scripted', prompt }));
+/** @template T @param {() => T} read @param {(state: T) => unknown} predicate @param {string} label */
 async function until(read, predicate, label) {
   for (let i = 0; i < 400; i++) {
     const value = read();
@@ -23,12 +43,14 @@ async function until(read, predicate, label) {
   }
   assert.fail(`Timed out waiting for ${label}`);
 }
+/** @param {ReturnType<typeof createPlaygroundSession>} session */
 const ended = (session) =>
   until(
     () => session.state(),
     (state) => !state.active,
     'run completion',
   );
+/** @param {ReturnType<typeof createPlaygroundSession>} session */
 const waiting = (session) =>
   until(
     () => session.state(),
@@ -52,16 +74,19 @@ test('Playground uses real tool dispatch, exact request digests and bounded conv
     const state = await ended(session),
       run = state.runs[0];
     assert.equal(state.runs.length, 1);
-    assert.equal(run.phase, 'completed');
-    assert.equal(run.events.filter((event) => event.kind === 'tool-start').length, 1);
-    const requests = run.events.filter((event) => event.kind === 'request');
+    assert.equal(present(run).phase, 'completed');
+    assert.equal(present(run).events.filter((event) => event.kind === 'tool-start').length, 1);
+    const requests = present(run).events.filter((event) => event.kind === 'request');
     assert.equal(requests.length, 2);
     assert.equal(
-      requests[0].data.digest,
-      run.events.find((event) => event.kind === 'inspection').data.actualDigest,
+      expectProperty(present(requests[0]).data, 'digest'),
+      expectProperty(
+        present(present(run).events.find((event) => event.kind === 'inspection')).data,
+        'actualDigest',
+      ),
     );
-    assert.equal(requests[1].data.body.messages.at(-1).role, 'tool');
-    assert.equal(requests[1].data.body.messages.at(-1).content, '"HELLO"');
+    assert.equal(present(messages(present(requests[1])).at(-1)).role, 'tool');
+    assert.equal(present(messages(present(requests[1])).at(-1)).content, '"HELLO"');
     assert.equal(
       (
         await session.endpoint.command({
@@ -72,8 +97,13 @@ test('Playground uses real tool dispatch, exact request digests and bounded conv
       'rejected',
     );
     await start(session, 'conversation', 'next turn');
-    const next = (await ended(session)).runs.at(-1).events.find((event) => event.kind === 'request')
-      .data.body.messages;
+    const next = messages(
+      present(
+        present((await ended(session)).runs.at(-1)).events.find(
+          (event) => event.kind === 'request',
+        ),
+      ),
+    );
     assert.ok(
       next.some((message) => message.role === 'assistant' && message.content.includes('HELLO')),
     );
@@ -111,11 +141,11 @@ test('Playground approval writes only after owner approval; rejection and cancel
         run = state.runs.at(-1);
       assert.equal(state.note, action === 'playground/approve' ? action : '');
       assert.equal(
-        run.events.filter((event) => event.kind === 'tool-start').length,
+        present(run).events.filter((event) => event.kind === 'tool-start').length,
         action === 'playground/approve' ? 1 : 0,
       );
       assert.equal(
-        run.phase,
+        present(run).phase,
         action === 'playground/approve'
           ? 'completed'
           : action === 'part.run/cancel'
@@ -134,18 +164,18 @@ test('Playground validation blocks the executor and report artifacts remain sess
   try {
     await start(session, 'failure');
     const failed = (await ended(session)).runs.at(-1);
-    assert.equal(failed.phase, 'failed');
-    assert.equal(failed.events.filter((event) => event.kind === 'tool-start').length, 0);
+    assert.equal(present(failed).phase, 'failed');
+    assert.equal(present(failed).events.filter((event) => event.kind === 'tool-start').length, 0);
     await start(session, 'artifact', 'A small report');
     await ended(session);
     const report = session.hub.snapshot().items.find((item) => item.type === 'playground/report');
     assert.ok(report);
-    const content = await session.artifact(report.artifacts[0].id);
-    assert.match(content.bytes.toString(), /A small report/);
-    assert.equal(await other.artifact(report.artifacts[0].id), null);
+    const content = await session.artifact(present(report.artifacts[0]).id);
+    assert.match(present(content).bytes.toString(), /A small report/);
+    assert.equal(await other.artifact(present(report.artifacts[0]).id), null);
     assert.equal((await session.endpoint.command(command('playground/clear'))).kind, 'completed');
     assert.equal(session.state().runs.length, 0);
-    assert.equal(await session.artifact(report.artifacts[0].id), null);
+    assert.equal(await session.artifact(present(report.artifacts[0]).id), null);
   } finally {
     await Promise.all([session.close(), other.close()]);
   }
@@ -157,9 +187,9 @@ test('Closing observation keeps playground work alive; shutdown cancels the owne
   await start(session, 'approval');
   await waiting(session);
   await expectProperty(watcher, 'value').close();
-  assert.equal(session.state().runs.at(-1).phase, 'waiting');
+  assert.equal(present(session.state().runs.at(-1)).phase, 'waiting');
   await session.close();
-  assert.equal(session.state().runs.at(-1).phase, 'cancelled');
-  assert.equal(session.state().runs.at(-1).approval, null);
+  assert.equal(present(session.state().runs.at(-1)).phase, 'cancelled');
+  assert.equal(present(session.state().runs.at(-1)).approval, null);
   assert.equal(session.state().note, '');
 });

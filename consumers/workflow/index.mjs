@@ -1,11 +1,11 @@
 // @ts-check
-import { expectProperty } from '../../fixtures/assertions.mjs';
-import assert from 'node:assert/strict';
-import { localContext, jsonSchema, ok } from '@slop-lab/part/contracts/index.js';
-import { defineCodeWorkflow, createCodeEngine } from '@slop-lab/part-plugins/workflows/code.js';
-import { createWorkflowHost } from '@slop-lab/part-plugins/workflows/host.js';
+import { createCodeEngine, defineCodeWorkflow } from '@slop-lab/part-plugins/workflows/code.js';
 import { createWorkflowEndpoint } from '@slop-lab/part-plugins/workflows/endpoint.js';
-import { createLocalPort, createController } from '@slop-lab/part/client/index.js';
+import { createWorkflowHost } from '@slop-lab/part-plugins/workflows/host.js';
+import { createController, createLocalPort } from '@slop-lab/part/client/index.js';
+import { jsonSchema, localContext, ok } from '@slop-lab/part/contracts/index.js';
+import assert from 'node:assert/strict';
+import { expectProperty, present } from '../../fixtures/assertions.mjs';
 const context = localContext();
 let executed = 0;
 const definition = await defineCodeWorkflow({
@@ -64,23 +64,27 @@ try {
   const delivery = await controller.invoke(command);
   assert.equal(expectProperty(delivery, 'receipt').kind, 'accepted');
   assert.equal(
-    expectProperty(expectProperty(await controller.invoke(command), 'receipt'), 'operation').id,
-    expectProperty(expectProperty(delivery, 'receipt'), 'operation').id,
+    present(
+      expectProperty(expectProperty(await controller.invoke(command), 'receipt'), 'operation'),
+    ).id,
+    present(expectProperty(expectProperty(delivery, 'receipt'), 'operation')).id,
   );
   for (
     let i = 0;
     i < 100 &&
     expectProperty(
-      controller.getItem(expectProperty(expectProperty(delivery, 'receipt'), 'operation').id)
-        ?.payload,
+      controller.getItem(
+        present(expectProperty(expectProperty(delivery, 'receipt'), 'operation')).id,
+      )?.payload,
       'phase',
     ) !== 'succeeded';
     i++
   )
     await new Promise((resolve) => setTimeout(resolve, 2));
   const item = controller.getItem(
-    expectProperty(expectProperty(delivery, 'receipt'), 'operation').id,
+    present(expectProperty(expectProperty(delivery, 'receipt'), 'operation')).id,
   );
+  assert.ok(item);
   assert.equal(expectProperty(item.payload, 'phase'), 'succeeded');
   assert.deepEqual(expectProperty(expectProperty(item.payload, 'output'), 'data'), {
     received: { value: 42 },

@@ -1,25 +1,56 @@
 // @ts-check
 import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
+import { createMemoryArtifacts } from '@slop-lab/part/artifacts/index.js';
 import { createWatchHub } from '@slop-lab/part/client/index.js';
 import { messageItem } from '@slop-lab/part/context/index.js';
 import {
   canonical,
   fail,
+  isJson,
   localContext,
   ok,
   schema,
   stringSchema,
 } from '@slop-lab/part/contracts/index.js';
-import { createMemoryArtifacts } from '@slop-lab/part/artifacts/index.js';
 import { createSuspensions } from '@slop-lab/part/runtime/waits.js';
 import { functionTool } from '@slop-lab/part/tools.js';
 import catalog from './catalog.json' with { type: 'json' };
 import { createPlaygroundModel, providerOptions } from './models.mjs';
 
+/** @import {Contracts, Client, Runtime, Model, Context, Projection} from '@slop-lab/part/reference/index.js' */
+/**
+ * @typedef {import('@slop-lab/part/reference/index.js').Convenience.Agent<string | readonly Context.SemanticItem[], Model.Response>} Agent
+ * @typedef {{prompt: string, scenario: string, provider: string, model?: string}} StartInput
+ * @typedef {{kind: string, at: string, data: Contracts.Json}} TraceEvent
+ * @typedef {{id: string, scenario: string, provider: string, phase: string, text: string, events: TraceEvent[], approval: Runtime.WaitTicket | null, error: {code: string, message: string} | null, usage: Model.Response['usage'] | null, agent?: Agent, handle?: Runtime.ExecutionHandle<Model.Response>, done?: Promise<void>}} Run
+ */
+/** @param {unknown} value @returns {Contracts.Json} */
+function wire(value) {
+  if (!isJson(value)) throw Error('Invalid playground JSON data');
+  return value;
+}
+const startInput = schema(
+  'playground/start',
+  /** @param {unknown} value @returns {value is StartInput} */
+  (value) =>
+    value !== null &&
+    typeof value === 'object' &&
+    'prompt' in value &&
+    typeof value.prompt === 'string' &&
+    !!value.prompt.trim() &&
+    value.prompt.length <= 4000 &&
+    'scenario' in value &&
+    typeof value.scenario === 'string' &&
+    catalog.some((entry) => entry.id === value.scenario) &&
+    'provider' in value &&
+    typeof value.provider === 'string' &&
+    (!('model' in value) ||
+      (typeof value.model === 'string' && !!value.model.trim() && value.model.length <= 120)),
+);
 const textInput = schema(
   'playground/text',
   /** @param {unknown} value @returns {value is {text: string}} */ (value) =>
-    value &&
+    value !== null &&
     typeof value === 'object' &&
     'text' in value &&
     typeof value.text === 'string' &&
@@ -32,6 +63,7 @@ const parameters = {
   required: ['text'],
   additionalProperties: false,
 };
+/** @type {Record<string, string>} */
 const instructions = {
   tools: 'Call uppercase exactly once with the user text, then explain its result briefly.',
   approval:
@@ -40,6 +72,7 @@ const instructions = {
   cancellation: 'Explain managed execution in detail using twelve short sections.',
   conversation: 'You are a concise assistant demonstrating part. Use Markdown when useful.',
 };
+/** @param {string} id @returns {Contracts.ActionDescriptor} */
 const descriptor = (id) => ({
   id,
   version: 1,
@@ -57,13 +90,19 @@ export function createPlaygroundSession({
   const hub = createWatchHub({ revision: 'playground-1', entries: [] });
   const waits = createSuspensions();
   let artifacts = createMemoryArtifacts({ id: 'playground/reports', maxBytes: 128 * 1024 });
-  const runs = [],
-    history = new Map(),
-    commands = new Map(),
-    reports = new Map();
-  let active,
-    note = '',
+  /** @type {Run[]} */
+  const runs = [];
+  /** @type {Map<string, Context.SemanticItem[]>} */
+  const history = new Map();
+  /** @type {Map<string, {encoded: string, result: Promise<Contracts.CommandReceipt>}>} */
+  const commands = new Map();
+  /** @type {Map<string, import('@slop-lab/part/reference/index.js').Storage.FinalizedArtifact>} */
+  const reports = new Map();
+  /** @type {Run | undefined} */
+  let active;
+  let note = '',
     closed = false;
+  /** @param {string} id @param {string} type @param {string} label @param {string} text @param {Contracts.Json} payload @param {Partial<Projection.Item>} extras */
   const project = (id, type, label, text, payload = {}, extras = {}) => {
     hub.upsert({
       id,
@@ -77,11 +116,13 @@ export function createPlaygroundSession({
       ...extras,
     });
   };
+  /** @param {Contracts.CommandRequest} request @param {string} message @returns {Contracts.CommandReceipt} */
   const reject = (request, message) => ({
     kind: 'rejected',
     commandId: request.commandId,
     error: fail('playground.command', message, 'conflict').error,
   });
+  /** @param {Contracts.CommandRequest} request @param {Contracts.Json} result @returns {Contracts.CommandReceipt} */
   const complete = (request, result = null) => ({
     kind: 'completed',
     commandId: request.commandId,
@@ -106,27 +147,22 @@ export function createPlaygroundSession({
       active: active?.id ?? null,
     };
   }
+  /** @param {Contracts.CommandRequest} request @returns {Promise<Contracts.CommandReceipt>} */
   async function start(request) {
-    const input = request.input;
+    const validated = startInput.validate(request.input);
+    if (!validated.ok)
+      return reject(request, 'Choose a valid example/provider and enter 1?4,000 characters.');
+    const input = validated.value;
     if (
-      !input ||
-      typeof input !== 'object' ||
-      typeof input.prompt !== 'string' ||
-      !input.prompt.trim() ||
-      input.prompt.length > 4000 ||
-      !catalog.some((entry) => entry.id === input.scenario) ||
-      !providerOptions(environment).some(
-        (entry) => entry.id === input.provider && entry.available,
-      ) ||
-      (input.model !== undefined &&
-        (typeof input.model !== 'string' || !input.model.trim() || input.model.length > 120))
+      !providerOptions(environment).some((entry) => entry.id === input.provider && entry.available)
     )
-      return reject(request, 'Choose a valid example/provider and enter 1–4,000 characters.');
+      return reject(request, 'Choose an available provider.');
     if (input.scenario === 'failure' && input.provider !== 'scripted')
       return reject(request, 'The deliberate invalid-argument example uses the scripted provider.');
     if (active) return reject(request, 'Stop or finish the current run first.');
     if (runs.length >= 24)
       return reject(request, 'This session has 24 runs. Clear the session to continue.');
+    /** @type {Run} */
     const run = {
       id: crypto.randomUUID(),
       ...input,
@@ -162,6 +198,7 @@ export function createPlaygroundSession({
             : [],
         },
       );
+    /** @param {string} kind @param {Contracts.Json} data */
     const trace = (kind, data) => {
       run.events.push({ kind, at: new Date().toISOString(), data });
       if (run.events.length > 64) run.events.shift();
@@ -179,7 +216,7 @@ export function createPlaygroundSession({
         effects: id === 'uppercase' ? 'read' : 'write',
         async execute({ text }, execution) {
           trace('tool-start', { tool: id, input: { text } });
-          let result;
+          let result = '';
           if (id === 'uppercase') result = text.toUpperCase();
           if (id === 'save_note') {
             note = text;
@@ -211,7 +248,7 @@ export function createPlaygroundSession({
               'playground/report',
               'Runtime field notes',
               'A finalized Markdown report. Open it in the inspector.',
-              { ...artifact, name: 'runtime-report.md', mediaType: 'text/markdown' },
+              wire({ ...artifact, name: 'runtime-report.md', mediaType: 'text/markdown' }),
               { source: ref, artifacts: [artifact.ref] },
             );
             result = `Report artifact ${artifact.ref.id} finalized (${artifact.bytes} bytes)`;
@@ -226,6 +263,7 @@ export function createPlaygroundSession({
         },
       }),
     );
+    /** @type {Agent | undefined} */
     let agent;
     try {
       const model = createPlaygroundModel({
@@ -308,32 +346,42 @@ export function createPlaygroundSession({
             },
           },
         ],
-        inspectRequest: (view) => trace('inspection', view),
+        inspectRequest: (view) => trace('inspection', wire(view)),
       });
       if (created.ok === false) throw Error('Agent composition failed');
-      agent = created.value;
+      const createdAgent = created.value;
+      agent = createdAgent;
       run.agent = agent;
       const key = `${input.provider}/${input.model ?? ''}`;
       const previous = history.get(key) ?? [];
       const items = [
         await messageItem('system', [
-          { kind: 'text', text: instructions[input.scenario] ?? instructions.tools },
+          { kind: 'text', text: instructions[input.scenario] ?? 'Use tools when needed.' },
         ]),
         ...previous,
         await messageItem('user', [{ kind: 'text', text: input.prompt }]),
       ];
       const started = await agent.start(items);
       if (started.ok === false) throw Error('Run admission failed');
-      run.handle = started.value;
+      const handle = started.value;
+      run.handle = handle;
       run.phase = 'running';
       project(`${run.id}/user`, 'part/message', 'You', input.prompt, { text: input.prompt });
       update();
       run.done = (async () => {
         const progress = (async () => {
-          for await (const event of run.handle.observe()) {
+          for await (const event of handle.observe()) {
             if (event.kind !== 'data') continue;
             if (event.type === 'part.model/text') {
-              const text = event.payload.text;
+              const payload = event.payload;
+              if (
+                !payload ||
+                typeof payload !== 'object' ||
+                !('text' in payload) ||
+                typeof payload.text !== 'string'
+              )
+                throw Error('Invalid text event');
+              const text = payload.text;
               hub.delta({
                 itemId: run.id,
                 partId: 'text',
@@ -345,7 +393,7 @@ export function createPlaygroundSession({
             } else if (event.type === 'part.tool/result') trace('dispatch', event.payload);
           }
         })();
-        const outcome = await run.handle.done;
+        const outcome = await handle.done;
         await progress;
         run.phase = outcome.phase;
         if (outcome.phase === 'completed') {
@@ -358,7 +406,7 @@ export function createPlaygroundSession({
             key,
             [
               ...previous,
-              items.at(-1),
+              await messageItem('user', [{ kind: 'text', text: input.prompt }]),
               await messageItem('assistant', [{ kind: 'text', text: run.text }]),
             ].slice(-12),
           );
@@ -374,18 +422,21 @@ export function createPlaygroundSession({
             : null;
           run.text = `${run.text}${run.text ? '\n\n' : ''}${run.phase === 'cancelled' ? 'Run cancelled.' : (run.error?.message ?? 'Run ended without a result.')}`;
         }
-        trace('run-ended', {
-          phase: run.phase,
-          effect: outcome.effect,
-          error: run.error,
-          usage: run.usage,
-        });
+        trace(
+          'run-ended',
+          wire({
+            phase: run.phase,
+            effect: outcome.effect,
+            error: run.error,
+            usage: run.usage,
+          }),
+        );
         hub.remove(run.id);
         update();
       })().finally(async () => {
         if (run.approval) waits.cancel(run.approval.id);
         run.approval = null;
-        await agent.dispose();
+        await createdAgent.dispose();
         if (active === run) active = undefined;
       });
       // Ensure an unexpected observer/disposal error cannot create an unhandled rejection.
@@ -408,6 +459,7 @@ export function createPlaygroundSession({
     hub,
     context,
     state,
+    /** @param {string} id */
     async artifact(id) {
       const metadata = reports.get(id);
       if (!metadata) return null;
@@ -421,11 +473,11 @@ export function createPlaygroundSession({
         name: 'runtime-report.md',
       };
     },
-    endpoint: {
+    endpoint: /** @satisfies {Client.Endpoint} */ ({
       async command(request) {
         if (closed || request.actionVersion !== 1)
           return reject(request, 'The session is closed or the action version is unsupported.');
-        const encoded = canonical(request),
+        const encoded = canonical(wire(request)),
           old = commands.get(request.commandId);
         if (old)
           return old.encoded === encoded
@@ -471,7 +523,7 @@ export function createPlaygroundSession({
       },
       async query(request) {
         if (request.version !== 1) return fail('playground.query', 'Unsupported query version');
-        if (request.queryId === 'playground/state') return ok(state());
+        if (request.queryId === 'playground/state') return ok(wire(state()));
         if (request.queryId === 'part/capabilities')
           return ok({ revision: 'playground-1', entries: [] });
         return fail('playground.query', 'Unknown query');
@@ -479,7 +531,7 @@ export function createPlaygroundSession({
       async watch(_request, caller) {
         return hub.watch(caller);
       },
-    },
+    }),
     async close() {
       closed = true;
       await Promise.all([...commands.values()].map((entry) => entry.result));

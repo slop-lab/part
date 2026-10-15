@@ -1,18 +1,19 @@
 // @ts-check
-import { packageEntrypoints } from './package-build.mjs';
-import { npmSync } from './npm.mjs';
 import { build } from 'esbuild';
 import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { npmSync } from './npm.mjs';
+import { packageEntrypoints } from './package-build.mjs';
+import { readPackageMetadata } from './package-metadata.mjs';
 
 const root = process.cwd();
 const temporary = mkdtempSync(join(tmpdir(), 'part-consumers-'));
 const packages = ['core', 'plugins', 'node', 'browser'].map((directory) => ({
   directory,
   tarball: '',
-  manifest: JSON.parse(readFileSync(`packages/${directory}/dist/package.json`, 'utf8')),
+  manifest: readPackageMetadata(`packages/${directory}/dist/package.json`),
 }));
 const consumers = {
   core: ['core'],
@@ -23,6 +24,7 @@ const consumers = {
   node: ['core', 'node'],
   browser: ['core', 'browser'],
 };
+/** @param {string} command @param {string[]} args @param {string} cwd */
 function run(command, args, cwd = root) {
   const result =
     command === 'npm'
@@ -42,10 +44,12 @@ function run(command, args, cwd = root) {
     );
   return result.stdout;
 }
+/** @param {typeof packages[number]} pkg @param {string} name */
 const publicPath = (pkg, name) => pkg.manifest.name + (name === '.' ? '' : '/' + name.slice(2));
 try {
   cpSync(join(root, 'fixtures'), join(temporary, 'fixtures'), { recursive: true });
   for (const pkg of packages) {
+    /** @type {{filename: string, files: {path: string}[]}[]} */
     const packed = JSON.parse(
       run('npm', [
         'pack',
@@ -55,14 +59,16 @@ try {
         temporary,
       ]),
     );
+    const item = packed[0];
+    if (!item) throw Error(`No tarball for ${pkg.directory}`);
     if (
-      packed[0].files.some(
+      item.files.some(
         ({ path }) =>
           path.startsWith('src/') || path.startsWith('dist/') || path.endsWith('.tsbuildinfo'),
       )
     )
       throw Error(`${pkg.manifest.name} was not packed from its clean distribution root`);
-    pkg.tarball = join(temporary, packed[0].filename);
+    pkg.tarball = join(temporary, item.filename);
   }
   for (const [name, selected] of Object.entries(consumers)) {
     const directory = join(temporary, 'consumers', name);
@@ -169,6 +175,7 @@ try {
       )
         throw Error('Browser consumer pulled in another runtime');
     }
+    /** @type {{packages: Record<string, {version: string}>}} */
     const lock = JSON.parse(readFileSync(join(directory, 'package-lock.json'), 'utf8'));
     for (const pkg of packages) {
       const path = join(directory, 'node_modules', pkg.manifest.name);

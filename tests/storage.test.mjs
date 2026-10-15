@@ -1,19 +1,20 @@
 // @ts-check
-import { expectProperty } from '../fixtures/assertions.mjs';
-import test from 'node:test';
+import { openSqliteStore } from '@slop-lab/part-node/storage/sqlite.js';
+import { createHistory } from '@slop-lab/part/context/history.js';
+import { provenance } from '@slop-lab/part/context/index.js';
+import { localContext } from '@slop-lab/part/contracts/index.js';
+import { managedAttempt } from '@slop-lab/part/runtime/index.js';
+import { createMemoryStore } from '@slop-lab/part/storage/memory.js';
+import { createExecutionRecovery, createStoredBoundary } from '@slop-lab/part/storage/runtime.js';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createMemoryStore } from '@slop-lab/part/storage/memory.js';
-import { openSqliteStore } from '@slop-lab/part-node/storage/sqlite.js';
-import { createHistory } from '@slop-lab/part/context/history.js';
-import { createStoredBoundary, createExecutionRecovery } from '@slop-lab/part/storage/runtime.js';
-import { localContext } from '@slop-lab/part/contracts/index.js';
-import { provenance } from '@slop-lab/part/context/index.js';
-import { managedAttempt } from '@slop-lab/part/runtime/index.js';
+import test from 'node:test';
+import { expectProperty, present } from '../fixtures/assertions.mjs';
 const context = localContext();
 const address = { namespace: 'test', scope: { kind: 'runtime', id: 'r' }, key: 'state' };
+/** @param {string} id @param {string} expected @param {number} value */
 const change = (id, expected = 'absent', value = 1) => ({
   id,
   mutations: [{ address, expected, next: { schemaVersion: 1, value } }],
@@ -35,12 +36,17 @@ for (const kind of ['memory', 'sqlite'])
       );
       assert.equal((await store.commit(change('first', 'absent', 2), context)).ok, false);
       assert.equal((await store.commit(change('conflict'), context)).ok, false);
-      assert.equal(expectProperty(await store.read(address, context), 'value').value.value, 1);
+      assert.equal(
+        present(expectProperty(await store.read(address, context), 'value')).value.value,
+        1,
+      );
       assert.equal(
         expectProperty(await store.journal(undefined, 100, context), 'value').items.length,
         1,
       );
-      const revision = expectProperty(await store.read(address, context), 'value').revision;
+      const revision = present(
+        expectProperty(await store.read(address, context), 'value'),
+      ).revision;
       const raced = await Promise.all([
         store.commit(change('a', revision, 2), context),
         store.commit(change('b', revision, 3), context),
@@ -53,7 +59,10 @@ for (const kind of ['memory', 'sqlite'])
           expectProperty(await reopened.journal(undefined, 100, context), 'value').items.length,
           2,
         );
-        assert.equal(expectProperty(await reopened.read(address, context), 'value').value.value, 2);
+        assert.equal(
+          present(expectProperty(await reopened.read(address, context), 'value')).value.value,
+          2,
+        );
         reopened.close();
       }
     } finally {
@@ -79,8 +88,9 @@ test('G06: immutable history, stale append rejection and forks preserve source p
   record.payload.text = 'mutated';
   assert.equal(
     expectProperty(
-      expectProperty(await history.path(appended.value, undefined, context), 'value').items[0]
-        .record.payload,
+      present(
+        expectProperty(await history.path(appended.value, undefined, context), 'value').items[0],
+      ).record.payload,
       'text',
     ),
     'original',
@@ -124,7 +134,10 @@ test('DU04/G11: committed intents recover as unknown/abandoned without repeating
     { namespace: 'part/execution', scope: { kind: 'operation', id: 'o' }, key: 'a' },
     context,
   );
-  assert.equal(expectProperty(expectProperty(persisted, 'value').value.value, 'effect'), 'unknown');
+  assert.equal(
+    expectProperty(present(expectProperty(persisted, 'value')).value.value, 'effect'),
+    'unknown',
+  );
   let count = 0;
   const completed = await managedAttempt(
     boundary,
@@ -136,7 +149,7 @@ test('DU04/G11: committed intents recover as unknown/abandoned without repeating
     context,
   );
   assert.equal(completed.phase, 'completed');
-  assert.equal(completed.commit[0].durability, 'memory');
+  assert.equal(present(completed.commit[0]).durability, 'memory');
   assert.equal(count, 1);
   store.close();
 });

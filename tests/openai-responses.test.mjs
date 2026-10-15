@@ -1,15 +1,22 @@
 // @ts-check
-import { expectProperty, stub } from '../fixtures/assertions.mjs';
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import { createOpenAIResponsesAdapter } from '@slop-lab/part-plugins/providers/openai-responses/index.js';
-import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible/index.js';
+import { parseObject } from '../fixtures/contracts.mjs';
 import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
+import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible/index.js';
+import { createOpenAIResponsesAdapter } from '@slop-lab/part-plugins/providers/openai-responses/index.js';
+import { digest, schema, stringSchema } from '@slop-lab/part/contracts/index.js';
 import { createFetchTransport, noAuth } from '@slop-lab/part/model/index.js';
 import { functionTool } from '@slop-lab/part/tools.js';
-import { digest, schema, stringSchema } from '@slop-lab/part/contracts/index.js';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import test from 'node:test';
+import { expectProperty, present, stub } from '../fixtures/assertions.mjs';
 
+/** @import {Context, Model, Contracts} from '@slop-lab/part/reference/index.js' */
+/** @typedef {{id: string, type: 'message', status: string, role: string, content: [{type: string, text: string, annotations: unknown[]}]}} ResponseMessage */
+/** @typedef {{id: string, type: 'function_call', status: string, call_id: string, name: string, arguments: string}} ResponseCall */
+/** @typedef {{id: string, type: 'reasoning', summary: {type: string, text: string}[], encrypted_content: string}} ResponseReasoning */
+/** @typedef {ResponseMessage | ResponseCall | ResponseReasoning} OutputItem */
+/** @typedef {{type: string} & Record<string, unknown>} ResponseEvent */
 const adapter = createOpenAIResponsesAdapter();
 const profile = {
   id: 'responses',
@@ -22,20 +29,24 @@ const profile = {
   defaults: {},
   capabilities: { revision: '1', entries: [] },
 };
-/** @returns {import('@slop-lab/part/reference/index.js').Model.Invocation} */
+/** @param {Context.Fragment[]} fragments @param {Contracts.Json} options @returns {Model.Invocation} */
 const invocation = (fragments = [], options = {}) => ({
   profileId: profile.id,
   context: stub({ fragments }),
   tools: [],
   options,
 });
-const fragment = (role, content, kind = 'message', toolRelation) => ({
-  role,
-  content,
-  kind,
-  ...(toolRelation ? { toolRelation } : {}),
-});
+/** @param {Context.Fragment["role"]} role @param {Context.Fragment["content"]} content @param {Context.Fragment["kind"]} kind @param {Context.Fragment["toolRelation"]} [toolRelation] @returns {Context.Fragment} */
+const fragment = (role, content, kind = 'message', toolRelation) =>
+  stub({
+    role,
+    content,
+    kind,
+    ...(toolRelation ? { toolRelation } : {}),
+  });
+/** @param {string} text @returns {Model.ContentPart} */
 const textPart = (text) => ({ kind: 'text', text });
+/** @param {string} text @param {string} id @returns {ResponseMessage} */
 const message = (text, id = 'msg-1') => ({
   id,
   type: 'message',
@@ -43,6 +54,7 @@ const message = (text, id = 'msg-1') => ({
   role: 'assistant',
   content: [{ type: 'output_text', text, annotations: [] }],
 });
+/** @type {ResponseCall} */
 const call = {
   id: 'fc-1',
   type: 'function_call',
@@ -51,13 +63,14 @@ const call = {
   name: 'uppercase',
   arguments: '{"text":"hello"}',
 };
+/** @type {ResponseReasoning} */
 const reasoning = {
   id: 'rs-1',
   type: 'reasoning',
   summary: [{ type: 'summary_text', text: 'Use the tool.' }],
   encrypted_content: 'opaque-fixture',
 };
-/** @param {Record<string, any>[]} [output] */
+/** @param {Record<string, unknown>[]} [output] */
 const completion = (output = [message('HELLO')]) => ({
   id: 'resp-1',
   object: 'response',
@@ -72,13 +85,16 @@ const completion = (output = [message('HELLO')]) => ({
     output_tokens_details: { reasoning_tokens: 1 },
   },
 });
+/** @param {string} type @param {Record<string, unknown>} fields @returns {ResponseEvent} */
 const event = (type, fields) => ({ type, ...fields });
+/** @param {Record<string, unknown>[]} events @param {string} newline */
 const wire = (events, newline = '\n') =>
   events
     .map(
       (value) => `event: ${value.type}${newline}data: ${JSON.stringify(value)}${newline}${newline}`,
     )
     .join('');
+/** @param {unknown} value @param {boolean} streaming @param {boolean} bytes */
 function decode(value, streaming = false, bytes = false) {
   const decoder = expectProperty(
     adapter.createDecoder({
@@ -99,6 +115,7 @@ function decode(value, streaming = false, bytes = false) {
   const result = decoder.finish();
   return result.ok === true ? { ...result, progress } : result;
 }
+/** @param {OutputItem[]} output */
 function eventsFor(output) {
   const events = [event('response.created', { response: { id: 'resp-1', status: 'in_progress' } })];
   output.forEach((item, output_index) => {
@@ -133,7 +150,7 @@ function eventsFor(output) {
 }
 
 test('Responses encodes text, JSON, function calls/results and native reasoning without hidden state', async () => {
-  const source = invocation(
+  let source = invocation(
     [
       fragment('system', [textPart('System')]),
       fragment('user', [{ kind: 'json', value: { task: 'hello' } }]),
@@ -151,21 +168,23 @@ test('Responses encodes text, JSON, function calls/results and native reasoning 
     ],
     { stream: false, max_output_tokens: 50 },
   );
-  // @ts-expect-error Deliberately attempt mutation to verify snapshot isolation.
-  source.tools = [
-    {
-      id: 'uppercase',
-      description: 'Uppercase',
-      execution: 'runtime',
-      version: '1',
-      inputSchema: { type: 'object' },
-    },
-  ];
+  source = {
+    ...source,
+    tools: [
+      {
+        id: 'uppercase',
+        description: 'Uppercase',
+        execution: 'runtime',
+        version: '1',
+        inputSchema: { type: 'object' },
+      },
+    ],
+  };
   const encoded = await adapter.encode(source, profile);
   assert.equal(encoded.ok, true);
   assert.equal(encoded.value.protocol, 'openai.responses');
   assert.equal(encoded.value.digest, await digest(encoded.value.body));
-  const body = JSON.parse(new TextDecoder().decode(encoded.value.body));
+  const body = parseObject(new TextDecoder().decode(encoded.value.body));
   assert.deepEqual(body.input, [
     { role: 'system', content: 'System' },
     { role: 'user', content: '{"task":"hello"}' },
@@ -189,7 +208,8 @@ test('Responses encodes text, JSON, function calls/results and native reasoning 
 });
 
 test('Responses rejects reserved/stateful requests, hosted tools, media and foreign native content before delivery', async () => {
-  for (const options of [
+  /** @type {Contracts.Json[]} */
+  const forbiddenOptions = [
     { input: [] },
     { model: 'override' },
     { tools: [] },
@@ -202,7 +222,8 @@ test('Responses rejects reserved/stateful requests, hosted tools, media and fore
     { stream: 'yes' },
     { stream_options: {} },
     { max_completion_tokens: 1 },
-  ])
+  ];
+  for (const options of forbiddenOptions)
     assert.equal((await adapter.encode(invocation([], options), profile)).ok, false);
   assert.equal(
     (
@@ -221,16 +242,18 @@ test('Responses rejects reserved/stateful requests, hosted tools, media and fore
       .ok,
     false,
   );
-  for (const part of [
+  /** @type {Partial<Model.ContentPart>[]} */
+  const invalidParts = [
     { kind: 'media' },
     {
       kind: 'native',
       native: { provider: 'other/provider', formatVersion: '1', payload: reasoning },
     },
     { kind: 'native', native: { provider: adapter.id, formatVersion: '2', payload: reasoning } },
-  ])
+  ];
+  for (const part of invalidParts)
     assert.equal(
-      (await adapter.encode(invocation([fragment('assistant', [part])]), profile)).ok,
+      (await adapter.encode(invocation([fragment('assistant', [stub(part)])]), profile)).ok,
       false,
     );
   assert.equal(
@@ -259,9 +282,14 @@ test('JSON Responses preserves reasoning and function native items, call IDs, us
     expectProperty(expectProperty(result.value, 'content')[0], 'native').payload,
     reasoning,
   );
-  assert.equal(expectProperty(result.value, 'toolCalls')[0].id, 'call-1');
-  assert.deepEqual(expectProperty(result.value, 'toolCalls')[0].arguments, { text: 'hello' });
-  assert.deepEqual(expectProperty(result.value, 'toolCalls')[0].native.payload, call);
+  assert.equal(present(expectProperty(result.value, 'toolCalls')[0]).id, 'call-1');
+  assert.deepEqual(present(expectProperty(result.value, 'toolCalls')[0]).arguments, {
+    text: 'hello',
+  });
+  assert.deepEqual(
+    present(present(expectProperty(result.value, 'toolCalls')[0]).native).payload,
+    call,
+  );
   assert.deepEqual(expectProperty(result.value, 'usage'), {
     inputTokens: 12,
     outputTokens: 3,
@@ -332,6 +360,7 @@ test('Responses fails closed on partial tools, invalid usage, unsupported conten
 
 test('SSE Responses rejects missing terminals, mismatched snapshots, failed events, malformed framing and poisoned decoders', () => {
   const good = eventsFor([call]);
+  /** @type {Record<string, unknown>[][]} */
   const badSequences = [
     good.slice(0, -1),
     [
@@ -378,13 +407,13 @@ test('SSE Responses rejects missing terminals, mismatched snapshots, failed even
         : entry,
     ),
     [
-      good[0],
-      good[1],
+      present(good[0]),
+      present(good[1]),
       event('response.completed', { response: completion([{ ...call, call_id: 'changed' }]) }),
     ],
     [
-      good[0],
-      good[1],
+      present(good[0]),
+      present(good[1]),
       event('response.completed', { response: completion([{ ...call, name: 'changed' }]) }),
     ],
   );
@@ -413,6 +442,7 @@ test('SSE Responses rejects missing terminals, mismatched snapshots, failed even
 
 for (const mode of ['json', 'sse', 'truncated']) {
   test(`Responses fixed ${mode} fixture validates reasoning replay and prevents partial tool execution`, async () => {
+    /** @type {{prompt: string, exchanges: {request: Record<string, Contracts.Json> & {tools: [{parameters: Contracts.Json}], stream: boolean}, response: ReturnType<typeof completion> & {output: OutputItem[]}}[]}} */
     const fixture = JSON.parse(
       await readFile(
         new URL('../fixtures/openai-responses/tool-flow.fixture.json', import.meta.url),
@@ -420,8 +450,10 @@ for (const mode of ['json', 'sse', 'truncated']) {
       ),
     );
     if (mode === 'json') for (const exchange of fixture.exchanges) exchange.request.stream = false;
-    const transcript = [],
-      executions = [];
+    /** @type {{request: unknown, response: unknown}[]} */
+    const transcript = [];
+    /** @type {string[]} */
+    const executions = [];
     const model = {
       profile: { ...profile, defaults: { stream: mode !== 'json' } },
       adapter,
@@ -432,7 +464,8 @@ for (const mode of ['json', 'sse', 'truncated']) {
           const exchange = fixture.exchanges[transcript.length];
           assert.ok(exchange, 'Unexpected extra request');
           assert.equal(String(url), profile.endpoint);
-          const request = JSON.parse(new TextDecoder().decode(init.body));
+          assert.ok(init?.body instanceof Uint8Array);
+          const request = parseObject(new TextDecoder().decode(init.body));
           assert.deepEqual(request, exchange.request);
           transcript.push({ request, response: exchange.response });
           return new Response(
@@ -462,7 +495,7 @@ for (const mode of ['json', 'sse', 'truncated']) {
           input: schema(
             'responses/text',
             /** @param {unknown} value @returns {value is {text: string}} */ (value) =>
-              value &&
+              value !== null &&
               typeof value === 'object' &&
               'text' in value &&
               typeof value.text === 'string',
@@ -474,7 +507,7 @@ for (const mode of ['json', 'sse', 'truncated']) {
           },
         }),
       ],
-      toolSchemas: { uppercase: fixture.exchanges[0].request.tools[0].parameters },
+      toolSchemas: { uppercase: present(fixture.exchanges[0]).request.tools[0].parameters },
     });
     assert.equal(created.ok, true);
     try {

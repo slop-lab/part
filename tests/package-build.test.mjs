@@ -1,16 +1,17 @@
 // @ts-check
-import test from 'node:test';
+import { readPackageMetadata } from '../scripts/package-metadata.mjs';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   copyPackageAssets,
-  writePackageMetadata,
   packageEntrypoints,
+  writePackageMetadata,
 } from '../scripts/package-build.mjs';
 
 test('Distribution metadata uses root-relative exports and bins without rewriting workspace metadata', async () => {
@@ -60,7 +61,7 @@ test('Distribution metadata uses root-relative exports and bins without rewritin
     copyPackageAssets(directory);
     writePackageMetadata(directory);
     const output = join(directory, 'dist');
-    const published = JSON.parse(readFileSync(join(output, 'package.json'), 'utf8'));
+    const published = readPackageMetadata(join(output, 'package.json'));
     assert.deepEqual(published.exports, {
       '.': { types: './index.d.ts', default: './index.js' },
       './*': './*',
@@ -125,7 +126,8 @@ test('Wildcard exports need no regeneration for new modules and packages without
   const directory = mkdtempSync(join(tmpdir(), 'part-wildcard-'));
   try {
     mkdirSync(join(directory, 'dist'), { recursive: true });
-    const workspace = '{"name":"test-wildcard","type":"module","exports":{"./*":"./dist/*"}}\n';
+    const workspace =
+      '{"name":"test-wildcard","version":"1.0.0","type":"module","exports":{"./*":"./dist/*"}}\n';
     writeFileSync(join(directory, 'package.json'), workspace);
     writePackageMetadata(directory);
     const metadata = readFileSync(join(directory, 'dist/package.json'), 'utf8');

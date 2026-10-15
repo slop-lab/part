@@ -3,9 +3,11 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import ts from 'typescript';
 import { packageEntrypoints } from './package-build.mjs';
+import { readPackageMetadata } from './package-metadata.mjs';
 
 const root = process.cwd();
 const failures = [];
+/** @param {string} directory @returns {string[]} */
 function files(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) =>
     entry.isDirectory()
@@ -16,14 +18,21 @@ function files(directory) {
 const packages = ['core', 'plugins', 'node', 'browser'].map((directory) => ({
   directory,
   path: `packages/${directory}`,
-  manifest: JSON.parse(readFileSync(`packages/${directory}/package.json`, 'utf8')),
+  manifest: readPackageMetadata(`packages/${directory}/package.json`),
 }));
 const byName = new Map(packages.map((pkg) => [pkg.manifest.name, pkg]));
 const sources = packages
   .flatMap((pkg) => files(`${pkg.path}/src`))
   .filter((file) => file.endsWith('.ts'));
+/** @type {Map<string, Set<string>>} */
 const graph = new Map(sources.map((file) => [file, new Set()]));
-const owner = (file) => packages.find((pkg) => file.startsWith(`${pkg.path}/src/`));
+/** @param {string} file */
+function owner(file) {
+  const pkg = packages.find((pkg) => file.startsWith(`${pkg.path}/src/`));
+  if (!pkg) throw Error(`No package owns ${file}`);
+  return pkg;
+}
+/** @param {string} file */
 const localPath = (file) => file.slice(owner(file).path.length + 5);
 const coreFiles = new Set([
   'index.ts',
@@ -38,7 +47,8 @@ const coreFiles = new Set([
   'runtime/progress.ts',
   'runtime/deadline.ts',
 ]);
-function resolveDependency(file, specifier, runtime) {
+/** @param {string} file @param {string} specifier @param {boolean} _runtime */
+function resolveDependency(file, specifier, _runtime) {
   const pkg = owner(file);
   if (specifier.startsWith('node:')) {
     if (pkg.directory !== 'node')
@@ -56,8 +66,8 @@ function resolveDependency(file, specifier, runtime) {
     return target;
   }
   const match = /^(@[^/]+\/[^/]+)(?:\/(.*))?$/.exec(specifier);
-  const dependency = match && byName.get(match[1]);
-  if (!dependency) {
+  const dependency = match?.[1] && byName.get(match[1]);
+  if (!match || !dependency) {
     failures.push(`${file}: dependency ${specifier} must be explicitly reviewed`);
     return undefined;
   }
@@ -83,6 +93,7 @@ for (const file of sources) {
     true,
   );
   const imports = [];
+  /** @param {import("typescript").Node} node */
   function visit(node) {
     if ((ts.isImportSpecifier(node) && node.propertyName) || ts.isNamespaceImport(node))
       failures.push(`${file}: import aliases are not allowed`);
@@ -123,7 +134,8 @@ for (const file of sources) {
   for (const { specifier, runtime } of imports) {
     const target = resolveDependency(file, specifier, runtime);
     if (!target || !runtime) continue;
-    graph.get(file).add(target);
+    graph.get(file)?.add(target);
+    if (target.startsWith('node:')) continue;
     if (owner(file).directory === 'core' && owner(target)?.directory === 'core') {
       const source = localPath(file),
         destination = localPath(target);
@@ -153,8 +165,11 @@ for (const file of sources) {
       failures.push(`${file}: script execution must use model ports, not the model implementation`);
   }
 }
-const visiting = new Set(),
-  visited = new Set();
+/** @type {Set<string>} */
+const visiting = new Set();
+/** @type {Set<string>} */
+const visited = new Set();
+/** @param {string} file @param {string[]} path */
 function checkCycles(file, path = []) {
   if (visiting.has(file)) {
     failures.push(`Runtime import cycle: ${[...path, file].join(' -> ')}`);
@@ -167,6 +182,7 @@ function checkCycles(file, path = []) {
   visited.add(file);
 }
 for (const file of sources) checkCycles(file);
+/** @param {string} file @param {Set<string>} seen */
 function reachable(file, seen = new Set()) {
   if (seen.has(file)) return seen;
   seen.add(file);
@@ -184,7 +200,7 @@ for (const pkg of packages) {
   const expectedDependencies =
     pkg.directory === 'core'
       ? {}
-      : { '@slop-lab/part': byName.get('@slop-lab/part').manifest.version };
+      : { '@slop-lab/part': packages.find((pkg) => pkg.directory === 'core')?.manifest.version };
   if (JSON.stringify(pkg.manifest.dependencies ?? {}) !== JSON.stringify(expectedDependencies))
     failures.push(`${pkg.path}: dependencies must follow the core/plugin/environment boundary`);
   const hasRoot = existsSync(`${pkg.path}/src/index.ts`);
@@ -194,7 +210,7 @@ for (const pkg of packages) {
   };
   if (JSON.stringify(pkg.manifest.exports) !== JSON.stringify(expectedWorkspace))
     failures.push(`${pkg.path}: workspace exports must use fixed dist routing`);
-  const distribution = JSON.parse(readFileSync(`${pkg.path}/dist/package.json`, 'utf8'));
+  const distribution = readPackageMetadata(`${pkg.path}/dist/package.json`);
   const expectedPublished = {
     ...(hasRoot ? { '.': { types: './index.d.ts', default: './index.js' } } : {}),
     './*': './*',

@@ -1,20 +1,27 @@
 // @ts-check
-import { createServer, request } from 'node:http';
+import { startHttpHost } from '@slop-lab/part-node/host/http.js';
+import { fail, localContext, ok } from '@slop-lab/part/contracts/index.js';
+import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { readFile } from 'node:fs/promises';
-import { randomUUID } from 'node:crypto';
-import { localContext, fail, ok } from '@slop-lab/part/contracts/index.js';
-import { startHttpHost } from '@slop-lab/part-node/host/http.js';
-import { createPlaygroundSession } from './runtime.mjs';
+import { createServer, request } from 'node:http';
 import { providerOptions } from './models.mjs';
+import { createPlaygroundSession } from './runtime.mjs';
 
 export async function startPlayground({
   port = 4173,
   environment = /** @type {NodeJS.ProcessEnv} */ ({}),
   delayScale = 1,
 } = {}) {
-  const sessions = new Map(),
-    hostToken = randomUUID();
+  /** @type {Map<string, ReturnType<typeof createPlaygroundSession>>} */
+  const sessions = new Map();
+  const hostToken = randomUUID();
+  /** @param {string} id */
+  function sessionFor(id) {
+    const session = sessions.get(id);
+    if (!session) throw Error('Unknown session');
+    return session;
+  }
   const assets = new Map(
     await Promise.all(
       [
@@ -30,6 +37,7 @@ export async function startPlayground({
       ),
     ),
   );
+  /** @param {import("node:http").IncomingMessage} request */
   const findSession = (request) => {
     const id = /(?:^|;\s*)part_playground=([0-9a-f-]{36})(?:;|$)/.exec(
       request.headers.cookie ?? '',
@@ -39,11 +47,10 @@ export async function startPlayground({
   const hosted = await startHttpHost(
     {
       command: (request, context) =>
-        sessions.get(context.principal.subject).endpoint.command(request, context),
-      query: (request, context) =>
-        sessions.get(context.principal.subject).endpoint.query(request, context),
+        sessionFor(context.principal.subject).endpoint.command(request),
+      query: (request, context) => sessionFor(context.principal.subject).endpoint.query(request),
       watch: (request, context) =>
-        sessions.get(context.principal.subject).endpoint.watch(request, context),
+        sessionFor(context.principal.subject).endpoint.watch(request, context),
     },
     {
       host: '127.0.0.1',
@@ -58,8 +65,9 @@ export async function startPlayground({
     },
   );
   if (hosted.ok === false) throw Error('Could not start the SDK HTTP host');
-  let origin;
+  let origin = '';
   const server = createServer(async (incoming, response) => {
+    /** @param {number} status @param {import("@slop-lab/part/reference/index.js").Contracts.Json} body */
     const json = (status, body) => {
       response.writeHead(status, {
         'content-type': 'application/json',
@@ -74,7 +82,7 @@ export async function startPlayground({
         incoming.headers['sec-fetch-site'] === 'cross-site'
       )
         return json(403, { error: 'Use the local playground origin.' });
-      const path = new URL(incoming.url, origin).pathname;
+      const path = new URL(incoming.url ?? '/', origin).pathname;
       response.setHeader('x-content-type-options', 'nosniff');
       response.setHeader('referrer-policy', 'same-origin');
       response.setHeader(
@@ -117,7 +125,7 @@ export async function startPlayground({
       const session = findSession(incoming);
       if (!session) return json(403, { error: 'Open the playground before using its API.' });
       if (incoming.method === 'GET' && /^\/api\/artifacts\/[0-9a-f-]{36}$/.test(path)) {
-        const artifact = await session.artifact(path.split('/').at(-1));
+        const artifact = await session.artifact(path.slice('/api/artifacts/'.length));
         if (!artifact) return json(404, { error: 'Artifact not found in this session.' });
         response.writeHead(200, {
           'content-type': artifact.mediaType,
@@ -144,7 +152,7 @@ export async function startPlayground({
           },
         },
         (remote) => {
-          response.writeHead(remote.statusCode, {
+          response.writeHead(remote.statusCode ?? 502, {
             'content-type': remote.headers['content-type'],
             'cache-control': 'no-store',
           });
@@ -170,6 +178,7 @@ export async function startPlayground({
     throw error;
   }
   origin = `http://127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (server.address()).port}`;
+  /** @type {Promise<void> | undefined} */
   let closing;
   return {
     url: origin,

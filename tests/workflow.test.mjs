@@ -1,35 +1,28 @@
 // @ts-check
-import { expectProperty, stub, json } from '../fixtures/assertions.mjs';
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import {
-  localContext,
-  ok,
-  fail,
-  jsonSchema,
-  stringSchema,
-  schema,
-  digest,
-} from '@slop-lab/part/contracts/index.js';
-import { createOperations, createBoundary } from '@slop-lab/part/runtime/index.js';
 import { createNodeScripts } from '@slop-lab/part-node/scripts/index.js';
-import { createResults } from '@slop-lab/part/results/index.js';
-import { createSuspensions } from '@slop-lab/part/runtime/waits.js';
+import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
 import { createCodeEngine, defineCodeWorkflow } from '@slop-lab/part-plugins/workflows/code.js';
+import { createWorkflowHost } from '@slop-lab/part-plugins/workflows/host.js';
+import { callIdentity } from '@slop-lab/part-plugins/workflows/memory/index.js';
 import {
   createPipelineEngine,
   installStepHandler,
 } from '@slop-lab/part-plugins/workflows/pipeline/index.js';
-import { createWorkflowHost } from '@slop-lab/part-plugins/workflows/host.js';
-import { callIdentity } from '@slop-lab/part-plugins/workflows/memory/index.js';
-import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
+import { createContextCompiler, messageItem } from '@slop-lab/part/context/index.js';
+import { digest, fail, jsonSchema, localContext, ok } from '@slop-lab/part/contracts/index.js';
 import { createModelGateway } from '@slop-lab/part/model/index.js';
-import { messageItem, createContextCompiler } from '@slop-lab/part/context/index.js';
+import { createResults } from '@slop-lab/part/results/index.js';
+import { createOperations } from '@slop-lab/part/runtime/index.js';
+import { createSuspensions } from '@slop-lab/part/runtime/waits.js';
+import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import test from 'node:test';
+import { expectProperty, json, present, stub } from '../fixtures/assertions.mjs';
 const context = localContext(),
-  delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  delay = /** @param {number} ms */ (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+/** @param {string} id @param {string} format @param {string} digest @returns {import("@slop-lab/part/reference/index.js").Workflows.DefinitionRef} */
 const ref = (id, format, digest) => ({
   id,
   format,
@@ -37,6 +30,7 @@ const ref = (id, format, digest) => ({
   digest,
   source: { owner: 'test', native: { entry: id } },
 });
+/** @param {import("@slop-lab/part/reference/index.js").Workflows.Engine} engine @param {import("@slop-lab/part/reference/index.js").Workflows.DefinitionRef} definition */
 const prepare = (engine, definition) =>
   engine.prepare(
     {
@@ -48,9 +42,10 @@ const prepare = (engine, definition) =>
     },
     context,
   );
+/** @param {import("@slop-lab/part/reference/index.js").Workflows.Engine} engine @param {import("@slop-lab/part/reference/index.js").Workflows.ExecutionRef} ref */
 const terminal = async (engine, ref) => {
   for (let i = 0; i < 200; i++) {
-    const snapshot = (await engine.get(ref, context)).value;
+    const snapshot = expectProperty(await engine.get(ref, context), 'value');
     if (['succeeded', 'failed', 'cancelled', 'unknown'].includes(snapshot.phase)) return snapshot;
     await delay(2);
   }
@@ -151,6 +146,7 @@ test('GW03/W01: code workflow executes script -> managed model -> validated resu
     effects: 'read',
     retry: 'never',
   };
+  /** @type {import("@slop-lab/part/reference/index.js").Results.Accepted | undefined} */
   let acceptedResult;
   const definition = await defineCodeWorkflow({
     id: 'code-review',
@@ -158,7 +154,7 @@ test('GW03/W01: code workflow executes script -> managed model -> validated resu
     input: jsonSchema,
     output: jsonSchema,
     replay: 'none',
-    async execute(input, c) {
+    async execute(_input, c) {
       const collected = await c.script(
         await callIdentity(c.execution, 'collect', json(request)),
         request,
@@ -238,8 +234,10 @@ test('GW03/W01: code workflow executes script -> managed model -> validated resu
     'value',
   );
   try {
-    const prepared = (await prepare(engine, ref('code-review', 'part.code', definition.digest)))
-      .value;
+    const prepared = expectProperty(
+      await prepare(engine, ref('code-review', 'part.code', definition.digest)),
+      'value',
+    );
     const started = await engine.start(
       { requestId: 'code-start', idempotencyKey: 'code-start', prepared, input: {} },
       context,
@@ -251,22 +249,22 @@ test('GW03/W01: code workflow executes script -> managed model -> validated resu
       if (waiting.phase === 'waiting') break;
       await delay(2);
     }
-    assert.equal(waiting.phase, 'waiting');
+    assert.equal(present(waiting).phase, 'waiting');
     assert.equal(fake.requests.length, 1);
     assert.ok(acceptedResult);
-    assert.equal(acceptedResult.validation[0].status, 'pass');
+    assert.equal(present(acceptedResult.validation[0]).status, 'pass');
     const response = {
       protocolVersion: 1,
       commandId: 'approve',
       actionId: 'part.workflow/respond',
       actionVersion: 1,
-      input: { ticketId: waiting.waitingOn[0].id, revision: '0', response: true },
+      input: { ticketId: present(present(waiting).waitingOn[0]).id, revision: '0', response: true },
     };
     assert.equal((await engine.action(started.ref, response, context)).kind, 'completed');
     assert.equal((await engine.action(started.ref, response, context)).kind, 'completed');
     const done = await terminal(engine, started.ref);
     assert.equal(done.phase, 'succeeded');
-    assert.equal(done.output.data.text, 'model-result');
+    assert.equal(expectProperty(expectProperty(done.output, 'data'), 'text'), 'model-result');
     assert.equal(done.guarantees.checkpoint, 'none');
     const duplicate = await engine.start(
       { requestId: 'another-id', idempotencyKey: 'code-start', prepared, input: {} },
@@ -336,8 +334,10 @@ test('GW04/W02/W04: pipeline enforces validation/assert before write and execute
       }),
       'value',
     ),
-    prepared = (await prepare(engine, ref('pipeline', 'part.pipeline', await digest(json(base)))))
-      .value;
+    prepared = expectProperty(
+      await prepare(engine, ref('pipeline', 'part.pipeline', await digest(json(base)))),
+      'value',
+    );
   const bad = await engine.start(
     { requestId: 'bad', prepared, input: { approved: false } },
     context,
@@ -369,12 +369,13 @@ test('GW04/W02/W04: pipeline enforces validation/assert before write and execute
       }),
       'value',
     ),
-    earlyPrepared = (
+    earlyPrepared = expectProperty(
       await prepare(
         earlyEngine,
         ref(expectProperty(early, 'id'), 'part.pipeline', await digest(json(early))),
-      )
-    ).value;
+      ),
+      'value',
+    );
   const failed = await earlyEngine.start(
     { requestId: 'early', prepared: earlyPrepared, input: { approved: false } },
     context,
@@ -446,6 +447,7 @@ test('W03/W14: missing engines, unsupported primitives and durable code requirem
   );
 });
 test('W10: workflow host preserves independent native engine metadata and unknown submissions', async () => {
+  /** @type {import("@slop-lab/part/reference/index.js").Workflows.EngineDescriptor} */
   const descriptor = {
     id: 'external',
     version: '7',
@@ -453,6 +455,7 @@ test('W10: workflow host preserves independent native engine metadata and unknow
     formats: [{ id: 'native', versions: ['9'] }],
     capabilities: { revision: 'native-1', entries: [] },
   };
+  /** @type {Partial<import("@slop-lab/part/reference/index.js").Workflows.Engine>} */
   const native = {
     descriptor,
     prepare: async (request) =>

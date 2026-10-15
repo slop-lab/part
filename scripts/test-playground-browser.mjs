@@ -14,6 +14,7 @@ let browser;
 try {
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  /** @type {string[]} */
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
@@ -27,26 +28,29 @@ try {
   );
   const bootstrap = await fetch(`${server.url}/api/bootstrap`);
   assert.equal((await bootstrap.text()).includes(serverKey), false);
-  assert.match(bootstrap.headers.get('set-cookie'), /HttpOnly; SameSite=Strict/);
+  assert.match(bootstrap.headers.get('set-cookie') ?? '', /HttpOnly; SameSite=Strict/);
   assert.equal((await (await fetch(`${server.url}/app.js`)).text()).includes(serverKey), false);
   await page.goto(server.url);
   await page.locator('#connection[data-state="connected"]').waitFor();
   let runs = 0;
+  /** @param {string} value */
   const phase = async (value) =>
     page.waitForFunction(
-      (expected) => document.querySelector('#run-status').textContent.startsWith(expected),
+      (expected) => document.querySelector('#run-status')?.textContent?.startsWith(expected),
       value,
     );
+  /** @param {string} scenario @param {string | null} final */
   const run = async (scenario, final = 'completed') => {
     await page.locator(`[data-scenario="${scenario}"]`).click();
     await page.getByRole('button', { name: 'Try this example' }).click();
     runs++;
     await page.waitForFunction(
-      (count) => document.querySelector('#turn-count').textContent.startsWith(`${count} `),
+      (count) => document.querySelector('#turn-count')?.textContent?.startsWith(`${count} `),
       runs,
     );
     if (final) await phase(final);
   };
+  /** @returns {Promise<ReturnType<ReturnType<import("../examples/playground/runtime.mjs").createPlaygroundSession>["state"]>>} */
   const session = () =>
     page.evaluate(
       async () =>
@@ -68,7 +72,7 @@ try {
   assert.match(await page.locator('#inspect-requests').innerText(), /digest/);
   await run('tools');
   assert.equal(
-    (await session()).runs.at(-1).events.filter((event) => event.kind === 'tool-start').length,
+    (await session()).runs.at(-1)?.events.filter((event) => event.kind === 'tool-start').length,
     1,
   );
   await run('approval', null);
@@ -86,19 +90,19 @@ try {
   await page.getByRole('button', { name: 'Open report', exact: true }).click();
   await page.getByRole('button', { name: 'Load artifact', exact: true }).click();
   await page.waitForFunction(() =>
-    document.querySelector('#inspect-items').textContent.includes('# Runtime field notes'),
+    document.querySelector('#inspect-items')?.textContent?.includes('# Runtime field notes'),
   );
   const download = page.waitForEvent('download');
   await page.getByRole('link', { name: 'Download ↓', exact: true }).click();
   assert.equal((await download).suggestedFilename(), 'runtime-report.md');
   await run('failure', 'failed');
   assert.equal(
-    (await session()).runs.at(-1).events.filter((event) => event.kind === 'tool-start').length,
+    (await session()).runs.at(-1)?.events.filter((event) => event.kind === 'tool-start').length,
     0,
   );
   await run('cancellation', null);
   await page.waitForFunction(() =>
-    document.querySelector('[data-part-part="thread"]').textContent.includes('Step 1'),
+    document.querySelector('[data-part-part="thread"]')?.textContent?.includes('Step 1'),
   );
   await page.getByRole('button', { name: 'Reconnect', exact: true }).click();
   assert.ok((await session()).active);
@@ -120,7 +124,7 @@ try {
   await page.getByRole('dialog').waitFor();
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Clear session' }).click();
-  await page.waitForFunction(() => document.querySelector('#turn-count').textContent === '0 runs');
+  await page.waitForFunction(() => document.querySelector('#turn-count')?.textContent === '0 runs');
   assert.equal((await session()).note, '');
   await page.locator('[data-scenario="tools"]').click();
   await page.getByRole('button', { name: 'Try this example' }).click();

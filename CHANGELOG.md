@@ -2,6 +2,11 @@
 
 ## 0.1.0-alpha.2 (unreleased)
 
+- Enforce strict JS/MJS checks, checked indexed access, unused-code checks and full
+  dependency declaration checks. Type runtime state, callbacks, protocol fixtures and
+  test doubles; validate metadata and unknown inputs at their boundaries. Add compile-only
+  regressions for the JS contracts and keep ACP byte-stream adaptation type safe.
+
 - Publish `dist` as each package root. Generate only its distribution metadata with
   `.` for an existing root index and `./*` for all built files; keep workspace
   metadata unchanged during builds. Replace source export annotations and individual

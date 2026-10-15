@@ -1,19 +1,20 @@
 // @ts-check
-import { stub, expectProperty } from '../fixtures/assertions.mjs';
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { localContext, digest, jsonSchema, ok, fail } from '@slop-lab/part/contracts/index.js';
-import { provenance } from '@slop-lab/part/context/index.js';
-import { createMemoryArtifacts } from '@slop-lab/part/artifacts/index.js';
 import { openFileArtifacts } from '@slop-lab/part-node/artifacts.js';
-import { createResults } from '@slop-lab/part/results/index.js';
-import { createScriptBridge } from '@slop-lab/part-plugins/scripts/bridge/index.js';
 import { startScriptBridge } from '@slop-lab/part-node/scripts/bridge.js';
 import { createNodeScripts } from '@slop-lab/part-node/scripts/index.js';
-import { createBudget, budgetKey } from '@slop-lab/part/runtime/index.js';
+import { createScriptBridge } from '@slop-lab/part-plugins/scripts/bridge/index.js';
+import { createMemoryArtifacts } from '@slop-lab/part/artifacts/index.js';
+import { provenance } from '@slop-lab/part/context/index.js';
+import { digest, jsonSchema, localContext, ok } from '@slop-lab/part/contracts/index.js';
+import { createResults } from '@slop-lab/part/results/index.js';
+import { budgetKey, createBudget } from '@slop-lab/part/runtime/index.js';
+import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import test from 'node:test';
+import { deferred, expectProperty } from '../fixtures/assertions.mjs';
+import { singleService } from '../fixtures/contracts.mjs';
 const context = localContext();
 const metadata = { mediaType: 'application/json', provenance };
 test('Artifacts publish only complete immutable bytes, authorize ranges and survive reopening', async () => {
@@ -71,9 +72,11 @@ test('Results pin artifact bytes and deduplicate concurrent processors; bad proc
     async process(input) {
       calls++;
       await new Promise((r) => setTimeout(r, 5));
+      const x = expectProperty(expectProperty(input, 'value'), 'x');
+      assert.ok(typeof x === 'number');
       const output = {
         kind: /** @type {const} */ ('inline'),
-        value: { x: expectProperty(expectProperty(input, 'value'), 'x') + 1 },
+        value: { x: x + 1 },
       };
       return ok({
         output,
@@ -150,11 +153,7 @@ test('Authenticated bridge rejects public IDs, profile widening and changed IDs;
   const upstream = createBudget({ maxModelInvocations: 1 });
   const owner = localContext({
     scope: { kind: 'runtime', id: 'owner' },
-    services: stub({
-      get(key) {
-        return key.id === budgetKey.id ? ok(upstream) : fail('missing', 'Missing service');
-      },
-    }),
+    services: singleService(budgetKey, upstream),
   });
   let calls = 0;
   const bridge = createScriptBridge({
@@ -283,7 +282,7 @@ test('Script tools share one prepared executor attempt; direct workflow scripts 
   const { createToolDispatcher, installTool } = await import('@slop-lab/part/tools.js');
   const { schema } = await import('@slop-lab/part/contracts/index.js');
   const { isScriptRequest } = await import('@slop-lab/part/scripts/index.js');
-  const { createBoundary, createOperations } = await import('@slop-lab/part/runtime/index.js');
+  const { createBoundary } = await import('@slop-lab/part/runtime/index.js');
   const root = await mkdtemp(join(tmpdir(), 'part-script-attempt-'));
   try {
     const source = 'console.log(JSON.stringify({done:true}));';
@@ -347,9 +346,7 @@ test('Script tools share one prepared executor attempt; direct workflow scripts 
     );
     const budget = createBudget({ maxExecutorAttempts: 1 });
     const caller = localContext({
-      services: stub({
-        get: (key) => (key.id === budgetKey.id ? ok(budget) : fail('missing', 'Missing service')),
-      }),
+      services: singleService(budgetKey, budget),
     });
     const handle = expectProperty(
       await dispatcher.dispatch(
@@ -383,7 +380,7 @@ test('Script tools share one prepared executor attempt; direct workflow scripts 
 
 test('Processor timeout rejects acceptance and late normalization cannot revive the submission', async () => {
   const { createOperations } = await import('@slop-lab/part/runtime/index.js');
-  let /** @type {(...args: any[]) => void} */ finish;
+  const gate = deferred();
   /** @type {import('@slop-lab/part/reference/index.js').Results.Processor} */
   const processor = {
     id: 'test/timeout',
@@ -391,9 +388,7 @@ test('Processor timeout rejects acceptance and late normalization cannot revive 
     inputType: jsonSchema.ref,
     outputType: jsonSchema.ref,
     process: async (input) => {
-      await new Promise((resolve) => {
-        finish = resolve;
-      });
+      await gate.promise;
       return ok({
         output: input,
         evidence: {
@@ -429,7 +424,7 @@ test('Processor timeout rejects acceptance and late normalization cannot revive 
   };
   const failed = await results.submit(request, context);
   assert.equal(failed.ok, false);
-  finish();
+  gate.resolve();
   await new Promise((resolve) => setTimeout(resolve, 2));
   assert.equal((await results.submit(request, context)).ok, false);
 });

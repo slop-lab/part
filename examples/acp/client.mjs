@@ -1,13 +1,14 @@
 // @ts-check
+import { client, methods, ndJsonStream } from '@agentclientprotocol/sdk';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { Readable, Writable } from 'node:stream';
+import { Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
-import { client, methods, ndJsonStream } from '@agentclientprotocol/sdk';
+import { byteStream } from './streams.mjs';
 
 const live = process.argv.includes('--live'),
   approve = process.argv.includes('--approve');
-if (live && !['responses', 'chat'].includes(process.env.PART_ACP_PROVIDER))
+if (live && !['responses', 'chat'].includes(process.env.PART_ACP_PROVIDER ?? ''))
   throw Error('Set PART_ACP_PROVIDER=responses or chat when using --live');
 const child = spawn(process.execPath, [fileURLToPath(new URL('./agent.mjs', import.meta.url))], {
   env: { ...process.env, PART_ACP_PROVIDER: live ? process.env.PART_ACP_PROVIDER : 'scripted' },
@@ -38,17 +39,18 @@ try {
       console.error(
         `\nPermission: ${params.toolCall.title} → ${approve ? 'allow once' : 'reject'}`,
       );
+      if (!option) return { outcome: { outcome: 'cancelled' } };
       return { outcome: { outcome: 'selected', optionId: option.optionId } };
     })
     .connectWith(
-      ndJsonStream(Writable.toWeb(child.stdin), Readable.toWeb(child.stdout)),
+      ndJsonStream(Writable.toWeb(child.stdin), byteStream(child.stdout)),
       async (context) => {
         const initialized = await context.request(methods.agent.initialize, {
           protocolVersion: 1,
           clientCapabilities: {},
         });
         console.error(
-          `Connected to ${initialized.agentInfo.name} (ACP ${initialized.protocolVersion}).`,
+          `Connected to ${initialized.agentInfo?.name ?? 'agent'} (ACP ${initialized.protocolVersion}).`,
         );
         const session = await context.request(methods.agent.session.new, {
           cwd: process.cwd(),
@@ -65,7 +67,15 @@ try {
             });
             console.log(`\nStop: ${result.stopReason}`);
           } catch (error) {
-            if (error.data?.code === 'part.acp.denied')
+            if (
+              error !== null &&
+              typeof error === 'object' &&
+              'data' in error &&
+              error.data !== null &&
+              typeof error.data === 'object' &&
+              'code' in error.data &&
+              error.data.code === 'part.acp.denied'
+            )
               console.log('\nPermission rejected; the tool was not executed.');
             else throw error;
           }
