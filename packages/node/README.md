@@ -17,3 +17,9 @@ using the HTTP host need Node typings for its IncomingMessage callback.
 
 Build in the workspace with `npm run build --workspace @part/node`.
 This is a private experimental package; pin its exact version and its core dependency.
+
+Local OpenAI-compatible mocks are available from `@part/node/testing/mock-provider`,
+with operator tools at `@part/node/testing/mock-provider/tools`. Installed packages
+provide `part-mock-provider --help`; interactive sessions wait for working-agent
+decisions, and fixed sessions replay exact fixtures. See `docs/mock-provider.md` in
+the repository for CLI flows, transcript export and noninteractive replay.

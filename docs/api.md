@@ -61,6 +61,12 @@ only the needed packages. Bridge interfaces are type-only exports from
 | `@part/core/runtime/observability`                                                                       | Immutable manifests, explicit trace/redaction policy, bounded retention and authorized reads                    |
 | `@part/plugins/testing`                                                                                  | Deterministic fake model fixtures; no real-provider compatibility claim                                         |
 
+Mock providers are exported by `@part/node/testing/mock-provider`, with operator
+tools at `@part/node/testing/mock-provider/tools` and a packaged `part-mock-provider`
+CLI. The portable Chat Completions adapter is
+`@part/plugins/providers/openai-compatible`. See [mock workflows](mock-provider.md)
+for session ownership, exact fixture matching, transcript export and profile limits.
+
 ## Extension contracts
 
 `lowerersPoint` is a context-owned registry and `transformsPoint` is a context-owned

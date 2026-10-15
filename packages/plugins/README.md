@@ -16,3 +16,9 @@ stack recovery. Real-provider smoke is deferred.
 
 Build in the workspace with `npm run build --workspace @part/plugins`.
 This is a private experimental package; pin its exact version and its core dependency.
+
+`@part/plugins/providers/openai-compatible` exports `createOpenAICompatibleAdapter`
+for text/function-tool Chat Completions over JSON or SSE. It works with the local
+Node mock and an explicitly configured compatible endpoint. This profile does not
+implement Responses API, media or provider-hosted tools; no real-provider smoke
+success is claimed.

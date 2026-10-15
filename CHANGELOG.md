@@ -2,6 +2,12 @@
 
 ## 0.1.0-alpha.2 (unreleased)
 
+- Add loopback OpenAI-compatible interactive/fixed mock providers, project-bound
+  operator tools and the `part-mock-provider` CLI. Export successful interactive
+  transcripts as exact ordered fixtures for noninteractive replay.
+- Add a portable Chat Completions text/function-tool adapter, agent tool-loop
+  examples and fixed/interactive golden transcripts.
+
 - Split the SDK into `@part/core`, `@part/plugins`, `@part/node` and `@part/browser`.
   The private workspace root is not an aggregate package. All three optional packages
   depend only on the matching core version; each has independent output and packaging.

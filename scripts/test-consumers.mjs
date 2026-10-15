@@ -111,6 +111,14 @@ try {
     for (const { pkg, entry } of entries)
       if (entry.default?.endsWith('.css'))
         readFileSync(join(directory, 'node_modules', pkg.manifest.name, entry.default));
+    for (const pkg of installed)
+      for (const command of Object.keys(pkg.manifest.bin ?? {}))
+        if (
+          !run(join(directory, 'node_modules', '.bin', command), ['--help'], directory).includes(
+            command,
+          )
+        )
+          throw Error(`Packaged executable ${command} failed`);
     if (name === 'browser') {
       const bundle = await build({
         stdin: {

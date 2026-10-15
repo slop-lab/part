@@ -43,6 +43,11 @@ console.log(outcome);
 await created.value.dispose();
 ```
 
+Local provider tests can be controlled by the working agent through a JSON CLI or
+registered operator tools. Requests wait for explicit decisions; successful transcripts
+can become exact fixed fixtures for automated tests. Run `npm run example:mock:fixed`
+for the complete tool flow, or see [mock provider workflows](docs/mock-provider.md).
+
 Build local packages and install only the packages a dependent repository needs:
 
 ```sh
