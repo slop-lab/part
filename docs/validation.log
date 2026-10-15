@@ -273,3 +273,28 @@ npm run format:check and git diff --check: passed
 Source guide: docs/playground.md; structured results: docs/playground.evidence.json; scripted desktop screenshot: docs/images/playground-desktop.png
 CI now configures Chromium on Node 24; hosted CI was not executed
 Scope: bounded memory playground, not durable history, a workflow engine, production authentication or a complete cross-browser/device/a11y audit
+
+ACP agent integration — 2026-10-15 UTC
+Implementation: a2ee152e77e02b5be3a7d95cc9098d697059848c
+Final runtime source: d69c9540fd22ba49d509b137405b492d3c9c76d7
+Environment: Node v26.5.1, npm 11.17.0, official @agentclientprotocol/sdk 1.8.0 (development only)
+npm test: 127 tests passed, including 18 focused ACP tests
+ACP coverage: official SDK initialization/session prompts, text resources/Unicode/history isolation, approved/rejected/unknown permissions, late decisions, request/session/connection cancellation, reused provider call IDs, reused RPC IDs during write backpressure, limits/timeouts/EOF and incomplete cleanup retention
+MCP coverage: owned real stdio child, host launch policy, permission before invocation, model-visible result, ambient credential exclusion, unknown remote effect evidence and process cleanup
+node examples/acp/client.mjs: passed; rejected save_note, no execution, child exited 0
+node examples/acp/client.mjs --approve: passed; one allow-once decision, second turn completed, child exited 0
+PART_ACP_PROVIDER=responses node examples/acp/client.mjs --live: passed; ACP_OK, end_turn, 1 text chunk, no tools, child exited 0
+PART_ACP_PROVIDER=chat node examples/acp/client.mjs --live: passed; ACP_OK, end_turn, 1 text chunk, no tools, child exited 0
+Live requests used the existing server-side R4U configuration and gpt-6-luna; no keys or configured endpoints recorded
+Live ACP checks cover text only; function-tool permission behavior is covered locally, while provider-native tool loops have separate prior smoke evidence
+npm run test:consumers: 7 isolated packed consumers passed, including portable ACP without Node adapters and Node ACP without the plugin bundle
+Public exports: @part/plugins/acp, @part/node/acp and @part/node/acp/mcp
+node scripts/check-architecture.mjs: passed (4 packages, 139 source modules, 68 public entrypoints)
+npm run format:check and git diff --check: passed
+Guide: docs/acp.md, including Zed custom-agent settings and bounded ACP/MCP profile
+Scope: ACP agent side only; no Zed GUI execution, external ACP agent client, durable sessions or full ACP/MCP conformance claim; hosted CI not executed
+npm run pack:local: passed; refreshed four alpha.2 tarballs and checksum sidecars
+SHA-256 part-core-0.1.0-alpha.2.tgz: f80bca43c8c15052aab2549a426e44313fe7d79c6da3575823bb20a65b9b85b9
+SHA-256 part-plugins-0.1.0-alpha.2.tgz: 58770f05fc03171670dfdb10fe8d4a011b4ad385b886fd427faee63e9c0c5d37
+SHA-256 part-node-0.1.0-alpha.2.tgz: d31a1eb62803a7a9ac6a33c82286f70bbad1e8f327deb58c36e96114893eb06c
+SHA-256 part-browser-0.1.0-alpha.2.tgz: adf20cd63693653b7a29f1ca9cbd651acef48b01821772063443707cfabb2c16

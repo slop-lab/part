@@ -29,3 +29,9 @@ for stateless Responses text/runtime-function calls over JSON or SSE, with nativ
 reasoning replay. Live R4U `gpt-6-luna` smoke passed JSON/SSE text and a tool loop.
 See [Responses usage and limits](../../docs/openai-responses.md). Media, hosted tools,
 background requests and stored conversation/continuation handles are unsupported.
+
+`@part/plugins/acp` exports `createAcpAgent` for ACP v1 sessions, text streaming,
+tool permission requests and cancellation over a structural connection port.
+Hosts configure an agent per session; the plugin installs permission middleware.
+It has no Node or ACP SDK dependency. See [ACP integration](../../docs/acp.md)
+for the Node transport, MCP connector, executable examples and profile limits.

@@ -70,6 +70,15 @@ The separate `@part/plugins/providers/openai-responses` adapter supports statele
 Responses text/function calls over JSON/SSE and native reasoning replay. See
 [Responses usage and limits](openai-responses.md).
 
+`@part/plugins/acp` exports `createAcpAgent` for the ACP v1 agent profile:
+initialization, per-session managed agents, text/embedded-text prompts, streaming
+updates, permission-gated tools, cancellation and advertised session close.
+`@part/node/acp` provides `startAcpStdio`; `@part/node/acp/mcp` provides the
+authorized stdio MCP tools connector `connectAcpMcpServers`. Structural ports keep
+the Node and portable packages independent. ACP connection shutdown owns and
+cancels its sessions, unlike closing an ordinary runtime observation. See
+[ACP usage, protocol bounds and unsupported capabilities](acp.md).
+
 ## Extension contracts
 
 `lowerersPoint` is a context-owned registry and `transformsPoint` is a context-owned

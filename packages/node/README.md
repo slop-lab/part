@@ -23,3 +23,9 @@ with operator tools at `@part/node/testing/mock-provider/tools`. Installed packa
 provide `part-mock-provider --help`; interactive sessions wait for working-agent
 decisions, and fixed sessions replay exact fixtures. See `docs/mock-provider.md` in
 the repository for CLI flows, transcript export and noninteractive replay.
+
+`@part/node/acp` exports `startAcpStdio`, a bounded concurrent NDJSON JSON-RPC
+transport accepting a structural handler. `@part/node/acp/mcp` exports
+`connectAcpMcpServers` for explicitly authorized, session-owned stdio MCP tools.
+These adapters do not depend on the plugin bundle or the ACP SDK.
+See [ACP integration](../../docs/acp.md) for agent composition and Zed settings.

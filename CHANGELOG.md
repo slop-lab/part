@@ -2,6 +2,12 @@
 
 ## 0.1.0-alpha.2 (unreleased)
 
+- Add an ACP v1 agent plugin, separate Node stdio transport and authorized stdio
+  MCP tool connector. Support text streaming, session ownership, permission-gated
+  dispatch, cancellation and bounded cleanup; verify official SDK interoperability.
+- Add runnable ACP agent/client examples with scripted and optional R4U providers,
+  Zed configuration and isolated package-consumer coverage.
+
 - Replace the static chat preview with a six-scenario browser playground using real
   managed agents, tools, approval waits, artifacts and HTTP/SSE. Add server-only
   opt-in R4U providers, request/event inspection, memory sessions and responsive themes.

@@ -41,6 +41,12 @@ or a durable product host.
 
 ## Dependent-project readiness
 
+The optional [ACP agent plugin](acp.md) exposes configured part agents to editor
+clients over the separate Node stdio adapter. Local official-SDK interoperability,
+permission/cancellation races, bounded transport, session-owned MCP tools and live
+R4U text smoke are verified. This does not certify a specific editor GUI or every
+ACP/MCP capability. Calling external ACP agents remains separate scope.
+
 Dependent projects can start local development against selected alpha.2 workspace
 packages and a lockfile, using fake endpoints or their own configured provider.
 `npm run pack:local` creates four independent tarballs. Seven isolated consumers

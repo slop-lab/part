@@ -49,6 +49,12 @@ explicit owner cancellation/shutdown does, with unresolved cleanup preserved.
 
 ## Reproduction
 
+ACP agent integration has separate local evidence: 18 focused tests using official
+SDK 1.8.0 and owned stdio children, plus successful R4U Chat Completions/Responses
+text requests through the example ACP client. This supports the bounded profile
+in [ACP integration](acp.md); it does not imply Zed GUI verification or complete
+ACP/MCP conformance. Core gate scope is unchanged.
+
 ```sh
 npm ci
 npm run format:check

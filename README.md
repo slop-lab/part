@@ -52,6 +52,11 @@ registered operator tools. Requests wait for explicit decisions; successful tran
 can become exact fixed fixtures for automated tests. Run `npm run example:mock:fixed`
 for the complete tool flow, or see [mock provider workflows](docs/mock-provider.md).
 
+Run part as an ACP agent for editor clients with `@part/plugins/acp` and the
+`@part/node/acp` stdio adapter. `npm run example:acp` demonstrates conversation and
+tool permission requests using the official SDK client. See [ACP integration](docs/acp.md)
+for Zed settings, session-owned MCP tools and optional live R4U providers.
+
 Build local packages and install only the packages a dependent repository needs:
 
 ```sh
