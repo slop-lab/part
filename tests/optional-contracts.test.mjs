@@ -4,24 +4,24 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Window } from 'happy-dom';
-import { localContext, jsonSchema, schema, ok, fail, digest } from 'part/contracts';
-import { createMemoryStore } from 'part/storage/memory';
-import { createNamespaceMigrations } from 'part/storage/migrations';
-import { createCheckpointStore } from 'part/workflows/checkpoints';
-import { createNodeScripts } from 'part/scripts/node';
-import { createMarkdownView } from 'part/ui/markdown';
-import { createRendererRegistry, orderSlots } from 'part/ui/registry';
-import { createObservability } from 'part/runtime/observability';
-import { createHistory } from 'part/context/history';
-import { createChatHistoryAttachment } from 'part/context/run-history';
-import { createRunService, installDriver } from 'part/runtime/runs';
-import { createBasicDriver } from 'part/agent/drivers/basic';
-import { createPlanner } from 'part/composition';
-import { createOperations, createBudget, budgetKey } from 'part/runtime';
-import { createModelGateway } from 'part/model';
-import { fakeModel } from 'part/testing';
-import { createContextCompiler, provenance } from 'part/context';
-import { createRecipeEngine } from 'part/workflows/recipe';
+import { localContext, jsonSchema, schema, ok, fail, digest } from '@part/core/contracts';
+import { createMemoryStore } from '@part/core/storage/memory';
+import { createNamespaceMigrations } from '@part/core/storage/migrations';
+import { createCheckpointStore } from '@part/plugins/workflows/checkpoints';
+import { createNodeScripts } from '@part/node/scripts';
+import { createMarkdownView } from '@part/browser/markdown';
+import { createRendererRegistry, orderSlots } from '@part/browser/registry';
+import { createObservability } from '@part/core/runtime/observability';
+import { createHistory } from '@part/core/context/history';
+import { createChatHistoryAttachment } from '@part/core/context/run-history';
+import { createRunService, installDriver } from '@part/core/runtime/runs';
+import { createBasicDriver } from '@part/plugins/agent/drivers/basic';
+import { createPlanner } from '@part/core/composition';
+import { createOperations, createBudget, budgetKey } from '@part/core/runtime';
+import { createModelGateway } from '@part/core/model';
+import { fakeModel } from '@part/plugins/testing';
+import { createContextCompiler, provenance } from '@part/core/context';
+import { createRecipeEngine } from '@part/plugins/workflows/recipe';
 const context = localContext();
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 const outcome = (result) => ({
@@ -383,9 +383,9 @@ test('Recipe retries explicit read-only validation, but never retries failed or 
 });
 
 test('Estimated cost ceilings reserve before transport, require explicit pricing and preserve actual effect evidence', async () => {
-  const { createAgent } = await import('part/agent');
-  const { functionTool } = await import('part/agent/tools');
-  const { costUnits } = await import('part/runtime/costs');
+  const { createAgent } = await import('@part/plugins/agent');
+  const { functionTool } = await import('@part/core/tools');
+  const { costUnits } = await import('@part/core/runtime/costs');
   assert.equal(costUnits('0.000001').value, 1);
   assert.equal(costUnits('0.0000001').ok, false);
   assert.equal(costUnits('-1').ok, false);
@@ -432,9 +432,9 @@ test('Estimated cost ceilings reserve before transport, require explicit pricing
 });
 
 test('DOM components, ordered slots, inspector and artifact viewers use only public client contracts', async () => {
-  const { createWatchHub, createLocalPort, createController } = await import('part/client');
-  const { createChat } = await import('part/ui/dom');
-  const { createInspector } = await import('part/ui/inspector');
+  const { createWatchHub, createLocalPort, createController } = await import('@part/core/client');
+  const { createChat } = await import('@part/browser/dom');
+  const { createInspector } = await import('@part/browser/inspector');
   const hub = createWatchHub({ revision: '1', entries: [] });
   const endpoint = {
     watch: (_request, c) => hub.watch(c),

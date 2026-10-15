@@ -3,15 +3,15 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { localContext, digest, jsonSchema, ok, fail } from 'part/contracts';
-import { provenance } from 'part/context';
-import { createMemoryArtifacts } from 'part/artifacts';
-import { openFileArtifacts } from 'part/artifacts/node';
-import { createResults } from 'part/results';
-import { createScriptBridge } from 'part/scripts/bridge';
-import { startScriptBridge } from 'part/scripts/bridge/node';
-import { createNodeScripts } from 'part/scripts/node';
-import { createBudget, budgetKey } from 'part/runtime';
+import { localContext, digest, jsonSchema, ok, fail } from '@part/core/contracts';
+import { provenance } from '@part/core/context';
+import { createMemoryArtifacts } from '@part/core/artifacts';
+import { openFileArtifacts } from '@part/node/artifacts';
+import { createResults } from '@part/core/results';
+import { createScriptBridge } from '@part/plugins/scripts/bridge';
+import { startScriptBridge } from '@part/node/scripts/bridge';
+import { createNodeScripts } from '@part/node/scripts';
+import { createBudget, budgetKey } from '@part/core/runtime';
 const context = localContext();
 const metadata = { mediaType: 'application/json', provenance };
 test('Artifacts publish only complete immutable bytes, authorize ranges and survive reopening', async () => {
@@ -250,10 +250,10 @@ test('Authenticated bridge rejects public IDs, profile widening and changed IDs;
 });
 
 test('Script tools share one prepared executor attempt; direct workflow scripts retain their own boundary', async () => {
-  const { createToolDispatcher, installTool } = await import('part/agent/tools');
-  const { schema } = await import('part/contracts');
-  const { isScriptRequest } = await import('part/scripts');
-  const { createBoundary, createOperations } = await import('part/runtime');
+  const { createToolDispatcher, installTool } = await import('@part/core/tools');
+  const { schema } = await import('@part/core/contracts');
+  const { isScriptRequest } = await import('@part/core/scripts');
+  const { createBoundary, createOperations } = await import('@part/core/runtime');
   const root = await mkdtemp(join(tmpdir(), 'part-script-attempt-'));
   try {
     const source = 'console.log(JSON.stringify({done:true}));';
@@ -339,7 +339,7 @@ test('Script tools share one prepared executor attempt; direct workflow scripts 
 });
 
 test('Processor timeout rejects acceptance and late normalization cannot revive the submission', async () => {
-  const { createOperations } = await import('part/runtime');
+  const { createOperations } = await import('@part/core/runtime');
   let finish;
   const processor = {
     id: 'test/timeout',

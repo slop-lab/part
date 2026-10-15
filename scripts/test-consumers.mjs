@@ -1,12 +1,24 @@
-import { mkdtempSync, readFileSync, writeFileSync, cpSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { build } from 'esbuild';
 import { spawnSync } from 'node:child_process';
-const root = process.cwd(),
-  temporary = mkdtempSync(join(tmpdir(), 'part-consumers-'));
-const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-const publicEntries = Object.entries(manifest.exports);
-const publicPath = (name) => (name === '.' ? manifest.name : `${manifest.name}/${name.slice(2)}`);
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const root = process.cwd();
+const temporary = mkdtempSync(join(tmpdir(), 'part-consumers-'));
+const packages = ['core', 'plugins', 'node', 'browser'].map((directory) => ({
+  directory,
+  manifest: JSON.parse(readFileSync(`packages/${directory}/package.json`, 'utf8')),
+}));
+const consumers = {
+  core: ['core'],
+  'non-coding': ['core', 'plugins'],
+  swe: ['core', 'plugins'],
+  contracts: ['core', 'plugins', 'browser'],
+  workflow: ['core', 'plugins'],
+  node: ['core', 'node'],
+  browser: ['core', 'browser'],
+};
 function run(command, args, cwd = root) {
   const result = spawnSync(command, args, {
     cwd,
@@ -19,11 +31,21 @@ function run(command, args, cwd = root) {
     );
   return result.stdout;
 }
+const publicPath = (pkg, name) => pkg.manifest.name + (name === '.' ? '' : '/' + name.slice(2));
 try {
-  const packed = JSON.parse(run('npm', ['pack', '--json', '--pack-destination', temporary]));
-  const tarball = join(temporary, packed[0].filename);
-  for (const name of ['non-coding', 'swe', 'contracts', 'workflow']) {
+  for (const pkg of packages) {
+    const packed = JSON.parse(
+      run(
+        'npm',
+        ['pack', '--json', '--pack-destination', temporary],
+        join(root, 'packages', pkg.directory),
+      ),
+    );
+    pkg.tarball = join(temporary, packed[0].filename);
+  }
+  for (const [name, selected] of Object.entries(consumers)) {
     const directory = join(temporary, name);
+    const installed = packages.filter((pkg) => selected.includes(pkg.directory));
     cpSync(join(root, 'consumers', name), directory, { recursive: true });
     writeFileSync(
       join(directory, 'package.json'),
@@ -32,25 +54,26 @@ try {
           name: `part-fixture-${name}`,
           private: true,
           type: 'module',
-          dependencies: { part: `file:${tarball}` },
+          dependencies: Object.fromEntries(
+            installed.map((pkg) => [pkg.manifest.name, `file:${pkg.tarball}`]),
+          ),
         },
         null,
         2,
       ),
     );
     run('npm', ['install', '--ignore-scripts', '--offline', '--no-audit', '--no-fund'], directory);
-    if (name === 'contracts') {
-      const writeEntrypoints = (entries) =>
-        writeFileSync(
-          join(directory, 'entrypoints.ts'),
-          `export type Entrypoints = [\n${entries
-            .filter(([, entry]) => entry.types)
-            .map(([name]) => `  typeof import(${JSON.stringify(publicPath(name))})`)
-            .join(',\n')}\n];\n`,
-        );
-      // The Node HTTP adapter intentionally exposes IncomingMessage. All other
-      // declarations must also compile in a consumer without ambient Node types.
-      writeEntrypoints(publicEntries.filter(([name]) => name !== './host/http'));
+    const entries = installed.flatMap((pkg) =>
+      Object.entries(pkg.manifest.exports).map(([name, entry]) => ({ pkg, name, entry })),
+    );
+    if (['core', 'contracts', 'node', 'browser'].includes(name)) {
+      writeFileSync(
+        join(directory, 'entrypoints.ts'),
+        `export type Entrypoints = [\n${entries
+          .filter(({ entry }) => entry.types)
+          .map(({ pkg, name }) => `  typeof import(${JSON.stringify(publicPath(pkg, name))})`)
+          .join(',\n')}\n];\n`,
+      );
       writeFileSync(
         join(directory, 'tsconfig.json'),
         JSON.stringify({
@@ -59,48 +82,60 @@ try {
             module: 'NodeNext',
             moduleResolution: 'NodeNext',
             strict: true,
-            types: [],
             skipLibCheck: false,
             outDir: 'out',
             lib: ['ES2022', 'DOM', 'DOM.Iterable'],
+            types: name === 'node' ? ['node'] : [],
+            ...(name === 'node' ? { typeRoots: [join(root, 'node_modules/@types')] } : {}),
           },
           include: ['index.ts', 'entrypoints.ts'],
         }),
       );
       run(process.execPath, [join(root, 'node_modules/typescript/bin/tsc')], directory);
-      process.stdout.write(run(process.execPath, ['out/index.js'], directory));
-      writeEntrypoints(publicEntries);
-      run(
-        process.execPath,
-        [
-          join(root, 'node_modules/typescript/bin/tsc'),
-          '--types',
-          'node',
-          '--typeRoots',
-          join(root, 'node_modules/@types'),
-        ],
-        directory,
-      );
-      const modules = publicEntries
-        .filter(([, entry]) => entry.default?.endsWith('.js'))
-        .map(([name]) => publicPath(name));
-      run(
-        process.execPath,
-        [
-          '--input-type=module',
-          '--eval',
-          `for (const path of ${JSON.stringify(modules)}) await import(path);`,
-        ],
-        directory,
-      );
-      for (const [, entry] of publicEntries)
-        if (entry.default?.endsWith('.css'))
-          readFileSync(join(directory, 'node_modules', manifest.name, entry.default));
-      console.log(`All ${publicEntries.length} public package entrypoints verified`);
-    } else process.stdout.write(run(process.execPath, ['index.mjs'], directory));
+    }
+    process.stdout.write(
+      run(process.execPath, [name === 'contracts' ? 'out/index.js' : 'index.mjs'], directory),
+    );
+    const modules = entries
+      .filter(({ entry }) => entry.default?.endsWith('.js'))
+      .map(({ pkg, name }) => publicPath(pkg, name));
+    run(
+      process.execPath,
+      [
+        '--input-type=module',
+        '--eval',
+        `for (const path of ${JSON.stringify(modules)}) await import(path);`,
+      ],
+      directory,
+    );
+    for (const { pkg, entry } of entries)
+      if (entry.default?.endsWith('.css'))
+        readFileSync(join(directory, 'node_modules', pkg.manifest.name, entry.default));
+    if (name === 'browser') {
+      const bundle = await build({
+        stdin: {
+          contents:
+            "export { createChat } from '@part/browser/dom'; export { createController } from '@part/core/client';",
+          resolveDir: directory,
+        },
+        bundle: true,
+        platform: 'browser',
+        write: false,
+        metafile: true,
+      });
+      if (Object.keys(bundle.metafile.inputs).some((path) => /@part\/(node|plugins)\//.test(path)))
+        throw Error('Browser consumer pulled in another runtime');
+    }
     const lock = JSON.parse(readFileSync(join(directory, 'package-lock.json'), 'utf8'));
-    if (lock.packages['node_modules/part'].version !== manifest.version)
-      throw Error('Unpinned consumer version');
+    for (const pkg of packages) {
+      const path = join(directory, 'node_modules', pkg.manifest.name);
+      if (selected.includes(pkg.directory)) {
+        if (lock.packages[`node_modules/${pkg.manifest.name}`]?.version !== pkg.manifest.version)
+          throw Error('Unpinned consumer version');
+      } else if (existsSync(path))
+        throw Error(`${name} unexpectedly installed ${pkg.manifest.name}`);
+    }
+    console.log(`${name}: isolated packages and ${entries.length} public entrypoints verified`);
   }
 } finally {
   rmSync(temporary, { recursive: true, force: true });

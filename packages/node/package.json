@@ -1,0 +1,47 @@
+{
+  "name": "@part/node",
+  "version": "0.1.0-alpha.2",
+  "private": true,
+  "type": "module",
+  "description": "Node.js adapters for part",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    "./packages": {
+      "types": "./dist/packages.d.ts",
+      "default": "./dist/packages.js"
+    },
+    "./scripts": {
+      "types": "./dist/scripts/index.d.ts",
+      "default": "./dist/scripts/index.js"
+    },
+    "./scripts/bridge": {
+      "types": "./dist/scripts/bridge.d.ts",
+      "default": "./dist/scripts/bridge.js"
+    },
+    "./host/http": {
+      "types": "./dist/host/http.d.ts",
+      "default": "./dist/host/http.js"
+    },
+    "./storage/sqlite": {
+      "types": "./dist/storage/sqlite.d.ts",
+      "default": "./dist/storage/sqlite.js"
+    },
+    "./artifacts": {
+      "types": "./dist/artifacts.d.ts",
+      "default": "./dist/artifacts.js"
+    }
+  },
+  "dependencies": {
+    "@part/core": "0.1.0-alpha.2"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build.mjs node",
+    "check": "tsc -b"
+  }
+}

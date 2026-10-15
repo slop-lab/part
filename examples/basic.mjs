@@ -1,14 +1,14 @@
-import { createAgent } from 'part/agent';
-import { functionTool } from 'part/agent/tools';
-import { stringSchema } from 'part/contracts';
-import { fakeModel } from 'part/testing';
+import { createAgent } from '@part/plugins/agent';
+import { functionTool } from '@part/core/tools';
+import { stringSchema } from '@part/core/contracts';
+import { fakeModel } from '@part/plugins/testing';
 
 const model = fakeModel([
   { toolCalls: [{ name: 'uppercase', arguments: { text: 'hello' } }] },
   { text: 'HELLO' },
 ]);
 // Runtime validation and provider JSON Schema are separate contracts.
-import { schema } from 'part/contracts';
+import { schema } from '@part/core/contracts';
 const input = schema(
   'example/text',
   (value) => value !== null && typeof value === 'object' && typeof value.text === 'string',

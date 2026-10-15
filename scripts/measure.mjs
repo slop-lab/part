@@ -2,7 +2,7 @@ import { performance } from 'node:perf_hooks';
 const before = process.getActiveResourcesInfo(),
   memory = process.memoryUsage().heapUsed,
   start = performance.now();
-await import('part');
+await import('@part/core');
 const elapsed = performance.now() - start,
   after = process.getActiveResourcesInfo();
 const activeDelta = after.filter(

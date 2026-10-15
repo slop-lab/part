@@ -2,7 +2,7 @@
 
 The runtime is named **part (progressive agent runtime)**. The ignored `.local/`
 source specification retains its original `car` name; implementation identifiers,
-package exports and examples use `part`.
+package exports and examples use `@part/core`.
 
 This release implements the specification's initial local profiles through S3,
 including the actual code and pipeline plugins required by section 16.1. The
@@ -26,10 +26,12 @@ than treating every proposed declaration as a shipped guarantee.
 
 ## Dependent-project readiness
 
-Dependent projects can start local development against the exact alpha.2 tarball
-and lockfile, using fake endpoints or their own configured provider. Four isolated
-consumers validate the package: non-coding, SWE, public TypeScript extension and
-generic workflow client. There is no reverse runtime dependency from part to SWE.
+Dependent projects can start local development against selected alpha.2 workspace
+packages and a lockfile, using fake endpoints or their own configured provider.
+`npm run pack:local` creates four independent tarballs. Seven isolated consumers
+cover core-only, non-coding, SWE, public TypeScript extensions, workflow, Node-only
+adapters and browser-only UI. They validate every public code/type/CSS entrypoint
+without installing unrelated packages. There is no reverse dependency on SWE.
 
 The actual-provider smoke test remains **explicitly deferred by the user**. This
 is missing external compatibility evidence, not an implementation failure. No real

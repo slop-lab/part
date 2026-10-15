@@ -1,7 +1,7 @@
-import { createController, createLocalPort, createWatchHub } from '../../src/client/index.js';
-import { fail, localContext, ok } from '../../src/contracts/index.js';
-import type { Client, Projection } from '../../src/reference/index.js';
-import { createChat } from '../../src/ui/dom.js';
+import { createChat } from '@part/browser/dom';
+import { createController, createLocalPort, createWatchHub } from '@part/core/client';
+import { fail, localContext, ok } from '@part/core/contracts';
+import type { Client, Projection } from '@part/core/reference';
 const context = localContext(),
   hub = createWatchHub({ revision: 'demo', entries: [] });
 const runs = new Map<string, AbortController>();

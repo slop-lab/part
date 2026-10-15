@@ -27,30 +27,37 @@ all optional modules are implemented.
 Public APIs are experimental until G-BASE passes. Consumers must pin exact versions.
 Breaking changes require a changelog, migration guidance, and consumer fixture runs.
 
-Source files are grouped by responsibility:
+The repository is an npm workspace with four packages:
 
-- `contracts/` contains shared JSON contracts and validation helpers;
-  `foundation/` contains internal hashing and deadline primitives.
-- `runtime/` contains operations, progress, effect boundaries, budgets, runs and waits.
-- `composition/`, `agent/` and `model/` contain composition, drivers/tools and model adapters.
-- `context/` contains semantic context, history and projections.
-- `extensions/` and `scripts/` contain hooks/skills/packages and script/bridge execution.
-- `workflows/` contains workflow engines and endpoints. Pipeline handler registration,
-  value resolution, compilation and execution live in separate `pipeline/` modules.
-  The memory engine separates submission/lifecycle, managed step contexts, output
-  validation, call identities and snapshots. Its scope-rebinding helper is private.
-- `host/`, `storage/` and `client/` contain hosting, persistence and client transport.
-- `artifacts/` owns immutable byte storage; `results/` owns result validation/processing.
-- `ui/` contains optional presentation modules and styles; `testing/` contains fixtures.
-- `reference/` contains the type-only design namespaces, one module per namespace.
+- `packages/core` owns environment-independent contracts, composition, runtime,
+  model/tool ports, context, clients, generic storage and script bridge ports.
+- `packages/plugins` owns portable agent presets/drivers, providers, hooks/skills,
+  script bridge policies, workflow engines and deterministic fake models.
+- `packages/node` owns POSIX process execution, authenticated loopback transport,
+  HTTP hosting, SQLite, immutable file artifacts and directory snapshots.
+- `packages/browser` owns DOM/headless presentation and styles.
+
+Only core has no runtime package dependencies. Plugins, Node and browser each
+have one exact-version dependency on core. Core cannot reference another package,
+and environment packages do not reference each other or the portable plugin bundle.
+Cross-package imports use declared public exports, including type-only ports;
+relative paths never cross a package boundary. Each package owns its sources,
+TypeScript project, build output, explicit exports, README and tarball. The repository
+root is private development tooling and does not aggregate the SDK. There are no
+mandatory plugin bundles in a core-only or browser-only installation.
+
+Within packages, modules are grouped by responsibility. Pipeline compilation,
+execution, handlers and value resolution are separate. The memory workflow engine
+separates submission/lifecycle, managed calls, output validation, identity and snapshots.
+Core design reference namespaces remain separate type-only modules.
 
 Composition separates planning, opaque handle storage and scope ownership. The client
 separates codecs, watch state, local transport and controller state. The Node script
 host separates admission/attempt ownership, immutable source selection and process I/O.
 
 Imports use their original descriptive names. Public package paths follow the
-domain hierarchy, such as `part/workflows/code`, `part/model/providers/ollama` and
-`part/ui/dom`. Flat compatibility paths and the duplicate core entrypoint are removed.
+domain hierarchy, such as `@part/plugins/workflows/code`, `@part/plugins/providers/ollama` and
+`@part/browser/dom`. Flat compatibility paths and the duplicate core entrypoint are removed.
 Internal modules import their actual dependencies instead of their own public barrels.
 Shared budget/effect logic belongs to runtime, so script and workflow engines do not
 depend on model gateways or agent drivers. Internal helper paths are not public exports.

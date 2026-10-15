@@ -1,18 +1,17 @@
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "strict": true,
-    "declaration": true,
-    "outDir": "dist",
-    "rootDir": "src",
-    "noUncheckedIndexedAccess": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "verbatimModuleSyntax": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "skipLibCheck": false
-  },
-  "include": ["src/**/*.ts"]
+  "files": [],
+  "references": [
+    {
+      "path": "packages/core"
+    },
+    {
+      "path": "packages/plugins"
+    },
+    {
+      "path": "packages/node"
+    },
+    {
+      "path": "packages/browser"
+    }
+  ]
 }

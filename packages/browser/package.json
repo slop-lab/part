@@ -1,0 +1,51 @@
+{
+  "name": "@part/browser",
+  "version": "0.1.0-alpha.2",
+  "private": true,
+  "type": "module",
+  "description": "Browser UI for part",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    "./dom": {
+      "types": "./dist/dom.d.ts",
+      "default": "./dist/dom.js"
+    },
+    "./headless": {
+      "types": "./dist/headless.d.ts",
+      "default": "./dist/headless.js"
+    },
+    "./inspector": {
+      "types": "./dist/inspector.d.ts",
+      "default": "./dist/inspector.js"
+    },
+    "./markdown": {
+      "types": "./dist/markdown.d.ts",
+      "default": "./dist/markdown.js"
+    },
+    "./registry": {
+      "types": "./dist/registry.d.ts",
+      "default": "./dist/registry.js"
+    },
+    "./workbench": {
+      "types": "./dist/workbench.d.ts",
+      "default": "./dist/workbench.js"
+    },
+    "./workflow": {
+      "types": "./dist/workflow.d.ts",
+      "default": "./dist/workflow.js"
+    },
+    "./styles.css": {
+      "default": "./dist/styles.css"
+    }
+  },
+  "dependencies": {
+    "@part/core": "0.1.0-alpha.2"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build.mjs browser",
+    "check": "tsc -b"
+  }
+}

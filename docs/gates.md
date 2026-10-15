@@ -1,8 +1,8 @@
 # Integration gate evidence
 
-Candidate: `part@0.1.0-alpha.2`.
+Candidate: `@part/core`, `@part/plugins`, `@part/node` and `@part/browser` at `0.1.0-alpha.2`.
 
-**Dependent local projects can start against the pinned tarball.** Formal G-BASE
+**Dependent local projects can start against the selected pinned package tarballs.** Formal G-BASE
 remains open because actual-provider smoke was explicitly deferred by the user.
 G-WORKFLOW's local reference profile has execution evidence for every gate area.
 This does not certify third-party product compatibility or durable continuation.
@@ -12,7 +12,7 @@ See [implementation coverage](implementation.md) and [support limits](api.md).
 
 | Gate | Actual evidence                                                                                                                             | Status                                                                                      |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| G01  | ADRs, strict codecs, four isolated packed consumers, zero runtime dependencies                                                              | Verified local profile                                                                      |
+| G01  | ADRs, strict codecs, seven isolated packed consumers, zero runtime dependencies                                                             | Verified local profile                                                                      |
 | G02  | Input → fake model → function tool → result, cold import resources/heap/time                                                                | Verified                                                                                    |
 | G03  | Text/tool/error/native/EOF decoding and real loopback custom HTTP endpoint                                                                  | Fake profile verified; actual provider deferred                                             |
 | G04  | Allow/rewrite/deny/substitute/redirect/suspend, output validation, substitute original calls zero                                           | Verified tested cases                                                                       |
@@ -62,5 +62,7 @@ with reviewed workspace sandbox escalation, use temporary local roots and requir
 no provider credentials. No real-provider success or remote CI execution is claimed.
 
 [Validation log](validation.log) records commands and outcomes. [Candidate evidence](evidence.json)
-records environment, code revision/digests and measurements. Cold-import numbers
+records the pre-refactor environment, code revision/digests and measurements.
+Current workspace verification is appended to the validation log; historical hashes
+do not describe the current package layout. Cold-import numbers
 are one local measurement, not a universal performance guarantee.

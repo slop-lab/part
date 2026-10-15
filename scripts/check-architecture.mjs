@@ -9,36 +9,68 @@ function files(directory) {
     entry.isDirectory() ? files(join(directory, entry.name)) : [join(directory, entry.name)],
   );
 }
-const sources = files('src').filter((file) => file.endsWith('.ts'));
+const packages = ['core', 'plugins', 'node', 'browser'].map((directory) => ({
+  directory,
+  path: `packages/${directory}`,
+  manifest: JSON.parse(readFileSync(`packages/${directory}/package.json`, 'utf8')),
+}));
+const byName = new Map(packages.map((pkg) => [pkg.manifest.name, pkg]));
+const sources = packages
+  .flatMap((pkg) => files(`${pkg.path}/src`))
+  .filter((file) => file.endsWith('.ts'));
 const graph = new Map(sources.map((file) => [file, new Set()]));
-const portableRoots = [
-  'src/index.ts',
-  'src/client/index.ts',
-  ...sources.filter((file) => file.startsWith('src/ui/')),
-];
+const owner = (file) => packages.find((pkg) => file.startsWith(`${pkg.path}/src/`));
+const localPath = (file) => file.slice(owner(file).path.length + 5);
 const coreFiles = new Set([
-  'src/index.ts',
-  'src/contracts/index.ts',
-  'src/foundation/hash.ts',
-  'src/foundation/deadline.ts',
-  'src/composition/index.ts',
-  'src/composition/handles.ts',
-  'src/composition/planner.ts',
-  'src/composition/scopes.ts',
-  'src/runtime/index.ts',
-  'src/runtime/budget.ts',
-  'src/runtime/boundary.ts',
-  'src/runtime/effects.ts',
-  'src/runtime/operations.ts',
-  'src/runtime/progress.ts',
+  'index.ts',
+  'contracts/index.ts',
+  'foundation/hash.ts',
+  'composition/planner.ts',
+  'composition/handles.ts',
+  'composition/scopes.ts',
+  'runtime/budget.ts',
+  'runtime/boundary.ts',
+  'runtime/operations.ts',
+  'runtime/progress.ts',
+  'runtime/deadline.ts',
 ]);
-const nodeAdapters =
-  /^(src\/(scripts\/node\/|scripts\/bridge\/node\.ts$|extensions\/packages\/node\.ts$|artifacts\/node\.ts$|storage\/sqlite\.ts$|host\/http\.ts$))/;
-const coreLayers = /^(src\/(contracts|foundation)\/)/;
-const lowerRuntime = /^src\/runtime\//;
-const higherLayers =
-  /^src\/(agent|model|scripts|workflows|host|storage|artifacts|results|ui|client)\//;
-
+function resolveDependency(file, specifier, runtime) {
+  const pkg = owner(file);
+  if (specifier.startsWith('node:')) {
+    if (pkg.directory !== 'node') failures.push(`${file}: Node imports belong in @part/node`);
+    return specifier;
+  }
+  if (specifier.startsWith('.')) {
+    const target = relative(root, resolve(dirname(file), specifier)).replace(/\.js$/, '.ts');
+    if (!graph.has(target)) failures.push(`${file}: missing source ${target}`);
+    else if (owner(target) !== pkg)
+      failures.push(`${file}: cross-package imports must use public exports`);
+    return target;
+  }
+  const match = /^(@[^/]+\/[^/]+)(?:\/(.*))?$/.exec(specifier);
+  const dependency = match && byName.get(match[1]);
+  if (!dependency) {
+    failures.push(`${file}: dependency ${specifier} must be explicitly reviewed`);
+    return undefined;
+  }
+  if (dependency === pkg) failures.push(`${file}: internal imports must be relative`);
+  if (
+    dependency !== pkg &&
+    pkg.manifest.dependencies?.[dependency.manifest.name] !== dependency.manifest.version
+  )
+    failures.push(`${file}: undeclared or unpinned dependency ${dependency.manifest.name}`);
+  const name = match[2] ? `./${match[2]}` : '.';
+  const entry = dependency.manifest.exports[name];
+  if (!entry || (runtime && !entry.default)) {
+    failures.push(`${file}: missing public ${runtime ? 'runtime' : 'type'} export ${specifier}`);
+    return undefined;
+  }
+  const output = entry.types ?? entry.default;
+  return `${dependency.path}/${output.slice(2)}`
+    .replace('/dist/', '/src/')
+    .replace(/\.d\.ts$/, '.ts')
+    .replace(/\.js$/, '.ts');
+}
 for (const file of sources) {
   const source = ts.createSourceFile(
     file,
@@ -47,21 +79,31 @@ for (const file of sources) {
     true,
   );
   const imports = [];
-  const visit = (node) => {
+  function visit(node) {
     if ((ts.isImportSpecifier(node) && node.propertyName) || ts.isNamespaceImport(node))
       failures.push(`${file}: import aliases are not allowed`);
     if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
       const specifier = node.arguments[0];
-      if (specifier && ts.isStringLiteral(specifier)) imports.push(specifier.text);
+      if (specifier && ts.isStringLiteral(specifier))
+        imports.push({ specifier: specifier.text, runtime: true });
       else failures.push(`${file}: dynamic imports must use literal module paths`);
     }
+    if (
+      ts.isImportTypeNode(node) &&
+      ts.isLiteralTypeNode(node.argument) &&
+      ts.isStringLiteral(node.argument.literal)
+    )
+      imports.push({ specifier: node.argument.literal.text, runtime: false });
     ts.forEachChild(node, visit);
-  };
+  }
   visit(source);
   for (const statement of source.statements) {
-    if (!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) continue;
-    if (!statement.moduleSpecifier || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
-    const specifier = statement.moduleSpecifier.text;
+    if (
+      (!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) ||
+      !statement.moduleSpecifier ||
+      !ts.isStringLiteral(statement.moduleSpecifier)
+    )
+      continue;
     const bindings = ts.isImportDeclaration(statement)
       ? statement.importClause?.namedBindings
       : statement.exportClause;
@@ -72,37 +114,41 @@ for (const file of sources) {
         (ts.isNamedImports(bindings) || ts.isNamedExports(bindings)) &&
         bindings.elements.length > 0 &&
         bindings.elements.every((item) => item.isTypeOnly));
-    if (typeOnly) continue;
-    imports.push(specifier);
+    imports.push({ specifier: statement.moduleSpecifier.text, runtime: !typeOnly });
   }
-  for (const specifier of imports) {
-    if (specifier.startsWith('node:')) {
-      graph.get(file).add(specifier);
-      if (!nodeAdapters.test(file))
-        failures.push(`${file}: Node imports belong in explicit Node adapters`);
-      continue;
-    }
-    if (!specifier.startsWith('.')) {
-      failures.push(`${file}: runtime dependency ${specifier} must be explicitly reviewed`);
-      continue;
-    }
-    const target = relative(root, resolve(dirname(file), specifier)).replace(/\.js$/, '.ts');
-    if (!graph.has(target)) {
-      failures.push(`${file}: missing source dependency ${target}`);
-      continue;
-    }
+  for (const { specifier, runtime } of imports) {
+    const target = resolveDependency(file, specifier, runtime);
+    if (!target || !runtime) continue;
     graph.get(file).add(target);
-    if (coreLayers.test(file) && !coreLayers.test(target))
-      failures.push(`${file}: shared primitives cannot depend on ${target}`);
-    if (lowerRuntime.test(file) && higherLayers.test(target))
-      failures.push(`${file}: runtime cannot depend on ${target}`);
-    if (file.startsWith('src/scripts/') && /^src\/(model|agent|workflows)\//.test(target))
-      failures.push(`${file}: scripts cannot depend on ${target}`);
-    if (file.startsWith('src/workflows/memory/') && target.startsWith('src/agent/'))
+    if (owner(file).directory === 'core' && owner(target)?.directory === 'core') {
+      const source = localPath(file),
+        destination = localPath(target);
+      if (
+        /^(contracts|foundation)\//.test(source) &&
+        !/^(contracts|foundation)\//.test(destination)
+      )
+        failures.push(`${file}: shared primitives cannot depend on ${target}`);
+      if (
+        source.startsWith('runtime/') &&
+        /^(model|tools|scripts|host|storage|artifacts|results|client)(?:\/|\.ts$)/.test(destination)
+      )
+        failures.push(`${file}: runtime cannot depend on ${target}`);
+    }
+    if (
+      owner(file).directory === 'plugins' &&
+      localPath(file).startsWith('workflows/memory/') &&
+      owner(target)?.directory === 'plugins' &&
+      localPath(target).startsWith('agent/')
+    )
       failures.push(`${file}: workflow execution cannot depend on agent drivers`);
+    if (
+      localPath(file).startsWith('scripts/') &&
+      owner(target)?.directory === 'core' &&
+      localPath(target).startsWith('model/')
+    )
+      failures.push(`${file}: script execution must use model ports, not the model implementation`);
   }
 }
-
 const visiting = new Set(),
   visited = new Set();
 function checkCycles(file, path = []) {
@@ -112,7 +158,7 @@ function checkCycles(file, path = []) {
   }
   if (visited.has(file) || file.startsWith('node:')) return;
   visiting.add(file);
-  for (const target of graph.get(file)) checkCycles(target, [...path, file]);
+  for (const target of graph.get(file) ?? []) checkCycles(target, [...path, file]);
   visiting.delete(file);
   visited.add(file);
 }
@@ -123,38 +169,42 @@ function reachable(file, seen = new Set()) {
   for (const target of graph.get(file) ?? []) reachable(target, seen);
   return seen;
 }
-for (const entry of portableRoots)
-  for (const target of reachable(entry))
-    if (target.startsWith('node:'))
-      failures.push(`${entry}: portable entrypoint reaches ${target}`);
-for (const target of reachable('src/index.ts'))
-  if (!coreFiles.has(target))
+for (const file of sources.filter((file) => owner(file).directory !== 'node'))
+  for (const target of reachable(file))
+    if (target.startsWith('node:')) failures.push(`${file}: portable code reaches ${target}`);
+for (const target of reachable('packages/core/src/index.ts'))
+  if (!target.startsWith('packages/core/src/') || !coreFiles.has(localPath(target)))
     failures.push(`Core entrypoint imports optional implementation ${target}`);
-
-const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
-const targets = new Set();
-for (const [name, entry] of Object.entries(pkg.exports)) {
-  if (name.includes('*')) failures.push(`Wildcard export ${name} exposes internal helpers`);
-  const output = entry.default ?? entry.types;
-  const source = output
-    .replace(/^\.\/dist\//, 'src/')
-    .replace(/\.d\.ts$/, '.ts')
-    .replace(/\.js$/, '.ts');
-  if (!existsSync(source)) failures.push(`${name}: missing source ${source}`);
-  if (targets.has(output)) failures.push(`${name}: duplicate public entrypoint for ${output}`);
-  targets.add(output);
-  const expected =
-    source === 'src/index.ts' ? '.' : './' + source.slice(4).replace(/(?:\/index)?\.ts$/, '');
-  if (name !== expected)
-    failures.push(`${name}: public path must follow its source domain (${expected})`);
-  if (entry.default?.endsWith('.js') && entry.types !== entry.default.replace(/\.js$/, '.d.ts'))
-    failures.push(`${name}: JavaScript and declaration targets disagree`);
+let entries = 0;
+for (const pkg of packages) {
+  const expectedDependencies =
+    pkg.directory === 'core' ? {} : { '@part/core': byName.get('@part/core').manifest.version };
+  if (JSON.stringify(pkg.manifest.dependencies ?? {}) !== JSON.stringify(expectedDependencies))
+    failures.push(`${pkg.path}: dependencies must follow the core/plugin/environment boundary`);
+  const targets = new Set();
+  for (const [name, entry] of Object.entries(pkg.manifest.exports)) {
+    entries++;
+    if (name.includes('*')) failures.push(`${pkg.path}: wildcard exports expose internal helpers`);
+    const output = entry.default ?? entry.types;
+    const source = `${pkg.path}/${output.slice(2)}`
+      .replace('/dist/', '/src/')
+      .replace(/\.d\.ts$/, '.ts')
+      .replace(/\.js$/, '.ts');
+    if (!existsSync(source)) failures.push(`${pkg.path}/${name}: missing source ${source}`);
+    if (targets.has(output)) failures.push(`${pkg.path}/${name}: duplicate public entrypoint`);
+    targets.add(output);
+    const path = source.slice(`${pkg.path}/src/`.length);
+    const expected = path === 'index.ts' ? '.' : './' + path.replace(/(?:\/index)?\.ts$/, '');
+    if (name !== expected)
+      failures.push(`${pkg.path}/${name}: public path must follow source domain (${expected})`);
+    if (entry.default?.endsWith('.js') && entry.types !== entry.default.replace(/\.js$/, '.d.ts'))
+      failures.push(`${pkg.path}/${name}: code/declaration targets disagree`);
+  }
 }
 if (failures.length) {
   console.error(failures.join('\n'));
   process.exitCode = 1;
-} else {
+} else
   console.log(
-    `Architecture checks passed (${sources.length} source modules, ${targets.size} public entrypoints)`,
+    `Architecture checks passed (${packages.length} packages, ${sources.length} source modules, ${entries} public entrypoints)`,
   );
-}

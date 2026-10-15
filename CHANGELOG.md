@@ -2,9 +2,15 @@
 
 ## 0.1.0-alpha.2 (unreleased)
 
+- Split the SDK into `@part/core`, `@part/plugins`, `@part/node` and `@part/browser`.
+  The private workspace root is not an aggregate package. All three optional packages
+  depend only on the matching core version; each has independent output and packaging.
+- Verify seven isolated consumers and all public entrypoints, including core-only,
+  Node-only and browser-only installs without unrelated packages.
+
 - Replace abbreviated import aliases with descriptive names and group source files
-  by responsibility. Public paths follow their domains, including `part/workflows/code`,
-  `part/scripts/node` and `part/ui/dom`; remove flat compatibility paths and `part/core`.
+  by responsibility. Public paths follow their domains, including `@part/plugins/workflows/code`,
+  `@part/node/scripts` and `@part/browser/dom`; remove flat compatibility paths and `part/core`.
 - Move shared budget/effect helpers into runtime and use direct internal dependencies.
 - Separate workflow lifecycle, managed calls, output validation and state; split script
   admission/source/process handling, composition planning/scopes and client codec/watch/controller.
@@ -29,8 +35,9 @@ Direct `createRunService` callers must pass a planner-resolved composition handl
 DOM component overrides now have concrete exported signatures. Durable checkpoint
 storage does not enable code/pipeline replay. Pin this version and rerun consumers.
 Update imports to the domain paths listed in `docs/api.md`; there are no compatibility
-aliases. `reserve`, `budgetKey` and `combineEffects` belong to `part/runtime`.
-The public stylesheet is `part/ui/styles.css`.
+aliases. `reserve`, `budgetKey` and `combineEffects` belong to `@part/core/runtime`.
+The public stylesheet is `@part/browser/styles.css`. Use `npm run pack:local`
+and install core plus only the required optional package tarballs.
 
 ## 0.1.0-alpha.1 (local baseline)
 

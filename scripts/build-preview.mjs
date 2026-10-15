@@ -8,7 +8,7 @@ const bundle = await build({
   target: 'es2022',
   write: false,
 });
-const css = readFileSync('src/ui/styles.css', 'utf8');
+const css = readFileSync('packages/browser/dist/styles.css', 'utf8');
 mkdirSync('preview', { recursive: true });
 writeFileSync(
   'preview/index.html',

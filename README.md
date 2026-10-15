@@ -1,32 +1,40 @@
 # part
 
-Progressive agent runtime: an embedded agent SDK with optional composition,
-model/tool execution, context, persistence, client/UI, skills, scripts, and workflows.
+Progressive agent runtime: a small environment-independent core with optional
+plugins and separate Node and browser packages.
 
-**Local integration alpha:** non-coding, SWE, contract and workflow consumers run against a
-packed `0.1.0-alpha.2` package. Fake-provider prototypes can start against this
-version. Formal G-BASE signoff remains pending the real-provider smoke test, which
-was explicitly deferred. See [gate evidence](docs/gates.md) and
-[supported contracts and limits](docs/api.md). Code/pipeline/recipe workflows,
-authenticated script bridges, generic workflow UI, history, artifacts and local
-host ownership are available as optional modules. See the
-[implementation coverage](docs/implementation.md) for the initial and later scope boundaries.
+| Package         | Responsibility                                                                                     | Runtime dependencies |
+| --------------- | -------------------------------------------------------------------------------------------------- | -------------------- |
+| `@part/core`    | Contracts, composition, operations, model/tool ports, context, storage ports and client protocol   | None                 |
+| `@part/plugins` | Agent presets/drivers, Ollama provider, workflows, hooks/skills, script bridge and test fixtures   | `@part/core`         |
+| `@part/node`    | POSIX script processes, loopback bridge, HTTP host, SQLite, file artifacts and directory snapshots | `@part/core`         |
+| `@part/browser` | DOM/headless UI, renderers, workflow forms, Inspector/Workbench and CSS                            | `@part/core`         |
+
+The repository root is a private npm workspace, not an installable aggregate SDK.
+Each package has explicit exports, independent build output and a local tarball.
+Plugins are grouped in one package; individual plugins do not each need a package.
+Core does not import the other packages, and browser/Node adapters communicate
+through core contracts rather than depending on each other or the plugin bundle.
 
 ```sh
 npm ci
+npm run check
 npm test
 npm run test:consumers
 npm run measure
 npm run preview
 ```
 
-The preview opens at `http://127.0.0.1:4173`. It demonstrates simulated streaming,
-owner cancellation, custom cards, and CSS theme replacement. Tests also exercise
-Chat against the actual embedded agent and a real local HTTP endpoint.
+The preview opens at `http://127.0.0.1:4173` with simulated streaming, owner
+cancellation and custom cards. Seven isolated consumer fixtures cover core-only,
+non-coding, SWE, contracts, workflow, Node and browser installations. Every public
+entrypoint is checked from separately packed packages. Portable declarations do
+not require Node types; Node HTTP host declarations are checked with explicit
+Node typings.
 
 ```js
-import { createAgent } from 'part/agent';
-import { fakeModel } from 'part/testing';
+import { createAgent } from '@part/plugins/agent';
+import { fakeModel } from '@part/plugins/testing';
 
 const created = createAgent({ model: fakeModel([{ text: 'Hello from part' }]) });
 if (!created.ok) throw new Error(created.error.message);
@@ -35,20 +43,28 @@ console.log(outcome);
 await created.value.dispose();
 ```
 
-For a dependent repository, build and install the local tarball:
+Build local packages and install only the packages a dependent repository needs:
 
 ```sh
-npm run build
-npm pack --cache /tmp/part-npm-cache
-# In the consumer repository:
-npm install /path/to/part-0.1.0-alpha.2.tgz
+npm run pack:local
+# In the consumer repository, for an agent application:
+npm install /path/to/part/artifacts/part-core-0.1.0-alpha.2.tgz \
+  /path/to/part/artifacts/part-plugins-0.1.0-alpha.2.tgz
+# Add part-node-*.tgz for Node adapters or part-browser-*.tgz for DOM UI.
 ```
 
-Commit the consumer lockfile and pin the package exactly. This package is private
-and has not been published to npm. Public APIs are experimental; changes require
-consumer regression tests and changelog/migration notes.
+Commit the consumer lockfile and pin package versions exactly. Packages are private
+and have not been published to npm. APIs are experimental; there are no compatibility
+aliases for the former flat imports. The browser stylesheet is
+`@part/browser/styles.css`. Run a single package build with
+`npm run build --workspace @part/browser` (or another workspace name).
 
-Use [the basic tool example](examples/basic.mjs),
-[packed consumer fixtures](consumers), and [architecture decisions](docs/architecture.md)
-for more detail. Core import opens no database, socket, watcher, process, or timer.
-All runtime plugins are trusted code; capability declarations do not provide OS isolation.
+Dependent projects can begin local development. Real-provider smoke remains
+explicitly deferred, so formal G-BASE signoff is open. See
+[gate evidence](docs/gates.md), [supported contracts](docs/api.md),
+[implementation coverage](docs/implementation.md), [architecture](docs/architecture.md),
+[the basic example](examples/basic.mjs) and [consumer fixtures](consumers).
+The recorded pre-refactor evidence is historical; current checks use the workspace layout.
+
+Core import opens no database, socket, watcher, process or timer. Plugins are trusted
+code; capability declarations do not provide OS isolation.

@@ -3,18 +3,26 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { localContext, ok, fail, jsonSchema, stringSchema, schema, digest } from 'part/contracts';
-import { createOperations, createBoundary } from 'part/runtime';
-import { createNodeScripts } from 'part/scripts/node';
-import { createResults } from 'part/results';
-import { createSuspensions } from 'part/runtime/waits';
-import { createCodeEngine, defineCodeWorkflow } from 'part/workflows/code';
-import { createPipelineEngine, installStepHandler } from 'part/workflows/pipeline';
-import { createWorkflowHost } from 'part/workflows/host';
-import { callIdentity } from 'part/workflows/memory';
-import { fakeModel } from 'part/testing';
-import { createModelGateway } from 'part/model';
-import { messageItem, createContextCompiler } from 'part/context';
+import {
+  localContext,
+  ok,
+  fail,
+  jsonSchema,
+  stringSchema,
+  schema,
+  digest,
+} from '@part/core/contracts';
+import { createOperations, createBoundary } from '@part/core/runtime';
+import { createNodeScripts } from '@part/node/scripts';
+import { createResults } from '@part/core/results';
+import { createSuspensions } from '@part/core/runtime/waits';
+import { createCodeEngine, defineCodeWorkflow } from '@part/plugins/workflows/code';
+import { createPipelineEngine, installStepHandler } from '@part/plugins/workflows/pipeline';
+import { createWorkflowHost } from '@part/plugins/workflows/host';
+import { callIdentity } from '@part/plugins/workflows/memory';
+import { fakeModel } from '@part/plugins/testing';
+import { createModelGateway } from '@part/core/model';
+import { messageItem, createContextCompiler } from '@part/core/context';
 const context = localContext(),
   delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const ref = (id, format, digest) => ({

@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, relative } from 'node:path';
-import { createAgent } from 'part/agent';
-import { functionTool } from 'part/agent/tools';
-import { schema, stringSchema } from 'part/contracts';
-import { fakeModel } from 'part/testing';
+import { createAgent } from '@part/plugins/agent';
+import { functionTool } from '@part/core/tools';
+import { schema, stringSchema } from '@part/core/contracts';
+import { fakeModel } from '@part/plugins/testing';
 const workspace = mkdtempSync(join(tmpdir(), 'part-consumer-workspace-'));
 try {
   writeFileSync(join(workspace, 'input.txt'), 'consumer-owned workspace');

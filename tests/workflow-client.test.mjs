@@ -1,15 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
-import { localContext, jsonSchema, ok, fail, digest } from 'part/contracts';
-import { createCodeEngine, defineCodeWorkflow } from 'part/workflows/code';
-import { createPipelineEngine, installStepHandler } from 'part/workflows/pipeline';
-import { createWorkflowHost } from 'part/workflows/host';
-import { createWorkflowEndpoint } from 'part/workflows/endpoint';
-import { createSuspensions } from 'part/runtime/waits';
-import { callIdentity } from 'part/workflows/memory';
-import { createLocalPort, createController, jsonCodec } from 'part/client';
-import { createWorkflowView } from 'part/ui/workflow';
+import { localContext, jsonSchema, ok, fail, digest } from '@part/core/contracts';
+import { createCodeEngine, defineCodeWorkflow } from '@part/plugins/workflows/code';
+import { createPipelineEngine, installStepHandler } from '@part/plugins/workflows/pipeline';
+import { createWorkflowHost } from '@part/plugins/workflows/host';
+import { createWorkflowEndpoint } from '@part/plugins/workflows/endpoint';
+import { createSuspensions } from '@part/core/runtime/waits';
+import { callIdentity } from '@part/plugins/workflows/memory';
+import { createLocalPort, createController, jsonCodec } from '@part/core/client';
+import { createWorkflowView } from '@part/browser/workflow';
 const context = localContext();
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function until(predicate) {

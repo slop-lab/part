@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-import { createAgent } from 'part/agent';
-import { functionTool } from 'part/agent/tools';
-import { schema, stringSchema } from 'part/contracts';
-import { fakeModel } from 'part/testing';
+import { createAgent } from '@part/plugins/agent';
+import { functionTool } from '@part/core/tools';
+import { schema, stringSchema } from '@part/core/contracts';
+import { fakeModel } from '@part/plugins/testing';
 const input = schema(
   'consumer/text',
   (value) => value && typeof value === 'object' && typeof value.text === 'string',
