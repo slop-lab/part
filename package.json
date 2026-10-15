@@ -23,12 +23,14 @@
     "example:mock:fixed": "npm run build && node examples/mock-provider/fixed.mjs",
     "smoke:provider": "npm run build && node --env-file=.env scripts/smoke-provider.mjs",
     "smoke:responses": "npm run build && node --env-file=.env scripts/smoke-provider.mjs responses",
-    "test:browser": "npm run preview:build && node scripts/test-playground-browser.mjs"
+    "test:browser": "npm run preview:build && node scripts/test-playground-browser.mjs",
+    "example:acp": "npm run build && node examples/acp/client.mjs"
   },
   "engines": {
     "node": ">=22.18"
   },
   "devDependencies": {
+    "@agentclientprotocol/sdk": "1.8.0",
     "@types/node": "^22.0.0",
     "esbuild": "^0.28.2",
     "happy-dom": "^21.0.1",
