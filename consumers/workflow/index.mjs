@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { localContext, jsonSchema, ok } from 'part/contracts';
-import { defineCodeWorkflow, createCodeEngine } from 'part/workflow-code';
-import { createWorkflowHost } from 'part/workflow-host';
-import { createWorkflowEndpoint } from 'part/workflow-endpoint';
+import { defineCodeWorkflow, createCodeEngine } from 'part/workflows/code';
+import { createWorkflowHost } from 'part/workflows/host';
+import { createWorkflowEndpoint } from 'part/workflows/endpoint';
 import { createLocalPort, createController } from 'part/client';
 const context = localContext();
 let executed = 0;

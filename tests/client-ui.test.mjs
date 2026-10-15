@@ -2,18 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
 import { build } from 'esbuild';
-import { createAgent } from '../dist/agent/index.js';
-import { fakeModel } from '../dist/testing/index.js';
-import { createEmbeddedEndpoint } from '../dist/host/embedded.js';
-import {
-  createLocalPort,
-  createWatchHub,
-  createController,
-  jsonCodec,
-} from '../dist/client/index.js';
-import { createComposer } from '../dist/ui/headless.js';
-import { createChat } from '../dist/ui/dom.js';
-import { localContext } from '../dist/foundation/contracts.js';
+import { createAgent } from 'part/agent';
+import { fakeModel } from 'part/testing';
+import { createEmbeddedEndpoint } from 'part/host/embedded';
+import { createLocalPort, createWatchHub, createController, jsonCodec } from 'part/client';
+import { createComposer } from 'part/ui/headless';
+import { createChat } from 'part/ui/dom';
+import { localContext } from 'part/contracts';
 const context = localContext();
 const command = (text, id = crypto.randomUUID()) => ({
   protocolVersion: 1,

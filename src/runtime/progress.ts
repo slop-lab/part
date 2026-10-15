@@ -1,5 +1,5 @@
-import { fail, isJson, ok } from '../foundation/contracts.js';
-import type { Runtime } from '../reference/index.js';
+import { fail, isJson, ok } from '../contracts/index.js';
+import type { Runtime } from '../reference/runtime.js';
 /** A bounded multicast stream. Readers never own execution. */
 export function createProgress(defaultCapacity = 64) {
   let index = 0,

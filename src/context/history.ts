@@ -1,5 +1,7 @@
-import { fail, isJson, ok } from '../foundation/contracts.js';
-import type { Contracts, History, Storage } from '../reference/index.js';
+import { fail, isJson, ok } from '../contracts/index.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { History } from '../reference/history.js';
+import type { Storage } from '../reference/storage.js';
 import { createMemoryStore } from '../storage/memory.js';
 import { provenance } from './index.js';
 interface SessionData {

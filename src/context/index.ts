@@ -1,5 +1,8 @@
-import { digest, fail, freeze, isJson, ok } from '../foundation/contracts.js';
-import type { Composition, Context, Contracts, Model } from '../reference/index.js';
+import { digest, fail, freeze, isJson, ok } from '../contracts/index.js';
+import type { Composition } from '../reference/composition.js';
+import type { Context } from '../reference/context.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Model } from '../reference/model.js';
 
 export const lowerersPoint: Composition.ExtensionPoint<Context.Lowerer<unknown>> = {
   id: 'part.context/lowerers',

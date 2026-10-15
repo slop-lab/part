@@ -1,14 +1,16 @@
-import { digest, fail, ok } from '../foundation/contracts.js';
-import type { Contracts, Skills, Workflows } from '../reference/index.js';
-import { createOperations } from '../runtime/index.js';
-import { createMemoryWorkflowEngine } from './memory.js';
-import { createBlockCompiler } from './pipeline/compile.js';
-import { createPipelineExecutor } from './pipeline/execute.js';
-import type { Handler } from './pipeline/handlers.js';
-import { bindings } from './pipeline/handlers.js';
-import type { PipelineOptions } from './pipeline/types.js';
-import { jsonValid, valueValid } from './pipeline/values.js';
-export { handlersPoint, installStepHandler } from './pipeline/handlers.js';
+import { digest, fail, ok } from '../../contracts/index.js';
+import type { Contracts } from '../../reference/contracts.js';
+import type { Skills } from '../../reference/skills.js';
+import type { Workflows } from '../../reference/workflows.js';
+import { createOperations } from '../../runtime/operations.js';
+import { createMemoryWorkflowEngine } from '../memory/index.js';
+import { createBlockCompiler } from './compile.js';
+import { createPipelineExecutor } from './execute.js';
+import type { Handler } from './handlers.js';
+import { bindings } from './handlers.js';
+import type { PipelineOptions } from './types.js';
+import { jsonValid, valueValid } from './values.js';
+export { handlersPoint, installStepHandler } from './handlers.js';
 export function createPipelineEngine(options: PipelineOptions): Contracts.Result<Workflows.Engine> {
   options = {
     ...options,

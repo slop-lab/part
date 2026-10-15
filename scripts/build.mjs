@@ -8,4 +8,4 @@ const compiler = spawnSync(process.execPath, ['node_modules/typescript/bin/tsc']
 });
 if (compiler.error) throw compiler.error;
 if (compiler.status !== 0) process.exit(compiler.status ?? 1);
-cpSync('src/ui/styles.css', 'dist/ui.css');
+cpSync('src/ui/styles.css', 'dist/ui/styles.css');

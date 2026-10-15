@@ -1,7 +1,8 @@
-import { fail, ok } from '../foundation/contracts.js';
-import type { Contracts, Runtime } from '../reference/index.js';
+import { fail, ok } from '../contracts/index.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Runtime } from '../reference/runtime.js';
+import { budgetKey, createBudget } from './budget.js';
 import { costUnits } from './costs.js';
-import { budgetKey, createBudget } from './index.js';
 /** Every local reservation also reserves the upstream owner. Failed admission rolls back. */
 export function createChildBudget(
   context: Contracts.InvocationContext,

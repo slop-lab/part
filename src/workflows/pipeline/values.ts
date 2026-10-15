@@ -1,5 +1,6 @@
-import { fail, isJson, isJsonObject, ok } from '../../foundation/contracts.js';
-import type { Contracts, PipelineV1 } from '../../reference/index.js';
+import { fail, isJson, isJsonObject, ok } from '../../contracts/index.js';
+import type { Contracts } from '../../reference/contracts.js';
+import type { PipelineV1 } from '../../reference/pipeline-v1.js';
 export const objectValid = (value: unknown): boolean => isJsonObject(value);
 export const jsonValid = (value: unknown): boolean => isJson(value);
 export function pointer(value: Contracts.Json, path: string): Contracts.Result<Contracts.Json> {

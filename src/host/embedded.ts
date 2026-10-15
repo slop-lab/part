@@ -1,22 +1,13 @@
 import { createControl, installAction, installQuery } from '../client/control.js';
 import { createWatchHub } from '../client/index.js';
-import {
-  fail,
-  jsonSchema,
-  localContext,
-  ok,
-  schema,
-  stringSchema,
-} from '../foundation/contracts.js';
-import type {
-  Client,
-  Context,
-  Contracts,
-  Convenience,
-  Model,
-  Projection,
-  Runtime,
-} from '../reference/index.js';
+import { fail, jsonSchema, localContext, ok, schema, stringSchema } from '../contracts/index.js';
+import type { Client } from '../reference/client.js';
+import type { Context } from '../reference/context.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Convenience } from '../reference/convenience.js';
+import type { Model } from '../reference/model.js';
+import type { Projection } from '../reference/projection.js';
+import type { Runtime } from '../reference/runtime.js';
 export const nullSchema = schema<null>('part/null', (value): value is null => value === null);
 export function createEmbeddedEndpoint(
   agent: Convenience.Agent<string | readonly Context.SemanticItem[], Model.Response>,

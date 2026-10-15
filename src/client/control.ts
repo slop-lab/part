@@ -1,5 +1,7 @@
-import { canonical, fail, isJson, isJsonObject, ok, schema } from '../foundation/contracts.js';
-import type { Client, Contracts, Control } from '../reference/index.js';
+import { canonical, fail, isJson, isJsonObject, ok, schema } from '../contracts/index.js';
+import type { Client } from '../reference/client.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Control } from '../reference/control.js';
 
 const fields = (value: Record<string, Contracts.Json>, allowed: string[]) =>
   Object.keys(value).every((key) => allowed.includes(key));

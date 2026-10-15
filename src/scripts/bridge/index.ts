@@ -1,9 +1,11 @@
-import { canonical, fail, freeze, isJson, isJsonObject, ok } from '../foundation/contracts.js';
-import { scheduleDeadline } from '../foundation/deadline.js';
-import type { Contracts, Runtime, Scripts } from '../reference/index.js';
-import { numericLimits } from '../runtime/budgets.js';
-import { costServices } from '../runtime/costs.js';
-import { budgetKey, createBudget } from '../runtime/index.js';
+import { canonical, fail, freeze, isJson, isJsonObject, ok } from '../../contracts/index.js';
+import { scheduleDeadline } from '../../foundation/deadline.js';
+import type { Contracts } from '../../reference/contracts.js';
+import type { Runtime } from '../../reference/runtime.js';
+import type { Scripts } from '../../reference/scripts.js';
+import { budgetKey, createBudget } from '../../runtime/budget.js';
+import { numericLimits } from '../../runtime/budgets.js';
+import { costServices } from '../../runtime/costs.js';
 export interface BridgeMethod {
   readonly profileRequired?: boolean;
   invoke(

@@ -1,5 +1,7 @@
-import { canonical, fail, freeze, isJson, ok } from '../foundation/contracts.js';
-import type { Contracts, Runtime, Workflows } from '../reference/index.js';
+import { canonical, fail, freeze, isJson, ok } from '../contracts/index.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Runtime } from '../reference/runtime.js';
+import type { Workflows } from '../reference/workflows.js';
 /** The native owner supplies scheduling, continuation, actions and recovery semantics. */
 export interface NativeWorkflowPort {
   prepare(

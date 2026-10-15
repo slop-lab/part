@@ -1,5 +1,6 @@
-import { digest, fail, isJson, isJsonObject, ok } from '../foundation/contracts.js';
-import type { Contracts, Model } from '../reference/index.js';
+import { digest, fail, isJson, isJsonObject, ok } from '../../contracts/index.js';
+import type { Contracts } from '../../reference/contracts.js';
+import type { Model } from '../../reference/model.js';
 
 /** Ollama /api/chat NDJSON adapter; streaming text, thinking, and function tools. */
 export function createOllamaAdapter(): Model.Adapter {

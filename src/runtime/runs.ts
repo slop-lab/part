@@ -1,12 +1,13 @@
 import { isCompositionHandle } from '../composition/index.js';
 import type { RunHistoryAttachment, RunHistoryLease } from '../context/run-history.js';
-import { canonical, emptyCleanup, fail, ok } from '../foundation/contracts.js';
-import { budgetKey } from '../model/gateway.js';
-import type { Contracts, Driver, Runtime } from '../reference/index.js';
+import { canonical, emptyCleanup, fail, ok } from '../contracts/index.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Driver } from '../reference/driver.js';
+import type { Runtime } from '../reference/runtime.js';
+import { budgetKey, createBudget } from './budget.js';
 import { numericLimits } from './budgets.js';
 import { costServices } from './costs.js';
-import type { Operations } from './index.js';
-import { createBudget } from './index.js';
+import type { Operations } from './operations.js';
 
 interface DriverBinding {
   readonly id: string;

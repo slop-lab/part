@@ -6,9 +6,10 @@ import {
   isJson,
   localContext,
   ok,
-} from '../foundation/contracts.js';
+} from '../contracts/index.js';
 import { sha256 } from '../foundation/hash.js';
-import type { Composition, Contracts } from '../reference/index.js';
+import type { Composition } from '../reference/composition.js';
+import type { Contracts } from '../reference/contracts.js';
 
 type Point = Composition.ExtensionPoint<unknown>;
 type Binding = Composition.Contribution<unknown>;

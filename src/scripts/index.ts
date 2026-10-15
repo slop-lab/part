@@ -1,5 +1,5 @@
-import { isJson, isJsonObject } from '../foundation/contracts.js';
-import type { Scripts } from '../reference/index.js';
+import { isJson, isJsonObject } from '../contracts/index.js';
+import type { Scripts } from '../reference/scripts.js';
 /** Structural validation can run during workflow preparation without launching a process. */
 export function isScriptRequest(value: unknown): value is Scripts.Request {
   if (

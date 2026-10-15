@@ -1,19 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  ok,
-  fail,
-  localContext,
-  stringSchema,
-  jsonSchema,
-  schema,
-  digest,
-} from '../dist/foundation/contracts.js';
-import { functionTool, createToolDispatcher } from '../dist/agent/tools.js';
-import { createContextCompiler, messageItem, semanticItem } from '../dist/context/index.js';
-import { createModelGateway, noAuth } from '../dist/model/gateway.js';
-import { createOllamaAdapter } from '../dist/model/ollama.js';
-import { createSuspensions } from '../dist/runtime/waits.js';
+import { ok, fail, localContext, stringSchema, jsonSchema, schema, digest } from 'part/contracts';
+import { functionTool, createToolDispatcher } from 'part/agent/tools';
+import { createContextCompiler, messageItem, semanticItem } from 'part/context';
+import { createModelGateway, noAuth } from 'part/model';
+import { createOllamaAdapter } from 'part/model/providers/ollama';
+import { createSuspensions } from 'part/runtime/waits';
 const context = localContext();
 const decision = (id, decide, resume) => ({
   id,
@@ -339,7 +331,7 @@ test('MT04: inspection digest matches bytes after final request transform', asyn
 });
 
 test('X06: inspector targets confer no authority and unknown projections never expose raw payload', async () => {
-  const { createProjectionService } = await import('../dist/context/projection.js');
+  const { createProjectionService } = await import('part/context/projection');
   let reads = 0;
   const projection = createProjectionService({
     authorize: (_target, _audience, c) => c.principal.subject === 'local',

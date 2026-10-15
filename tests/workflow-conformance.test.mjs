@@ -3,21 +3,21 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { localContext, ok, fail, jsonSchema, digest } from '../dist/foundation/contracts.js';
-import { createOperations, createBudget, budgetKey } from '../dist/runtime/index.js';
-import { createPlanner } from '../dist/composition/index.js';
-import { createBasicDriver } from '../dist/agent/basic-driver.js';
-import { createRunService, installDriver } from '../dist/runtime/runs.js';
-import { createModelGateway } from '../dist/model/gateway.js';
-import { fakeModel } from '../dist/testing/index.js';
-import { createContextCompiler } from '../dist/context/index.js';
-import { createNodeScripts } from '../dist/execution/node.js';
-import { createResults } from '../dist/storage/results.js';
-import { createSuspensions } from '../dist/runtime/waits.js';
-import { createCodeEngine, defineCodeWorkflow } from '../dist/workflows/code.js';
-import { callIdentity } from '../dist/workflows/memory.js';
-import { createScriptBridge } from '../dist/execution/bridge.js';
-import { createScriptHooks } from '../dist/extensions/hooks.js';
+import { localContext, ok, fail, jsonSchema, digest } from 'part/contracts';
+import { createOperations, createBudget, budgetKey } from 'part/runtime';
+import { createPlanner } from 'part/composition';
+import { createBasicDriver } from 'part/agent/drivers/basic';
+import { createRunService, installDriver } from 'part/runtime/runs';
+import { createModelGateway } from 'part/model';
+import { fakeModel } from 'part/testing';
+import { createContextCompiler } from 'part/context';
+import { createNodeScripts } from 'part/scripts/node';
+import { createResults } from 'part/results';
+import { createSuspensions } from 'part/runtime/waits';
+import { createCodeEngine, defineCodeWorkflow } from 'part/workflows/code';
+import { callIdentity } from 'part/workflows/memory';
+import { createScriptBridge } from 'part/scripts/bridge';
+import { createScriptHooks } from 'part/extensions/hooks';
 const context = localContext();
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function until(predicate) {
@@ -418,10 +418,10 @@ test('GW09: bridge expiry/revocation propagate cancellation and never widen pare
 });
 
 test('Pinned pipeline skill binding contributes explicit user instructions and releases the activation', async () => {
-  const { createDirectoryPackages } = await import('../dist/extensions/packages-node.js');
-  const { createSkills, skillLowerer } = await import('../dist/extensions/skills.js');
-  const { messageItem, messageLowerer } = await import('../dist/context/index.js');
-  const { createPipelineEngine } = await import('../dist/workflows/pipeline.js');
+  const { createDirectoryPackages } = await import('part/extensions/packages/node');
+  const { createSkills, skillLowerer } = await import('part/extensions/skills');
+  const { messageItem, messageLowerer } = await import('part/context');
+  const { createPipelineEngine } = await import('part/workflows/pipeline');
   const root = await mkdtemp(join(tmpdir(), 'part-skill-'));
   try {
     const name = 'review-skill',
@@ -537,8 +537,8 @@ test('Pinned pipeline skill binding contributes explicit user instructions and r
 });
 
 test('Bridge service adapter executes the configured gateway and exposes only its owner handles', async () => {
-  const { createBridgeMethods } = await import('../dist/execution/bridge-services.js');
-  const { messageItem } = await import('../dist/context/index.js');
+  const { createBridgeMethods } = await import('part/scripts/bridge/services');
+  const { messageItem } = await import('part/context');
   const operations = createOperations(),
     model = fakeModel([{ text: 'bridge response' }]),
     gateway = createModelGateway({
@@ -631,7 +631,7 @@ test('Bridge service adapter executes the configured gateway and exposes only it
 });
 
 test('W12: native logical step keys attach the same managed agent run and reject changed input', async () => {
-  const { createAgentStepBinding } = await import('../dist/workflows/agent-step.js');
+  const { createAgentStepBinding } = await import('part/workflows/agent-step');
   const operations = createOperations(),
     model = fakeModel([{ text: 'attached once' }]),
     gateway = createModelGateway({

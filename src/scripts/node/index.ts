@@ -2,13 +2,17 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, isAbsolute, join, relative, resolve } from 'node:path';
-import { digest, fail, isJson, isJsonObject, ok } from '../foundation/contracts.js';
-import { reserve } from '../model/gateway.js';
-import type { Contracts, Runtime, Scripts, Tools } from '../reference/index.js';
-import type { Operations } from '../runtime/index.js';
-import { createBoundary, createOperations, managedAttempt } from '../runtime/index.js';
-import type { ScriptBridgeEnvironment } from './bridge-node.js';
-import { isScriptRequest } from './requests.js';
+import { digest, fail, isJson, isJsonObject, ok } from '../../contracts/index.js';
+import type { Contracts } from '../../reference/contracts.js';
+import type { Runtime } from '../../reference/runtime.js';
+import type { Scripts } from '../../reference/scripts.js';
+import type { Tools } from '../../reference/tools.js';
+import { createBoundary, managedAttempt } from '../../runtime/boundary.js';
+import { reserve } from '../../runtime/budget.js';
+import type { Operations } from '../../runtime/operations.js';
+import { createOperations } from '../../runtime/operations.js';
+import type { ScriptBridgeEnvironment } from '../bridge/node.js';
+import { isScriptRequest } from '../index.js';
 export interface NodeScriptService extends Scripts.Service {
   executor(id?: string): Tools.Executor;
 }

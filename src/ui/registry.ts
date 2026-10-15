@@ -1,5 +1,6 @@
-import { fail, ok } from '../foundation/contracts.js';
-import type { Contracts, UI } from '../reference/index.js';
+import { fail, ok } from '../contracts/index.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { UI } from '../reference/ui.js';
 /** Highest layer wins; equal-layer collisions fail at installation. */
 export function createRendererRegistry<View>(
   layers: readonly (readonly UI.Renderer<Contracts.Json, View>[])[],

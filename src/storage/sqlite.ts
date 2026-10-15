@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
-import { fail, isJson, ok } from '../foundation/contracts.js';
-import type { Contracts } from '../reference/index.js';
+import { fail, isJson, ok } from '../contracts/index.js';
+import type { Contracts } from '../reference/contracts.js';
 import type { LocalStore, StoreData } from './memory.js';
 import { initialStoreData, storeFacade } from './memory.js';
 /** Explicitly opens a single local database. No resource is created on import. */

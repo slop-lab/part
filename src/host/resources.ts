@@ -1,5 +1,6 @@
-import { canonical, emptyCleanup, fail, ok } from '../foundation/contracts.js';
-import type { Contracts, Host } from '../reference/index.js';
+import { canonical, emptyCleanup, fail, ok } from '../contracts/index.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Host } from '../reference/host.js';
 export function createResourceManager(
   options: { closeGraceMs?: number } = {},
 ): Host.ResourceManager {

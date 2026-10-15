@@ -1,5 +1,6 @@
-import { canonical, digest, fail, freeze, isJson, ok } from '../foundation/contracts.js';
-import type { Contracts, Storage } from '../reference/index.js';
+import { canonical,digest,fail,freeze,isJson,ok } from '../contracts/index.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Storage } from '../reference/storage.js';
 
 export interface ArtifactRecord {
   metadata: Storage.ArtifactMetadata;

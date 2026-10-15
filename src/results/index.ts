@@ -1,8 +1,10 @@
 import { provenance } from '../context/index.js';
-import { canonical, digest, fail, freeze, isJson, ok } from '../foundation/contracts.js';
-import type { Contracts, Results, Storage } from '../reference/index.js';
-import type { Operations } from '../runtime/index.js';
-import { createOperations } from '../runtime/index.js';
+import { canonical, digest, fail, freeze, isJson, ok } from '../contracts/index.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Results } from '../reference/results.js';
+import type { Storage } from '../reference/storage.js';
+import type { Operations } from '../runtime/operations.js';
+import { createOperations } from '../runtime/operations.js';
 export interface ResultsOptions {
   artifacts?: Storage.ArtifactStore;
   capture?: (

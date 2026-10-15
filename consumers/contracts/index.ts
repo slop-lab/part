@@ -1,10 +1,10 @@
 import { createAgent } from 'part/agent';
+import { createControl, installAction } from 'part/client/control';
 import { createContextCompiler, lowerersPoint, semanticItem } from 'part/context';
 import { localContext, ok, stringSchema } from 'part/contracts';
-import { createControl, installAction } from 'part/control';
 import type { Context, Contracts, UI } from 'part/reference';
 import { fakeModel } from 'part/testing';
-import { createChat } from 'part/ui-dom';
+import { createChat } from 'part/ui/dom';
 
 const lowerer: Context.Lowerer<unknown> = {
   id: 'consumer/report-lowerer',

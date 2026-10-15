@@ -1,13 +1,11 @@
 import { commandSchema, querySchema } from '../client/control.js';
 import { createWatchHub } from '../client/index.js';
-import { canonical, fail, freeze, isJsonObject, ok } from '../foundation/contracts.js';
-import type {
-  Client,
-  Contracts,
-  ControlCatalog,
-  Projection,
-  Workflows,
-} from '../reference/index.js';
+import { canonical, fail, freeze, isJsonObject, ok } from '../contracts/index.js';
+import type { Client } from '../reference/client.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { ControlCatalog } from '../reference/control-catalog.js';
+import type { Projection } from '../reference/projection.js';
+import type { Workflows } from '../reference/workflows.js';
 export interface WorkflowRegistration {
   readonly definition: Workflows.DefinitionRef;
   readonly engineId: string;

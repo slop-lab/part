@@ -29,20 +29,25 @@ Breaking changes require a changelog, migration guidance, and consumer fixture r
 
 Source files are grouped by responsibility:
 
-- `foundation/` contains JSON contracts, hashing and deadline primitives.
+- `contracts/` contains shared JSON contracts and validation helpers;
+  `foundation/` contains internal hashing and deadline primitives.
 - `runtime/` contains operations, progress, effect boundaries, budgets, runs and waits.
 - `composition/`, `agent/` and `model/` contain composition, drivers/tools and model adapters.
 - `context/` contains semantic context, history and projections.
-- `extensions/` and `execution/` contain hooks/skills/packages and script/bridge execution.
+- `extensions/` and `scripts/` contain hooks/skills/packages and script/bridge execution.
 - `workflows/` contains workflow engines and endpoints. Pipeline handler registration,
   value resolution, compilation and execution live in separate `pipeline/` modules.
 - `host/`, `storage/` and `client/` contain hosting, persistence and client transport.
+- `artifacts/` owns immutable byte storage; `results/` owns result validation/processing.
 - `ui/` contains optional presentation modules and styles; `testing/` contains fixtures.
 - `reference/` contains the type-only design namespaces, one module per namespace.
 
-Imports use their original descriptive names. Package exports explicitly map the
-existing `part/...` public paths to these source groups, so moving an implementation
-does not change consumer imports. Internal helper paths are not public package exports.
+Imports use their original descriptive names. Public package paths follow the
+domain hierarchy, such as `part/workflows/code`, `part/model/providers/ollama` and
+`part/ui/dom`. Flat compatibility paths and the duplicate core entrypoint are removed.
+Internal modules import their actual dependencies instead of their own public barrels.
+Shared budget/effect logic belongs to runtime, so script and workflow engines do not
+depend on model gateways or agent drivers. Internal helper paths are not public exports.
 Builds remove stale output before compiling and copy the public stylesheet explicitly.
 The hashes and paths in `evidence.json` describe the recorded pre-refactor revision;
 they are historical validation evidence, not a manifest of the current checkout.

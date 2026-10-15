@@ -1,5 +1,6 @@
-import { fail, freeze, isJson, ok } from '../foundation/contracts.js';
-import type { Contracts, Projection } from '../reference/index.js';
+import { fail, freeze, isJson, ok } from '../contracts/index.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Projection } from '../reference/projection.js';
 export function createProjectionService(options: {
   authorize(
     target: Contracts.EntityRef,

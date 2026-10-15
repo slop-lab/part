@@ -1,6 +1,8 @@
-import { canonical, emptyCleanup, fail, freeze, isJson, ok } from '../foundation/contracts.js';
+import { canonical, emptyCleanup, fail, freeze, isJson, ok } from '../contracts/index.js';
 import { scheduleDeadline } from '../foundation/deadline.js';
-import type { Contracts, Host, Runtime } from '../reference/index.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Host } from '../reference/host.js';
+import type { Runtime } from '../reference/runtime.js';
 export function createRuntimeHost(options: {
   runs: Runtime.RunService;
   maxConcurrent?: number;

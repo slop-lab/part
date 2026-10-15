@@ -1,5 +1,9 @@
-import { canonical, fail, isJson, ok } from '../foundation/contracts.js';
-import type { Context, Contracts, History, Model, Runtime } from '../reference/index.js';
+import { canonical, fail, isJson, ok } from '../contracts/index.js';
+import type { Context } from '../reference/context.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { History } from '../reference/history.js';
+import type { Model } from '../reference/model.js';
+import type { Runtime } from '../reference/runtime.js';
 import type { HistoryService } from './history.js';
 import { messageItem, provenance, semanticItem } from './index.js';
 export interface RunHistoryLease {

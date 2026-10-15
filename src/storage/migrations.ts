@@ -1,6 +1,7 @@
 import { provenance } from '../context/index.js';
-import { canonical, fail, isJson } from '../foundation/contracts.js';
-import type { Contracts, Storage } from '../reference/index.js';
+import { canonical, fail, isJson } from '../contracts/index.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Storage } from '../reference/storage.js';
 /** Explicit owner migration: data and successful schema publication commit atomically. */
 export function createNamespaceMigrations(
   store: Storage.StateJournalStore,

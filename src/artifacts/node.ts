@@ -1,8 +1,8 @@
-import { mkdir, open, readFile, rename, rm, stat } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
-import { isJsonObject } from '../foundation/contracts.js';
-import type { Storage } from '../reference/index.js';
-import { createArtifactStore } from './artifacts.js';
+import { mkdir,open,readFile,rename,rm,stat } from 'node:fs/promises';
+import { join,resolve } from 'node:path';
+import { isJsonObject } from '../contracts/index.js';
+import type { Storage } from '../reference/storage.js';
+import { createArtifactStore } from './index.js';
 /** A bounded reference backend. One fsynced atomic record owns metadata and bytes. */
 export async function openFileArtifacts(
   root: string,
@@ -56,7 +56,7 @@ export async function openFileArtifacts(
           const bytes = Buffer.from(value.bytes, 'base64');
           if (bytes.toString('base64') !== value.bytes)
             throw new Error('Invalid artifact encoding');
-          return { ...value, bytes } as unknown as import('./artifacts.js').ArtifactRecord;
+          return { ...value, bytes } as unknown as import('./index.js').ArtifactRecord;
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
           throw error;

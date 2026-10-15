@@ -1,5 +1,8 @@
-import { fail, ok } from '../../foundation/contracts.js';
-import type { Composition, Contracts, PipelineV1, Workflows } from '../../reference/index.js';
+import { fail, ok } from '../../contracts/index.js';
+import type { Composition } from '../../reference/composition.js';
+import type { Contracts } from '../../reference/contracts.js';
+import type { PipelineV1 } from '../../reference/pipeline-v1.js';
+import type { Workflows } from '../../reference/workflows.js';
 export const handlersPoint: Composition.ExtensionPoint<PipelineV1.InstalledStepHandler> = {
   id: 'part.pipeline/handlers',
   owner: 'part/workflow-pipeline-v1',

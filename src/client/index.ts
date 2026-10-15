@@ -1,6 +1,8 @@
-import { canonical, fail, freeze, isJson, ok } from '../foundation/contracts.js';
-import type { Client, Contracts, Projection } from '../reference/index.js';
-import { createProgress } from '../runtime/index.js';
+import { canonical, fail, freeze, isJson, ok } from '../contracts/index.js';
+import type { Client } from '../reference/client.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Projection } from '../reference/projection.js';
+import { createProgress } from '../runtime/progress.js';
 const partKey = (itemId: string, partId: string) => canonical([itemId, partId]);
 export const jsonCodec: Client.Codec = {
   encode(value) {

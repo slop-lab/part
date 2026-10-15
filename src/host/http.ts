@@ -3,8 +3,9 @@ import type { IncomingMessage } from 'node:http';
 import { createServer } from 'node:http';
 import { commandSchema, querySchema } from '../client/control.js';
 import { jsonCodec } from '../client/index.js';
-import { fail, isJsonObject, ok } from '../foundation/contracts.js';
-import type { Client, Contracts } from '../reference/index.js';
+import { fail, isJsonObject, ok } from '../contracts/index.js';
+import type { Client } from '../reference/client.js';
+import type { Contracts } from '../reference/contracts.js';
 export async function startHttpHost(
   endpoint: Client.Endpoint,
   options: {

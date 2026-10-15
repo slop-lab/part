@@ -1,5 +1,5 @@
 import { createAgent } from 'part/agent';
-import { functionTool } from 'part/tools';
+import { functionTool } from 'part/agent/tools';
 import { stringSchema } from 'part/contracts';
 import { fakeModel } from 'part/testing';
 

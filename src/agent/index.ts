@@ -7,24 +7,22 @@ import {
   transformsKey,
   transformsPoint,
 } from '../context/index.js';
-import { emptyCleanup, fail, localContext, ok } from '../foundation/contracts.js';
-import { createModelGateway } from '../model/gateway.js';
-import type {
-  Composition,
-  Context,
-  Contracts,
-  Convenience,
-  Driver,
-  Model,
-  Runtime,
-  Tools,
-} from '../reference/index.js';
+import { emptyCleanup, fail, localContext, ok } from '../contracts/index.js';
+import { createModelGateway } from '../model/index.js';
+import type { Composition } from '../reference/composition.js';
+import type { Context } from '../reference/context.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Convenience } from '../reference/convenience.js';
+import type { Driver } from '../reference/driver.js';
+import type { Model } from '../reference/model.js';
+import type { Runtime } from '../reference/runtime.js';
+import type { Tools } from '../reference/tools.js';
 import type { CostEstimator } from '../runtime/costs.js';
-import { createOperations } from '../runtime/index.js';
+import { createOperations } from '../runtime/operations.js';
 import { createRunService, installDriver } from '../runtime/runs.js';
 import { createSuspensions } from '../runtime/waits.js';
-import type { BasicInput } from './basic-driver.js';
-import { createBasicDriver } from './basic-driver.js';
+import type { BasicInput } from './drivers/basic.js';
+import { createBasicDriver } from './drivers/basic.js';
 import { createToolDispatcher } from './tools.js';
 export const contextPoint: Composition.ExtensionPoint<Context.Compiler> = {
   id: 'part/context',

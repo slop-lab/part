@@ -1,7 +1,9 @@
 import { provenance } from '../context/index.js';
-import { fail, ok } from '../foundation/contracts.js';
-import type { Contracts, Runtime, Storage } from '../reference/index.js';
-import { createBoundary } from '../runtime/index.js';
+import { fail, ok } from '../contracts/index.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Runtime } from '../reference/runtime.js';
+import type { Storage } from '../reference/storage.js';
+import { createBoundary } from '../runtime/boundary.js';
 export function createStoredBoundary(
   store: Storage.StateJournalStore,
   namespace = 'part/execution',

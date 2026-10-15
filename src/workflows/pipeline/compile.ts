@@ -1,6 +1,8 @@
-import { isScriptRequest } from '../../execution/requests.js';
-import { canonical, fail, isJsonObject, ok } from '../../foundation/contracts.js';
-import type { Contracts, PipelineV1, Skills } from '../../reference/index.js';
+import { canonical, fail, isJsonObject, ok } from '../../contracts/index.js';
+import type { Contracts } from '../../reference/contracts.js';
+import type { PipelineV1 } from '../../reference/pipeline-v1.js';
+import type { Skills } from '../../reference/skills.js';
+import { isScriptRequest } from '../../scripts/index.js';
 import type { Handler } from './handlers.js';
 import type { Block, PipelineOptions } from './types.js';
 import { objectValid, valueValid } from './values.js';

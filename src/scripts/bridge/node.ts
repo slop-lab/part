@@ -1,8 +1,9 @@
 import { once } from 'node:events';
 import { createServer } from 'node:http';
-import { fail, isJsonObject, ok } from '../foundation/contracts.js';
-import type { Contracts, Scripts } from '../reference/index.js';
-import type { ManagedBridge } from './bridge.js';
+import { fail, isJsonObject, ok } from '../../contracts/index.js';
+import type { Contracts } from '../../reference/contracts.js';
+import type { Scripts } from '../../reference/scripts.js';
+import type { ManagedBridge } from './index.js';
 export interface ScriptBridgeEnvironment {
   environment(
     grantId: string,

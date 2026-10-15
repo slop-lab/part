@@ -1,6 +1,7 @@
-import { fail, ok } from '../foundation/contracts.js';
+import { fail, ok } from '../contracts/index.js';
 import { scheduleDeadline } from '../foundation/deadline.js';
-import type { Contracts, Runtime } from '../reference/index.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Runtime } from '../reference/runtime.js';
 import { budgetKey } from './budget.js';
 import { createProgress } from './progress.js';
 export type OperationContext = Contracts.InvocationContext & {

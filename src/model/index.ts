@@ -1,18 +1,14 @@
-import { digest, fail, freeze, ok } from '../foundation/contracts.js';
-import type { Contracts, Model, Runtime } from '../reference/index.js';
+import { digest, fail, freeze, ok } from '../contracts/index.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Model } from '../reference/model.js';
+import type { Runtime } from '../reference/runtime.js';
+import { createBoundary, managedAttempt } from '../runtime/boundary.js';
+import { reserve } from '../runtime/budget.js';
 import type { CostEstimator } from '../runtime/costs.js';
 import { costPolicyKey, costUnits } from '../runtime/costs.js';
-import type { Operations } from '../runtime/index.js';
-import { budgetKey, createBoundary, createOperations, managedAttempt } from '../runtime/index.js';
-export { budgetKey } from '../runtime/index.js';
-export function reserve(
-  context: Contracts.InvocationContext,
-  dimension: string,
-  quantity = 1,
-): Contracts.Result<Runtime.BudgetReservation | undefined> {
-  const budget = context.services.get(budgetKey);
-  return budget.ok ? budget.value.reserve(dimension, quantity) : ok(undefined);
-}
+import type { Operations } from '../runtime/operations.js';
+import { createOperations } from '../runtime/operations.js';
+
 export function createModelGateway(options: {
   profiles: readonly Model.Profile[];
   adapters: readonly Model.Adapter[];

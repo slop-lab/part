@@ -1,7 +1,9 @@
-import { digest, fail, isJson, ok } from '../foundation/contracts.js';
-import type { Composition, Contracts, Workflows } from '../reference/index.js';
-import type { WorkflowServices } from './memory.js';
-import { callIdentity, createMemoryWorkflowEngine } from './memory.js';
+import { digest, fail, isJson, ok } from '../contracts/index.js';
+import type { Composition } from '../reference/composition.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Workflows } from '../reference/workflows.js';
+import type { WorkflowServices } from './memory/index.js';
+import { callIdentity, createMemoryWorkflowEngine } from './memory/index.js';
 export interface RecipeDefinition {
   readonly id: string;
   readonly format: 'part.recipe';

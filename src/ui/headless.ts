@@ -1,4 +1,6 @@
-import type { Client, Contracts, UI } from '../reference/index.js';
+import type { Client } from '../reference/client.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { UI } from '../reference/ui.js';
 export function createComposer(options: {
   invoke: (request: Contracts.CommandRequest) => Promise<Client.CommandDelivery>;
   command: (draft: UI.Draft) => Contracts.CommandRequest;

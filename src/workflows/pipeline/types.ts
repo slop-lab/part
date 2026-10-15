@@ -1,5 +1,9 @@
-import type { Composition, Contracts, PipelineV1, Runtime, Skills } from '../../reference/index.js';
-import type { WorkflowServices } from '../memory.js';
+import type { Composition } from '../../reference/composition.js';
+import type { Contracts } from '../../reference/contracts.js';
+import type { PipelineV1 } from '../../reference/pipeline-v1.js';
+import type { Runtime } from '../../reference/runtime.js';
+import type { Skills } from '../../reference/skills.js';
+import type { WorkflowServices } from '../memory/index.js';
 export interface PipelineOptions {
   definitions: readonly PipelineV1.Definition[];
   schemas: readonly Contracts.Schema<Contracts.Json>[];

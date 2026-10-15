@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createAgent } from 'part/agent';
-import { functionTool } from 'part/tools';
+import { functionTool } from 'part/agent/tools';
 import { schema, stringSchema } from 'part/contracts';
 import { fakeModel } from 'part/testing';
 const input = schema(

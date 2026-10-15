@@ -1,6 +1,10 @@
-import { canonical, fail, isJsonObject } from '../foundation/contracts.js';
-import type { Composition, Contracts, Model, Results, Runtime } from '../reference/index.js';
-import type { BridgeMethod } from './bridge.js';
+import { canonical, fail, isJsonObject } from '../../contracts/index.js';
+import type { Composition } from '../../reference/composition.js';
+import type { Contracts } from '../../reference/contracts.js';
+import type { Model } from '../../reference/model.js';
+import type { Results } from '../../reference/results.js';
+import type { Runtime } from '../../reference/runtime.js';
+import type { BridgeMethod } from './index.js';
 /** Installed profile bindings contain executable/composition values only on the host. */
 export function createBridgeMethods(options: {
   model?: Model.Gateway;

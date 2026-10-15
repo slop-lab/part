@@ -3,7 +3,9 @@
 ## 0.1.0-alpha.2 (unreleased)
 
 - Replace abbreviated import aliases with descriptive names and group source files
-  by responsibility while preserving existing public package import paths.
+  by responsibility. Public paths follow their domains, including `part/workflows/code`,
+  `part/scripts/node` and `part/ui/dom`; remove flat compatibility paths and `part/core`.
+- Move shared budget/effect helpers into runtime and use direct internal dependencies.
 - Split runtime primitives, pipeline compilation/execution and reference namespaces
   into separate modules; clean build output before compilation.
 - Complete local workflow integration: nested pipelines, authenticated script bridge,
@@ -22,6 +24,9 @@ must use the script relative path as audience and send the new audience header.
 Direct `createRunService` callers must pass a planner-resolved composition handle.
 DOM component overrides now have concrete exported signatures. Durable checkpoint
 storage does not enable code/pipeline replay. Pin this version and rerun consumers.
+Update imports to the domain paths listed in `docs/api.md`; there are no compatibility
+aliases. `reserve`, `budgetKey` and `combineEffects` belong to `part/runtime`.
+The public stylesheet is `part/ui/styles.css`.
 
 ## 0.1.0-alpha.1 (local baseline)
 

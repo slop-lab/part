@@ -1,5 +1,6 @@
-import { digest, fail, ok } from '../foundation/contracts.js';
-import type { Contracts, Runtime } from '../reference/index.js';
+import { digest, fail, ok } from '../contracts/index.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Runtime } from '../reference/runtime.js';
 export function createBoundary(
   hooks: {
     prepare?: (

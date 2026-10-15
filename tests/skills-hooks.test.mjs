@@ -3,22 +3,15 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, rm, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createDirectoryPackages } from '../dist/extensions/packages-node.js';
-import { createSkills, skillLowerer } from '../dist/extensions/skills.js';
-import { createScriptHooks } from '../dist/extensions/hooks.js';
-import { createNodeScripts } from '../dist/execution/node.js';
-import { createBoundary, managedAttempt, createOperations } from '../dist/runtime/index.js';
-import { createPipelineEngine } from '../dist/workflows/pipeline.js';
-import { createCodeEngine, defineCodeWorkflow } from '../dist/workflows/code.js';
-import { createSuspensions } from '../dist/runtime/waits.js';
-import {
-  localContext,
-  jsonSchema,
-  ok,
-  schema,
-  digest,
-  fail,
-} from '../dist/foundation/contracts.js';
+import { createDirectoryPackages } from 'part/extensions/packages/node';
+import { createSkills, skillLowerer } from 'part/extensions/skills';
+import { createScriptHooks } from 'part/extensions/hooks';
+import { createNodeScripts } from 'part/scripts/node';
+import { createBoundary, managedAttempt, createOperations } from 'part/runtime';
+import { createPipelineEngine } from 'part/workflows/pipeline';
+import { createCodeEngine, defineCodeWorkflow } from 'part/workflows/code';
+import { createSuspensions } from 'part/runtime/waits';
+import { localContext, jsonSchema, ok, schema, digest, fail } from 'part/contracts';
 const context = localContext();
 test('SR02/SR03/SR12: skill discovery and activation pin content and never execute bundled scripts', async () => {
   const temporary = await mkdtemp(join(tmpdir(), 'part-skill-')),

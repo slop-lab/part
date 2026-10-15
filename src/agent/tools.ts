@@ -1,8 +1,11 @@
-import { digest, fail, freeze, isJson, ok } from '../foundation/contracts.js';
-import { reserve } from '../model/gateway.js';
-import type { Contracts, Runtime, Tools } from '../reference/index.js';
-import type { Operations } from '../runtime/index.js';
-import { createBoundary, createOperations, managedAttempt } from '../runtime/index.js';
+import { digest, fail, freeze, isJson, ok } from '../contracts/index.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Runtime } from '../reference/runtime.js';
+import type { Tools } from '../reference/tools.js';
+import { createBoundary, managedAttempt } from '../runtime/boundary.js';
+import { reserve } from '../runtime/budget.js';
+import type { Operations } from '../runtime/operations.js';
+import { createOperations } from '../runtime/operations.js';
 
 interface LocalBinding {
   definition: Tools.Definition<unknown, unknown>;

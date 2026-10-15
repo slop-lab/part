@@ -1,6 +1,8 @@
 import { provenance } from '../context/index.js';
-import { canonical, fail, freeze, isJson, ok } from '../foundation/contracts.js';
-import type { Contracts, Storage, Workflows } from '../reference/index.js';
+import { canonical, fail, freeze, isJson, ok } from '../contracts/index.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Storage } from '../reference/storage.js';
+import type { Workflows } from '../reference/workflows.js';
 /** A storage port only. Each engine still owns checkpoint eligibility and scheduling. */
 export function createCheckpointStore(
   store: Storage.StateJournalStore,

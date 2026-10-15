@@ -1,5 +1,6 @@
-import { fail, ok } from '../foundation/contracts.js';
-import type { Contracts, Runtime } from '../reference/index.js';
+import { fail, ok } from '../contracts/index.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Runtime } from '../reference/runtime.js';
 export const budgetKey: Contracts.ServiceKey<Runtime.BudgetPort> = {
   id: 'part/budget',
   contractVersion: 1,
@@ -36,4 +37,13 @@ export function createBudget(limits: Readonly<Record<string, number>> = {}): Run
       return ok(undefined);
     },
   };
+}
+
+export function reserve(
+  context: Contracts.InvocationContext,
+  dimension: string,
+  quantity = 1,
+): Contracts.Result<Runtime.BudgetReservation | undefined> {
+  const budget = context.services.get(budgetKey);
+  return budget.ok ? budget.value.reserve(dimension, quantity) : ok(undefined);
 }

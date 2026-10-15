@@ -1,4 +1,7 @@
-import type { Client, Contracts, Projection, UI } from '../reference/index.js';
+import type { Client } from '../reference/client.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Projection } from '../reference/projection.js';
+import type { UI } from '../reference/ui.js';
 import { orderSlots } from './registry.js';
 export interface ArtifactReader {
   read(

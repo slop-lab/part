@@ -1,5 +1,5 @@
 import { createController, createLocalPort, createWatchHub } from '../../src/client/index.js';
-import { fail, localContext, ok } from '../../src/foundation/contracts.js';
+import { fail, localContext, ok } from '../../src/contracts/index.js';
 import type { Client, Projection } from '../../src/reference/index.js';
 import { createChat } from '../../src/ui/dom.js';
 const context = localContext(),

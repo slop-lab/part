@@ -1,5 +1,6 @@
-import { fail, isJsonObject, ok } from '../foundation/contracts.js';
-import type { Client, Contracts } from '../reference/index.js';
+import { fail, isJsonObject, ok } from '../contracts/index.js';
+import type { Client } from '../reference/client.js';
+import type { Contracts } from '../reference/contracts.js';
 import { commandSchema, querySchema } from './control.js';
 import { jsonCodec } from './index.js';
 export function createHttpPort(

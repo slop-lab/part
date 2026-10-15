@@ -1,6 +1,11 @@
-import { messageItem } from '../context/index.js';
-import { emptyCleanup, fail, isJson, isJsonObject, schema } from '../foundation/contracts.js';
-import type { Context, Contracts, Driver, Model, Runtime } from '../reference/index.js';
+import { messageItem } from '../../context/index.js';
+import { emptyCleanup, fail, isJson, isJsonObject, schema } from '../../contracts/index.js';
+import type { Context } from '../../reference/context.js';
+import type { Contracts } from '../../reference/contracts.js';
+import type { Driver } from '../../reference/driver.js';
+import type { Model } from '../../reference/model.js';
+import type { Runtime } from '../../reference/runtime.js';
+import { combineEffects } from '../../runtime/effects.js';
 export type BasicInput = string | readonly Context.SemanticItem[];
 export const basicInputSchema = schema<BasicInput>(
   'part/basic-input',
@@ -193,15 +198,7 @@ export function createBasicDriver(options: {
     },
   };
 }
-export function combineEffects(
-  a: Contracts.EffectState,
-  b: Contracts.EffectState,
-): Contracts.EffectState {
-  if (a === 'unknown' || b === 'unknown') return 'unknown';
-  if (a === 'partially-applied' || b === 'partially-applied') return 'partially-applied';
-  if (a === 'applied' || b === 'applied') return 'applied';
-  return a === 'not-attempted' ? b : a;
-}
+
 async function relay(
   handle: Runtime.ExecutionHandle<unknown>,
   context: Contracts.InvocationContext,

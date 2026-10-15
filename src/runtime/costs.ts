@@ -1,5 +1,7 @@
-import { fail, ok } from '../foundation/contracts.js';
-import type { Contracts, Model, Runtime } from '../reference/index.js';
+import { fail, ok } from '../contracts/index.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Model } from '../reference/model.js';
+import type { Runtime } from '../reference/runtime.js';
 export const costPolicyKey: Contracts.ServiceKey<{ currency: string }> = {
   id: 'part/estimated-cost-policy',
   contractVersion: 1,

@@ -1,6 +1,9 @@
 import { semanticItem } from '../context/index.js';
-import { canonical, fail, freeze, ok } from '../foundation/contracts.js';
-import type { Context, Contracts, Packages, Skills } from '../reference/index.js';
+import { canonical, fail, freeze, ok } from '../contracts/index.js';
+import type { Context } from '../reference/context.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Packages } from '../reference/packages.js';
+import type { Skills } from '../reference/skills.js';
 interface Decoded {
   name: string;
   description: string;

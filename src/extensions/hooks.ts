@@ -1,5 +1,8 @@
-import { canonical, fail, isJsonObject, ok } from '../foundation/contracts.js';
-import type { Contracts, Hooks, Runtime, Scripts } from '../reference/index.js';
+import { canonical, fail, isJsonObject, ok } from '../contracts/index.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Hooks } from '../reference/hooks.js';
+import type { Runtime } from '../reference/runtime.js';
+import type { Scripts } from '../reference/scripts.js';
 export function createScriptHooks(
   points: readonly Hooks.Point<unknown, unknown>[],
   scripts: Scripts.Service,

@@ -1,7 +1,9 @@
-import { ok } from '../foundation/contracts.js';
-import { noAuth } from '../model/gateway.js';
-import { createOllamaAdapter } from '../model/ollama.js';
-import type { Contracts, Convenience, Model } from '../reference/index.js';
+import { ok } from '../contracts/index.js';
+import { noAuth } from '../model/index.js';
+import { createOllamaAdapter } from '../model/providers/ollama.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Convenience } from '../reference/convenience.js';
+import type { Model } from '../reference/model.js';
 export function fakeModel(
   replies: readonly {
     text?: string;

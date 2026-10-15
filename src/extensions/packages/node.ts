@@ -1,7 +1,8 @@
 import { lstat, readdir, readFile, realpath } from 'node:fs/promises';
 import { basename, join, relative, resolve } from 'node:path';
-import { digest, fail, freeze, ok } from '../foundation/contracts.js';
-import type { Contracts, Packages } from '../reference/index.js';
+import { digest, fail, freeze, ok } from '../../contracts/index.js';
+import type { Contracts } from '../../reference/contracts.js';
+import type { Packages } from '../../reference/packages.js';
 export function createDirectoryPackages(options: { maxBytes?: number } = {}): Packages.Source {
   const installed = new Map<string, { snapshot: Packages.Snapshot; root: string }>();
   return {

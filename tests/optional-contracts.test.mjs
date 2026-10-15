@@ -4,31 +4,24 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Window } from 'happy-dom';
-import {
-  localContext,
-  jsonSchema,
-  schema,
-  ok,
-  fail,
-  digest,
-} from '../dist/foundation/contracts.js';
-import { createMemoryStore } from '../dist/storage/memory.js';
-import { createNamespaceMigrations } from '../dist/storage/migrations.js';
-import { createCheckpointStore } from '../dist/workflows/checkpoints.js';
-import { createNodeScripts } from '../dist/execution/node.js';
-import { createMarkdownView } from '../dist/ui/markdown.js';
-import { createRendererRegistry, orderSlots } from '../dist/ui/registry.js';
-import { createObservability } from '../dist/runtime/observability.js';
-import { createHistory } from '../dist/context/history.js';
-import { createChatHistoryAttachment } from '../dist/context/run-history.js';
-import { createRunService, installDriver } from '../dist/runtime/runs.js';
-import { createBasicDriver } from '../dist/agent/basic-driver.js';
-import { createPlanner } from '../dist/composition/index.js';
-import { createOperations, createBudget, budgetKey } from '../dist/runtime/index.js';
-import { createModelGateway } from '../dist/model/gateway.js';
-import { fakeModel } from '../dist/testing/index.js';
-import { createContextCompiler, provenance } from '../dist/context/index.js';
-import { createRecipeEngine } from '../dist/workflows/recipe.js';
+import { localContext, jsonSchema, schema, ok, fail, digest } from 'part/contracts';
+import { createMemoryStore } from 'part/storage/memory';
+import { createNamespaceMigrations } from 'part/storage/migrations';
+import { createCheckpointStore } from 'part/workflows/checkpoints';
+import { createNodeScripts } from 'part/scripts/node';
+import { createMarkdownView } from 'part/ui/markdown';
+import { createRendererRegistry, orderSlots } from 'part/ui/registry';
+import { createObservability } from 'part/runtime/observability';
+import { createHistory } from 'part/context/history';
+import { createChatHistoryAttachment } from 'part/context/run-history';
+import { createRunService, installDriver } from 'part/runtime/runs';
+import { createBasicDriver } from 'part/agent/drivers/basic';
+import { createPlanner } from 'part/composition';
+import { createOperations, createBudget, budgetKey } from 'part/runtime';
+import { createModelGateway } from 'part/model';
+import { fakeModel } from 'part/testing';
+import { createContextCompiler, provenance } from 'part/context';
+import { createRecipeEngine } from 'part/workflows/recipe';
 const context = localContext();
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 const outcome = (result) => ({
@@ -390,9 +383,9 @@ test('Recipe retries explicit read-only validation, but never retries failed or 
 });
 
 test('Estimated cost ceilings reserve before transport, require explicit pricing and preserve actual effect evidence', async () => {
-  const { createAgent } = await import('../dist/agent/index.js');
-  const { functionTool } = await import('../dist/agent/tools.js');
-  const { costUnits } = await import('../dist/runtime/costs.js');
+  const { createAgent } = await import('part/agent');
+  const { functionTool } = await import('part/agent/tools');
+  const { costUnits } = await import('part/runtime/costs');
   assert.equal(costUnits('0.000001').value, 1);
   assert.equal(costUnits('0.0000001').ok, false);
   assert.equal(costUnits('-1').ok, false);
@@ -439,10 +432,9 @@ test('Estimated cost ceilings reserve before transport, require explicit pricing
 });
 
 test('DOM components, ordered slots, inspector and artifact viewers use only public client contracts', async () => {
-  const { createWatchHub, createLocalPort, createController } =
-    await import('../dist/client/index.js');
-  const { createChat } = await import('../dist/ui/dom.js');
-  const { createInspector } = await import('../dist/ui/inspector.js');
+  const { createWatchHub, createLocalPort, createController } = await import('part/client');
+  const { createChat } = await import('part/ui/dom');
+  const { createInspector } = await import('part/ui/inspector');
   const hub = createWatchHub({ revision: '1', entries: [] });
   const endpoint = {
     watch: (_request, c) => hub.watch(c),

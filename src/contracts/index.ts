@@ -1,5 +1,5 @@
-import type { Contracts } from '../reference/index.js';
-export type * from '../reference/index.js';
+import type { Contracts } from '../reference/contracts.js';
+export type { Contracts } from '../reference/contracts.js';
 export const ok = <T>(value: T): Contracts.Result<T> => ({ ok: true, value });
 export function fail(
   code: string,

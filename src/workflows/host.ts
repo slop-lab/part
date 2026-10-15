@@ -1,5 +1,7 @@
-import { fail, ok } from '../foundation/contracts.js';
-import type { Composition, Contracts, Workflows } from '../reference/index.js';
+import { fail, ok } from '../contracts/index.js';
+import type { Composition } from '../reference/composition.js';
+import type { Contracts } from '../reference/contracts.js';
+import type { Workflows } from '../reference/workflows.js';
 export const enginesPoint: Composition.ExtensionPoint<Workflows.Engine> = {
   id: 'part.workflow/engines',
   owner: 'part/workflow-host',
