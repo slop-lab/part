@@ -1,7 +1,6 @@
-/** @public */
-import { digest, fail, ok } from '@slop-lab/part/contracts';
-import type { Contracts, Skills, Workflows } from '@slop-lab/part/reference';
-import { createOperations } from '@slop-lab/part/runtime';
+import { digest, fail, ok } from '@slop-lab/part/contracts/index.js';
+import type { Contracts, Skills, Workflows } from '@slop-lab/part/reference/index.js';
+import { createOperations } from '@slop-lab/part/runtime/index.js';
 import { createMemoryWorkflowEngine } from '../memory/index.js';
 import { createBlockCompiler } from './compile.js';
 import { createPipelineExecutor } from './execute.js';

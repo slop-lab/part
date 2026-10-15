@@ -1,6 +1,5 @@
-/** @public */
-import { isJson, isJsonObject } from '@slop-lab/part/contracts';
-import type { Client, Contracts, Projection, UI } from '@slop-lab/part/reference';
+import { isJson, isJsonObject } from '@slop-lab/part/contracts/index.js';
+import type { Client, Contracts, Projection, UI } from '@slop-lab/part/reference/index.js';
 export function createWorkflowView(options: {
   client: Client.Controller;
   document?: Document;

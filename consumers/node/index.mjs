@@ -5,12 +5,12 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
-import { digest, localContext } from '@slop-lab/part/contracts';
-import { createNodeScripts } from '@slop-lab/part-node/scripts';
-import { startMockProvider } from '@slop-lab/part-node/testing/mock-provider';
-import { createMockProviderTools } from '@slop-lab/part-node/testing/mock-provider/tools';
-import { startAcpStdio } from '@slop-lab/part-node/acp';
-import { connectAcpMcpServers } from '@slop-lab/part-node/acp/mcp';
+import { digest, localContext } from '@slop-lab/part/contracts/index.js';
+import { createNodeScripts } from '@slop-lab/part-node/scripts/index.js';
+import { startMockProvider } from '@slop-lab/part-node/testing/mock-provider/index.js';
+import { createMockProviderTools } from '@slop-lab/part-node/testing/mock-provider/tools.js';
+import { startAcpStdio } from '@slop-lab/part-node/acp/index.js';
+import { connectAcpMcpServers } from '@slop-lab/part-node/acp/mcp.js';
 const root = await mkdtemp(join(tmpdir(), 'part-node-consumer-'));
 try {
   const bytes = new TextEncoder().encode('process.stdout.write(JSON.stringify({ value: 42 }))');

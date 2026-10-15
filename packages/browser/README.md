@@ -5,8 +5,8 @@ Inspector/Workbench and styles. Depends only on the matching `@slop-lab/part` ve
 No Node implementations, agent presets, providers or workflow engines are included.
 
 ```js
-import { createChat } from '@slop-lab/part-browser/dom';
-import { createController } from '@slop-lab/part/client';
+import { createChat } from '@slop-lab/part-browser/dom.js';
+import { createController } from '@slop-lab/part/client/index.js';
 import '@slop-lab/part-browser/styles.css';
 ```
 

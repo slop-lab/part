@@ -3,7 +3,7 @@ import { expectProperty } from '../fixtures/assertions.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createPlaygroundSession } from '../examples/playground/runtime.mjs';
-import { localContext } from '@slop-lab/part/contracts';
+import { localContext } from '@slop-lab/part/contracts/index.js';
 
 const command = (actionId, input = null, target) => ({
   protocolVersion: 1,

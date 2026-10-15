@@ -1,7 +1,6 @@
-/** @public */
-import { ok } from '@slop-lab/part/contracts';
-import { noAuth } from '@slop-lab/part/model';
-import type { Contracts, Convenience, Model } from '@slop-lab/part/reference';
+import { ok } from '@slop-lab/part/contracts/index.js';
+import { noAuth } from '@slop-lab/part/model/index.js';
+import type { Contracts, Convenience, Model } from '@slop-lab/part/reference/index.js';
 import { createOllamaAdapter } from '../providers/ollama.js';
 export function fakeModel(
   replies: readonly {

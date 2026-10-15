@@ -1,4 +1,3 @@
-/** @public */
 import { digest, fail, freeze, isJson, ok } from '../contracts/index.js';
 import type { Composition } from '../reference/composition.js';
 import type { Context } from '../reference/context.js';

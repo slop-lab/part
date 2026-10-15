@@ -5,15 +5,22 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, rm, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createDirectoryPackages } from '@slop-lab/part-node/packages';
-import { createSkills, skillLowerer } from '@slop-lab/part-plugins/extensions/skills';
-import { createScriptHooks } from '@slop-lab/part-plugins/extensions/hooks';
-import { createNodeScripts } from '@slop-lab/part-node/scripts';
-import { createBoundary, managedAttempt, createOperations } from '@slop-lab/part/runtime';
-import { createPipelineEngine } from '@slop-lab/part-plugins/workflows/pipeline';
-import { createCodeEngine, defineCodeWorkflow } from '@slop-lab/part-plugins/workflows/code';
-import { createSuspensions } from '@slop-lab/part/runtime/waits';
-import { localContext, jsonSchema, ok, schema, digest, fail } from '@slop-lab/part/contracts';
+import { createDirectoryPackages } from '@slop-lab/part-node/packages.js';
+import { createSkills, skillLowerer } from '@slop-lab/part-plugins/extensions/skills.js';
+import { createScriptHooks } from '@slop-lab/part-plugins/extensions/hooks.js';
+import { createNodeScripts } from '@slop-lab/part-node/scripts/index.js';
+import { createBoundary, managedAttempt, createOperations } from '@slop-lab/part/runtime/index.js';
+import { createPipelineEngine } from '@slop-lab/part-plugins/workflows/pipeline/index.js';
+import { createCodeEngine, defineCodeWorkflow } from '@slop-lab/part-plugins/workflows/code.js';
+import { createSuspensions } from '@slop-lab/part/runtime/waits.js';
+import {
+  localContext,
+  jsonSchema,
+  ok,
+  schema,
+  digest,
+  fail,
+} from '@slop-lab/part/contracts/index.js';
 const context = localContext();
 test('SR02/SR03/SR12: skill discovery and activation pin content and never execute bundled scripts', async (t) => {
   const temporary = await mkdtemp(join(tmpdir(), 'part-skill-')),
@@ -73,7 +80,7 @@ test('W15/SR12: awaited script hooks block malformed decisions, consume once and
     const code = 'process.stdout.write(JSON.stringify({kind:"allow"}));';
     await writeFile(join(root, 'hook.cjs'), code);
     const scripts = createNodeScripts({ root, interpreters: { node: process.execPath } }),
-      /** @type {import('@slop-lab/part/reference').Hooks.Point<unknown, unknown>} */
+      /** @type {import('@slop-lab/part/reference/index.js').Hooks.Point<unknown, unknown>} */
       point = {
         id: 'before',
         version: 1,
@@ -86,7 +93,7 @@ test('W15/SR12: awaited script hooks block malformed decisions, consume once and
       };
     const hooks = expectProperty(createScriptHooks([point], scripts), 'value'),
       owner = { owner: 'test', kind: 'run', id: context.scope.id };
-    /** @type {import('@slop-lab/part/reference').Hooks.Binding} */
+    /** @type {import('@slop-lab/part/reference/index.js').Hooks.Binding} */
     const binding = {
       id: 'hook',
       pointId: 'before',

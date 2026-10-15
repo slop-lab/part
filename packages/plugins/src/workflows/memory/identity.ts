@@ -1,5 +1,5 @@
-import { digest } from '@slop-lab/part/contracts';
-import type { Contracts, Workflows } from '@slop-lab/part/reference';
+import { digest } from '@slop-lab/part/contracts/index.js';
+import type { Contracts, Workflows } from '@slop-lab/part/reference/index.js';
 export async function callIdentity(
   execution: Workflows.ExecutionRef,
   stepKey: string,

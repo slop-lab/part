@@ -41,9 +41,9 @@ The repository is an npm workspace with four packages:
 Only core has no runtime package dependencies. Plugins, Node and browser each
 have one exact-version dependency on core. Core cannot reference another package,
 and environment packages do not reference each other or the portable plugin bundle.
-Cross-package imports use declared public exports, including type-only ports;
+Cross-package imports use package subpaths, including type-only ports;
 relative paths never cross a package boundary. Each package owns its sources,
-TypeScript project, build output, explicit exports, README and tarball. The repository
+TypeScript project, build output, README and tarball. The repository
 root is private development tooling and does not aggregate the SDK. There are no
 mandatory plugin bundles in a core-only or browser-only installation.
 
@@ -57,41 +57,43 @@ separates codecs, watch state, local transport and controller state. The Node sc
 host separates admission/attempt ownership, immutable source selection and process I/O.
 
 Imports use their original descriptive names. Public package paths follow the
-domain hierarchy, such as `@slop-lab/part-plugins/workflows/code`, `@slop-lab/part-plugins/providers/ollama` and
-`@slop-lab/part-browser/dom`. Flat compatibility paths and the duplicate core entrypoint are removed.
+domain hierarchy, such as `@slop-lab/part-plugins/workflows/code.js`, `@slop-lab/part-plugins/providers/ollama.js` and
+`@slop-lab/part-browser/dom.js`. Flat compatibility paths and the duplicate core entrypoint are removed.
 Internal modules import their actual dependencies instead of their own public barrels.
 Shared budget/effect logic belongs to runtime, so script and workflow engines do not
-depend on model gateways or agent drivers. Internal helper paths are not public exports.
-Builds remove stale output before compiling and copy marked public assets.
+depend on model gateways or agent drivers. All emitted files are accessible by package subpath.
+Builds remove stale output before compiling and copy non-TypeScript runtime assets.
 `npm run check` rejects unused code, import aliases, runtime cycles, reversed layer
-dependencies, Node imports from portable entrypoints and exports that disagree with
-the source domains. Packed-consumer checks load every JavaScript entrypoint, compile
+dependencies, Node imports from portable entrypoints and incorrect package routing. Packed-consumer checks load every JavaScript entrypoint, compile
 every public declaration entrypoint and verify the stylesheet is present.
 Portable declarations compile without ambient Node types; the HTTP host's
 `IncomingMessage` callback is additionally checked with explicit Node typings.
 
-## Public entrypoints
+## Package builds
 
-Public entrypoints are declared in their source files, without a second list in
-package metadata. Put `/** @public */` in a leading comment of a TypeScript source,
-or `/* @public */` in a CSS source. Unmarked files remain internal.
+The package root for distribution is `dist`. Builds generate only
+`dist/package.json`; tracked workspace metadata is never rewritten. The generated
+metadata retains package identity and runtime dependencies, omits development
+scripts and file filters, and rewrites executable paths relative to `dist`.
 
-The build discovers these markers and generates each workspace package's
-`exports` before TypeScript resolves cross-package imports. It also generates all
-workspace maps for a single-package build, so bootstrapping does not depend on
-existing exports. The generated field remains in `package.json` for package
-resolution; edit the source markers instead of that field.
+Every distribution has `"./*": "./*"`. A package with an emitted `index.js` also
+gets `".": { "types": "./index.d.ts", "default": "./index.js" }`. Currently only core
+has a root entrypoint. There are no source annotations or per-module export lists.
+All emitted modules, declarations and copied assets are accessible.
 
-- `src/index.ts` becomes `.`.
-- `src/domain/index.ts` becomes `./domain`.
-- `src/domain/feature.ts` becomes `./domain/feature`.
-- `src/styles.css` becomes `./styles.css` and is copied into `dist`.
+Use actual filenames in subpath imports:
 
-TypeScript entries get a declaration target. If their emitted JavaScript is empty
-because they only declare or re-export types, they have no runtime condition.
-Exports are sorted deterministically, removed markers remove exports, and ambiguous
-paths such as public `domain.ts` plus `domain/index.ts` fail the build.
-Internal helpers and the Windows supervisor source stay outside the export map.
+- `src/index.ts` becomes the root import, where present.
+- `src/domain/index.ts` becomes `package/domain/index.js`.
+- `src/domain/feature.ts` becomes `package/domain/feature.js`.
+- `src/styles.css` becomes `package/styles.css`.
+
+TypeScript resolves `.js` subpaths to their adjacent `.d.ts` declarations.
+Workspace metadata uses a fixed `"./*": "./dist/*"` route and, for core, a root
+route to its compiled index. New files require no metadata edits. Single-package
+builds also rebuild referenced workspace dependencies. Packing uses the `dist`
+directories directly, so installed packages have no enclosing `dist` directory.
+The Windows supervisor source is copied alongside its runtime module.
 
 ## Provider and runtime boundaries
 

@@ -3,8 +3,8 @@ import { createServer, request } from 'node:http';
 import { once } from 'node:events';
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
-import { localContext, fail, ok } from '@slop-lab/part/contracts';
-import { startHttpHost } from '@slop-lab/part-node/host/http';
+import { localContext, fail, ok } from '@slop-lab/part/contracts/index.js';
+import { startHttpHost } from '@slop-lab/part-node/host/http.js';
 import { createPlaygroundSession } from './runtime.mjs';
 import { providerOptions } from './models.mjs';
 

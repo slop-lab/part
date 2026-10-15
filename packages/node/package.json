@@ -22,45 +22,6 @@
     "part-mock-provider": "./dist/testing/mock-provider/cli.js"
   },
   "exports": {
-    "./acp": {
-      "types": "./dist/acp/index.d.ts",
-      "default": "./dist/acp/index.js"
-    },
-    "./acp/mcp": {
-      "types": "./dist/acp/mcp.d.ts",
-      "default": "./dist/acp/mcp.js"
-    },
-    "./artifacts": {
-      "types": "./dist/artifacts.d.ts",
-      "default": "./dist/artifacts.js"
-    },
-    "./host/http": {
-      "types": "./dist/host/http.d.ts",
-      "default": "./dist/host/http.js"
-    },
-    "./packages": {
-      "types": "./dist/packages.d.ts",
-      "default": "./dist/packages.js"
-    },
-    "./scripts": {
-      "types": "./dist/scripts/index.d.ts",
-      "default": "./dist/scripts/index.js"
-    },
-    "./scripts/bridge": {
-      "types": "./dist/scripts/bridge.d.ts",
-      "default": "./dist/scripts/bridge.js"
-    },
-    "./storage/sqlite": {
-      "types": "./dist/storage/sqlite.d.ts",
-      "default": "./dist/storage/sqlite.js"
-    },
-    "./testing/mock-provider": {
-      "types": "./dist/testing/mock-provider/index.d.ts",
-      "default": "./dist/testing/mock-provider/index.js"
-    },
-    "./testing/mock-provider/tools": {
-      "types": "./dist/testing/mock-provider/tools.d.ts",
-      "default": "./dist/testing/mock-provider/tools.js"
-    }
+    "./*": "./dist/*"
   }
 }

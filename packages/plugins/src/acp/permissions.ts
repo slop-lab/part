@@ -1,5 +1,5 @@
-import { fail, isJsonObject, ok } from '@slop-lab/part/contracts';
-import type { Contracts, Tools } from '@slop-lab/part/reference';
+import { fail, isJsonObject, ok } from '@slop-lab/part/contracts/index.js';
+import type { Contracts, Tools } from '@slop-lab/part/reference/index.js';
 import type { AcpConnection } from './types.js';
 
 export interface AcpToolState {

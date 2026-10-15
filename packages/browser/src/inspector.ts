@@ -1,5 +1,4 @@
-/** @public */
-import type { Client, Contracts, Projection, UI } from '@slop-lab/part/reference';
+import type { Client, Contracts, Projection, UI } from '@slop-lab/part/reference/index.js';
 import { orderSlots } from './registry.js';
 export interface ArtifactReader {
   read(

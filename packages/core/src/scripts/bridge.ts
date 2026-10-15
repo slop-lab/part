@@ -1,4 +1,3 @@
-/** @public */
 import type { Contracts } from '../reference/contracts.js';
 import type { Scripts } from '../reference/scripts.js';
 export interface BridgeMethod {

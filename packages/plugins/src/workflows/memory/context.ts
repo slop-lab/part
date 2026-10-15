@@ -1,6 +1,6 @@
-import { canonical, digest, fail } from '@slop-lab/part/contracts';
-import type { Contracts, Runtime, Workflows } from '@slop-lab/part/reference';
-import type { OperationContext } from '@slop-lab/part/runtime';
+import { canonical, digest, fail } from '@slop-lab/part/contracts/index.js';
+import type { Contracts, Runtime, Workflows } from '@slop-lab/part/reference/index.js';
+import type { OperationContext } from '@slop-lab/part/runtime/index.js';
 import type { Execution, WorkflowServices } from './types.js';
 const stepScopes = new WeakMap<
   Workflows.StepContext,

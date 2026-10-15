@@ -1,4 +1,3 @@
-/** @public */
 import { fail, freeze, isJson, ok } from '../contracts/index.js';
 import type { Contracts } from '../reference/contracts.js';
 import type { Projection } from '../reference/projection.js';

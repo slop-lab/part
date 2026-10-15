@@ -1,5 +1,5 @@
-import { fail, isJson, isJsonObject, ok } from '@slop-lab/part/contracts';
-import type { Contracts, Model, Runtime } from '@slop-lab/part/reference';
+import { fail, isJson, isJsonObject, ok } from '@slop-lab/part/contracts/index.js';
+import type { Contracts, Model, Runtime } from '@slop-lab/part/reference/index.js';
 
 export function createChatDecoder(response: {
   status?: number;

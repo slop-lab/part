@@ -1,4 +1,3 @@
-/** @public */
 import { startJsonRpcPeer } from './peer.js';
 import type { AcpStdioOptions } from './types.js';
 export { AcpRpcError } from './types.js';

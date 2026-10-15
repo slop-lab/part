@@ -1,5 +1,4 @@
-/** @public */
-import { createPlanner, createScopeManager } from '@slop-lab/part/composition';
+import { createPlanner, createScopeManager } from '@slop-lab/part/composition/index.js';
 import {
   createContextCompiler,
   lowerersKey,
@@ -7,9 +6,9 @@ import {
   messageLowerer,
   transformsKey,
   transformsPoint,
-} from '@slop-lab/part/context';
-import { emptyCleanup, fail, localContext, ok } from '@slop-lab/part/contracts';
-import { createModelGateway } from '@slop-lab/part/model';
+} from '@slop-lab/part/context/index.js';
+import { emptyCleanup, fail, localContext, ok } from '@slop-lab/part/contracts/index.js';
+import { createModelGateway } from '@slop-lab/part/model/index.js';
 import type {
   Composition,
   Context,
@@ -19,12 +18,12 @@ import type {
   Model,
   Runtime,
   Tools,
-} from '@slop-lab/part/reference';
-import { createOperations } from '@slop-lab/part/runtime';
-import type { CostEstimator } from '@slop-lab/part/runtime/costs';
-import { createRunService, installDriver } from '@slop-lab/part/runtime/runs';
-import { createSuspensions } from '@slop-lab/part/runtime/waits';
-import { createToolDispatcher } from '@slop-lab/part/tools';
+} from '@slop-lab/part/reference/index.js';
+import { createOperations } from '@slop-lab/part/runtime/index.js';
+import type { CostEstimator } from '@slop-lab/part/runtime/costs.js';
+import { createRunService, installDriver } from '@slop-lab/part/runtime/runs.js';
+import { createSuspensions } from '@slop-lab/part/runtime/waits.js';
+import { createToolDispatcher } from '@slop-lab/part/tools.js';
 import type { BasicInput } from './drivers/basic.js';
 import { createBasicDriver } from './drivers/basic.js';
 export const contextPoint: Composition.ExtensionPoint<Context.Compiler> = {

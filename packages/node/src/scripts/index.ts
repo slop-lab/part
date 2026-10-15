@@ -1,8 +1,12 @@
-/** @public */
-import { digest, fail, isJson, ok } from '@slop-lab/part/contracts';
-import type { Contracts, Runtime, Scripts } from '@slop-lab/part/reference';
-import { createBoundary, createOperations, managedAttempt, reserve } from '@slop-lab/part/runtime';
-import { isScriptRequest } from '@slop-lab/part/scripts';
+import { digest, fail, isJson, ok } from '@slop-lab/part/contracts/index.js';
+import type { Contracts, Runtime, Scripts } from '@slop-lab/part/reference/index.js';
+import {
+  createBoundary,
+  createOperations,
+  managedAttempt,
+  reserve,
+} from '@slop-lab/part/runtime/index.js';
+import { isScriptRequest } from '@slop-lab/part/scripts/index.js';
 import { resolve } from 'node:path';
 import { runScriptProcess } from './process.js';
 import { resolveScriptSource } from './source.js';

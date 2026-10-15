@@ -1,5 +1,4 @@
-/** @public */
-import type { Client, Contracts, UI } from '@slop-lab/part/reference';
+import type { Client, Contracts, UI } from '@slop-lab/part/reference/index.js';
 export function createComposer(options: {
   invoke: (request: Contracts.CommandRequest) => Promise<Client.CommandDelivery>;
   command: (draft: UI.Draft) => Contracts.CommandRequest;

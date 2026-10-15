@@ -1,13 +1,13 @@
 // @ts-check
-import { createAcpAgent } from '@slop-lab/part-plugins/acp';
-import { startAcpStdio } from '@slop-lab/part-node/acp';
-import { connectAcpMcpServers } from '@slop-lab/part-node/acp/mcp';
-import { fakeModel } from '@slop-lab/part-plugins/testing';
-import { createOpenAIResponsesAdapter } from '@slop-lab/part-plugins/providers/openai-responses';
-import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible';
-import { bearerAuth, createFetchTransport } from '@slop-lab/part/model';
-import { schema, stringSchema } from '@slop-lab/part/contracts';
-import { functionTool } from '@slop-lab/part/tools';
+import { createAcpAgent } from '@slop-lab/part-plugins/acp/index.js';
+import { startAcpStdio } from '@slop-lab/part-node/acp/index.js';
+import { connectAcpMcpServers } from '@slop-lab/part-node/acp/mcp.js';
+import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
+import { createOpenAIResponsesAdapter } from '@slop-lab/part-plugins/providers/openai-responses/index.js';
+import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible/index.js';
+import { bearerAuth, createFetchTransport } from '@slop-lab/part/model/index.js';
+import { schema, stringSchema } from '@slop-lab/part/contracts/index.js';
+import { functionTool } from '@slop-lab/part/tools.js';
 
 try {
   process.loadEnvFile(new URL('../../.env', import.meta.url));

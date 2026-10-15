@@ -1,4 +1,3 @@
-/** @public */
 import { isCompositionHandle } from '../composition/handles.js';
 import type { RunHistoryAttachment, RunHistoryLease } from '../context/run-history.js';
 import { canonical, emptyCleanup, fail, ok } from '../contracts/index.js';

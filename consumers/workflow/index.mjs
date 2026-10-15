@@ -1,11 +1,11 @@
 // @ts-check
 import { expectProperty } from '../../fixtures/assertions.mjs';
 import assert from 'node:assert/strict';
-import { localContext, jsonSchema, ok } from '@slop-lab/part/contracts';
-import { defineCodeWorkflow, createCodeEngine } from '@slop-lab/part-plugins/workflows/code';
-import { createWorkflowHost } from '@slop-lab/part-plugins/workflows/host';
-import { createWorkflowEndpoint } from '@slop-lab/part-plugins/workflows/endpoint';
-import { createLocalPort, createController } from '@slop-lab/part/client';
+import { localContext, jsonSchema, ok } from '@slop-lab/part/contracts/index.js';
+import { defineCodeWorkflow, createCodeEngine } from '@slop-lab/part-plugins/workflows/code.js';
+import { createWorkflowHost } from '@slop-lab/part-plugins/workflows/host.js';
+import { createWorkflowEndpoint } from '@slop-lab/part-plugins/workflows/endpoint.js';
+import { createLocalPort, createController } from '@slop-lab/part/client/index.js';
 const context = localContext();
 let executed = 0;
 const definition = await defineCodeWorkflow({

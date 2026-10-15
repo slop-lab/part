@@ -1,4 +1,4 @@
-import type { Contracts, Tools } from '@slop-lab/part/reference';
+import type { Contracts, Tools } from '@slop-lab/part/reference/index.js';
 
 export interface AcpMcpServer {
   readonly name: string;

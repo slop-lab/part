@@ -5,15 +5,15 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { localContext, digest, jsonSchema, ok, fail } from '@slop-lab/part/contracts';
-import { provenance } from '@slop-lab/part/context';
-import { createMemoryArtifacts } from '@slop-lab/part/artifacts';
-import { openFileArtifacts } from '@slop-lab/part-node/artifacts';
-import { createResults } from '@slop-lab/part/results';
-import { createScriptBridge } from '@slop-lab/part-plugins/scripts/bridge';
-import { startScriptBridge } from '@slop-lab/part-node/scripts/bridge';
-import { createNodeScripts } from '@slop-lab/part-node/scripts';
-import { createBudget, budgetKey } from '@slop-lab/part/runtime';
+import { localContext, digest, jsonSchema, ok, fail } from '@slop-lab/part/contracts/index.js';
+import { provenance } from '@slop-lab/part/context/index.js';
+import { createMemoryArtifacts } from '@slop-lab/part/artifacts/index.js';
+import { openFileArtifacts } from '@slop-lab/part-node/artifacts.js';
+import { createResults } from '@slop-lab/part/results/index.js';
+import { createScriptBridge } from '@slop-lab/part-plugins/scripts/bridge/index.js';
+import { startScriptBridge } from '@slop-lab/part-node/scripts/bridge.js';
+import { createNodeScripts } from '@slop-lab/part-node/scripts/index.js';
+import { createBudget, budgetKey } from '@slop-lab/part/runtime/index.js';
 const context = localContext();
 const metadata = { mediaType: 'application/json', provenance };
 test('Artifacts publish only complete immutable bytes, authorize ranges and survive reopening', async () => {
@@ -62,7 +62,7 @@ test('Results pin artifact bytes and deduplicate concurrent processors; bad proc
   await writer.write(new TextEncoder().encode('{"x":1}'));
   const artifact = expectProperty(await writer.finalize(), 'value');
   let calls = 0;
-  /** @type {import('@slop-lab/part/reference').Results.Processor} */
+  /** @type {import('@slop-lab/part/reference/index.js').Results.Processor} */
   const processor = {
     id: 'test/normalize',
     version: '1',
@@ -95,7 +95,7 @@ test('Results pin artifact bytes and deduplicate concurrent processors; bad proc
     ),
     'value',
   );
-  /** @type {import('@slop-lab/part/reference').Results.Submission} */
+  /** @type {import('@slop-lab/part/reference/index.js').Results.Submission} */
   const submission = {
     submissionId: 'one',
     expectedType: jsonSchema.ref,
@@ -280,10 +280,10 @@ test('Authenticated bridge rejects public IDs, profile widening and changed IDs;
 });
 
 test('Script tools share one prepared executor attempt; direct workflow scripts retain their own boundary', async () => {
-  const { createToolDispatcher, installTool } = await import('@slop-lab/part/tools');
-  const { schema } = await import('@slop-lab/part/contracts');
-  const { isScriptRequest } = await import('@slop-lab/part/scripts');
-  const { createBoundary, createOperations } = await import('@slop-lab/part/runtime');
+  const { createToolDispatcher, installTool } = await import('@slop-lab/part/tools.js');
+  const { schema } = await import('@slop-lab/part/contracts/index.js');
+  const { isScriptRequest } = await import('@slop-lab/part/scripts/index.js');
+  const { createBoundary, createOperations } = await import('@slop-lab/part/runtime/index.js');
   const root = await mkdtemp(join(tmpdir(), 'part-script-attempt-'));
   try {
     const source = 'console.log(JSON.stringify({done:true}));';
@@ -305,7 +305,7 @@ test('Script tools share one prepared executor attempt; direct workflow scripts 
       interpreters: { node: process.execPath },
       boundary,
     });
-    /** @type {import('@slop-lab/part/reference').Scripts.Request} */
+    /** @type {import('@slop-lab/part/reference/index.js').Scripts.Request} */
     const request = {
       requestId: 'one',
       executorId: 'part/node-process',
@@ -382,9 +382,9 @@ test('Script tools share one prepared executor attempt; direct workflow scripts 
 });
 
 test('Processor timeout rejects acceptance and late normalization cannot revive the submission', async () => {
-  const { createOperations } = await import('@slop-lab/part/runtime');
+  const { createOperations } = await import('@slop-lab/part/runtime/index.js');
   let /** @type {(...args: any[]) => void} */ finish;
-  /** @type {import('@slop-lab/part/reference').Results.Processor} */
+  /** @type {import('@slop-lab/part/reference/index.js').Results.Processor} */
   const processor = {
     id: 'test/timeout',
     version: '1',
@@ -419,7 +419,7 @@ test('Processor timeout rejects acceptance and late normalization cannot revive 
     ),
     'value',
   );
-  /** @type {import('@slop-lab/part/reference').Results.Submission} */
+  /** @type {import('@slop-lab/part/reference/index.js').Results.Submission} */
   const request = {
     submissionId: 'one',
     expectedType: jsonSchema.ref,

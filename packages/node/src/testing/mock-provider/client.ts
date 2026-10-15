@@ -1,4 +1,4 @@
-import { isJsonObject } from '@slop-lab/part/contracts';
+import { isJsonObject } from '@slop-lab/part/contracts/index.js';
 import type {
   MockProviderClient,
   MockReply,

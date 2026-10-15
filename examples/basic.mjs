@@ -1,16 +1,16 @@
 // @ts-check
 import { expectProperty } from '../fixtures/assertions.mjs';
-import { createAgent } from '@slop-lab/part-plugins/agent';
-import { functionTool } from '@slop-lab/part/tools';
-import { stringSchema } from '@slop-lab/part/contracts';
-import { fakeModel } from '@slop-lab/part-plugins/testing';
+import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
+import { functionTool } from '@slop-lab/part/tools.js';
+import { stringSchema } from '@slop-lab/part/contracts/index.js';
+import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
 
 const model = fakeModel([
   { toolCalls: [{ name: 'uppercase', arguments: { text: 'hello' } }] },
   { text: 'HELLO' },
 ]);
 // Runtime validation and provider JSON Schema are separate contracts.
-import { schema } from '@slop-lab/part/contracts';
+import { schema } from '@slop-lab/part/contracts/index.js';
 const input = schema(
   'example/text',
   /** @param {unknown} value @returns {value is {text: string}} */ (value) =>

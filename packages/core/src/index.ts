@@ -1,4 +1,3 @@
-/** @public */
 export { createPlanner } from './composition/planner.js';
 export { createScopeManager } from './composition/scopes.js';
 export { fail, jsonSchema, localContext, ok, schema, stringSchema } from './contracts/index.js';

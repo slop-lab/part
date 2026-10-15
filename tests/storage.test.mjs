@@ -5,13 +5,13 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createMemoryStore } from '@slop-lab/part/storage/memory';
-import { openSqliteStore } from '@slop-lab/part-node/storage/sqlite';
-import { createHistory } from '@slop-lab/part/context/history';
-import { createStoredBoundary, createExecutionRecovery } from '@slop-lab/part/storage/runtime';
-import { localContext } from '@slop-lab/part/contracts';
-import { provenance } from '@slop-lab/part/context';
-import { managedAttempt } from '@slop-lab/part/runtime';
+import { createMemoryStore } from '@slop-lab/part/storage/memory.js';
+import { openSqliteStore } from '@slop-lab/part-node/storage/sqlite.js';
+import { createHistory } from '@slop-lab/part/context/history.js';
+import { createStoredBoundary, createExecutionRecovery } from '@slop-lab/part/storage/runtime.js';
+import { localContext } from '@slop-lab/part/contracts/index.js';
+import { provenance } from '@slop-lab/part/context/index.js';
+import { managedAttempt } from '@slop-lab/part/runtime/index.js';
 const context = localContext();
 const address = { namespace: 'test', scope: { kind: 'runtime', id: 'r' }, key: 'state' };
 const change = (id, expected = 'absent', value = 1) => ({
@@ -105,7 +105,7 @@ test('G06: immutable history, stale append rejection and forks preserve source p
 test('DU04/G11: committed intents recover as unknown/abandoned without repeating effects', async () => {
   const store = createMemoryStore(),
     boundary = createStoredBoundary(store),
-    /** @type {import('@slop-lab/part/reference').Runtime.EffectPlan} */
+    /** @type {import('@slop-lab/part/reference/index.js').Runtime.EffectPlan} */
     plan = {
       operationId: 'o',
       attemptId: 'a',

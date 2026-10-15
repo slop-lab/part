@@ -12,17 +12,17 @@ import {
   createMockProviderClient,
   readMockSession,
   readFixture,
-} from '@slop-lab/part-node/testing/mock-provider';
-import { createMockProviderTools } from '@slop-lab/part-node/testing/mock-provider/tools';
-import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible';
-import { createToolDispatcher } from '@slop-lab/part/tools';
-import { localContext } from '@slop-lab/part/contracts';
+} from '@slop-lab/part-node/testing/mock-provider/index.js';
+import { createMockProviderTools } from '@slop-lab/part-node/testing/mock-provider/tools.js';
+import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible/index.js';
+import { createToolDispatcher } from '@slop-lab/part/tools.js';
+import { localContext } from '@slop-lab/part/contracts/index.js';
 import { createMockFlow } from '../examples/mock-provider/flow.mjs';
 const load = async (name) =>
   JSON.parse(await readFile(new URL(`../fixtures/mock-provider/${name}`, import.meta.url), 'utf8'));
 const project = { id: 'part/mock-tool-flow' };
 const request = { model: 'part-mock', messages: [{ role: 'user', content: 'hello' }] };
-/** @type {import('@slop-lab/part-node/testing/mock-provider').MockReply} */
+/** @type {import('@slop-lab/part-node/testing/mock-provider/index.js').MockReply} */
 const answer = { kind: 'completion', content: 'hello' };
 const post = (session, body = request, signal) =>
   fetch(`${session.baseURL}/chat/completions`, {
@@ -116,7 +116,7 @@ test('Interactive requests wait for project-bound operator tools; full tool flow
   }
 });
 test('Fixed matching is exact, ordered and sticky on mismatch; unused and exhausted fixtures fail verification', async () => {
-  /** @type {import('@slop-lab/part-node/testing/mock-provider').MockFixture} */
+  /** @type {import('@slop-lab/part-node/testing/mock-provider/index.js').MockFixture} */
   const fixture = {
     schemaVersion: 1,
     name: 'exact',
@@ -377,7 +377,7 @@ test('CLI starts a session, exposes pending requests, accepts a chosen reply and
 });
 
 test('Fixed fixtures preserve explicit provider errors and malformed wire responses', async () => {
-  /** @type {import('@slop-lab/part-node/testing/mock-provider').MockFixture} */
+  /** @type {import('@slop-lab/part-node/testing/mock-provider/index.js').MockFixture} */
   const fixture = {
     schemaVersion: 1,
     name: 'errors',

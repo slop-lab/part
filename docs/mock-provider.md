@@ -9,7 +9,7 @@ captured request; fixed mode uses exact ordered fixture exchanges.
 
 Implementation ownership stays explicit: the service, CLI and operator tools are
 in `@slop-lab/part-node`; the portable Chat Completions adapter is in
-`@slop-lab/part-plugins/providers/openai-compatible`. Core and browser packages do not
+`@slop-lab/part-plugins/providers/openai-compatible/index.js`. Core and browser packages do not
 acquire Node dependencies.
 
 ## Interactive flow for a working agent
@@ -71,8 +71,8 @@ import { readFile } from 'node:fs/promises';
 import {
   createMockProviderClient,
   readMockSession,
-} from '@slop-lab/part-node/testing/mock-provider';
-import { createMockProviderTools } from '@slop-lab/part-node/testing/mock-provider/tools';
+} from '@slop-lab/part-node/testing/mock-provider/index.js';
+import { createMockProviderTools } from '@slop-lab/part-node/testing/mock-provider/tools.js';
 
 const session = readMockSession(JSON.parse(await readFile('/tmp/part-mock-session.json', 'utf8')));
 const client = createMockProviderClient(session);

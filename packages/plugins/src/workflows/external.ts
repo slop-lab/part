@@ -1,6 +1,5 @@
-/** @public */
-import { canonical, fail, freeze, isJson, ok } from '@slop-lab/part/contracts';
-import type { Contracts, Runtime, Workflows } from '@slop-lab/part/reference';
+import { canonical, fail, freeze, isJson, ok } from '@slop-lab/part/contracts/index.js';
+import type { Contracts, Runtime, Workflows } from '@slop-lab/part/reference/index.js';
 /** The native owner supplies scheduling, continuation, actions and recovery semantics. */
 export interface NativeWorkflowPort {
   prepare(

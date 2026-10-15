@@ -1,4 +1,4 @@
-import { canonical } from '@slop-lab/part/contracts';
+import { canonical } from '@slop-lab/part/contracts/index.js';
 import { readFixture, readReply } from './protocol.js';
 import type {
   MockChatRequest,
@@ -57,8 +57,10 @@ export function createMockBroker(options: {
     if (
       record.state === 'responded' &&
       record.decisionId === decisionId &&
-      canonical(record.reply as unknown as import('@slop-lab/part/reference').Contracts.Json) ===
-        canonical(reply as unknown as import('@slop-lab/part/reference').Contracts.Json)
+      canonical(
+        record.reply as unknown as import('@slop-lab/part/reference/index.js').Contracts.Json,
+      ) ===
+        canonical(reply as unknown as import('@slop-lab/part/reference/index.js').Contracts.Json)
     )
       return inspect(id);
     if (record.state !== 'pending') throw Error(`Request is already ${record.state}`);

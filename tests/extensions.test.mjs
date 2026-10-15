@@ -10,12 +10,12 @@ import {
   jsonSchema,
   schema,
   digest,
-} from '@slop-lab/part/contracts';
-import { functionTool, createToolDispatcher } from '@slop-lab/part/tools';
-import { createContextCompiler, messageItem, semanticItem } from '@slop-lab/part/context';
-import { createModelGateway, noAuth } from '@slop-lab/part/model';
-import { createOllamaAdapter } from '@slop-lab/part-plugins/providers/ollama';
-import { createSuspensions } from '@slop-lab/part/runtime/waits';
+} from '@slop-lab/part/contracts/index.js';
+import { functionTool, createToolDispatcher } from '@slop-lab/part/tools.js';
+import { createContextCompiler, messageItem, semanticItem } from '@slop-lab/part/context/index.js';
+import { createModelGateway, noAuth } from '@slop-lab/part/model/index.js';
+import { createOllamaAdapter } from '@slop-lab/part-plugins/providers/ollama.js';
+import { createSuspensions } from '@slop-lab/part/runtime/waits.js';
 const context = localContext();
 const decision = (id, decide, resume) => ({
   id,
@@ -231,7 +231,7 @@ test('MT10: invalid output after a write preserves the applied effect', async ()
 test('X01-X04: custom semantic lowering supports multiple fragments, versions and required failures', async () => {
   const item = await semanticItem('test/report', { text: 'raw', private: 'secret' });
   const original = structuredClone(item);
-  /** @type {import('@slop-lab/part/reference').Context.Lowerer<unknown>} */
+  /** @type {import('@slop-lab/part/reference/index.js').Context.Lowerer<unknown>} */
   const lowerer = {
     id: 'test/lower',
     accepts: { id: 'test/report', version: 1 },
@@ -341,7 +341,7 @@ test('MT04: inspection digest matches bytes after final request transform', asyn
     capabilities: { revision: '1', entries: [] },
   };
   let actual;
-  /** @type {import('@slop-lab/part/reference').Model.RequestInspection} */
+  /** @type {import('@slop-lab/part/reference/index.js').Model.RequestInspection} */
   let inspected;
   const gateway = expectProperty(
     createModelGateway({
@@ -388,7 +388,7 @@ test('MT04: inspection digest matches bytes after final request transform', asyn
 });
 
 test('X06: inspector targets confer no authority and unknown projections never expose raw payload', async () => {
-  const { createProjectionService } = await import('@slop-lab/part/context/projection');
+  const { createProjectionService } = await import('@slop-lab/part/context/projection.js');
   let reads = 0;
   const projection = createProjectionService({
     authorize: (_target, _audience, c) => c.principal.subject === 'local',

@@ -1,5 +1,5 @@
-import { digest, fail, isJsonObject, ok } from '@slop-lab/part/contracts';
-import type { Contracts, Model } from '@slop-lab/part/reference';
+import { digest, fail, isJsonObject, ok } from '@slop-lab/part/contracts/index.js';
+import type { Contracts, Model } from '@slop-lab/part/reference/index.js';
 import { isReasoningItem } from './output.js';
 
 export async function encodeResponses(

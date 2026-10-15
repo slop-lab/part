@@ -1,5 +1,5 @@
-import type { Contracts, Runtime, Scripts, Tools } from '@slop-lab/part/reference';
-import type { Operations } from '@slop-lab/part/runtime';
+import type { Contracts, Runtime, Scripts, Tools } from '@slop-lab/part/reference/index.js';
+import type { Operations } from '@slop-lab/part/runtime/index.js';
 import type { ScriptBridgeEnvironment } from './bridge.js';
 export interface NodeScriptService extends Scripts.Service {
   executor(id?: string): Tools.Executor;

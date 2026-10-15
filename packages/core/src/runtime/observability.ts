@@ -1,4 +1,3 @@
-/** @public */
 import { canonical, fail, freeze, isJson, isJsonObject, ok } from '../contracts/index.js';
 import type { Contracts } from '../reference/contracts.js';
 import type { Observability } from '../reference/observability.js';

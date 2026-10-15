@@ -9,14 +9,14 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { connectAcpMcpServers } from '@slop-lab/part-node/acp/mcp';
+import { connectAcpMcpServers } from '@slop-lab/part-node/acp/mcp.js';
 import { setTimeout } from 'node:timers/promises';
 import { client, methods, ndJsonStream } from '@agentclientprotocol/sdk';
-import { createAcpAgent } from '@slop-lab/part-plugins/acp';
-import { startAcpStdio } from '@slop-lab/part-node/acp';
-import { fakeModel } from '@slop-lab/part-plugins/testing';
-import { functionTool } from '@slop-lab/part/tools';
-import { emptyCleanup, ok, schema, stringSchema } from '@slop-lab/part/contracts';
+import { createAcpAgent } from '@slop-lab/part-plugins/acp/index.js';
+import { startAcpStdio } from '@slop-lab/part-node/acp/index.js';
+import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
+import { functionTool } from '@slop-lab/part/tools.js';
+import { emptyCleanup, ok, schema, stringSchema } from '@slop-lab/part/contracts/index.js';
 
 const textSchema = schema(
   'acp/text',
@@ -46,7 +46,7 @@ const newSession = (cx) =>
   cx.request(methods.agent.session.new, { cwd: process.cwd(), mcpServers: [] });
 const prompt = (cx, sessionId, text = 'hello') =>
   cx.request(methods.agent.session.prompt, { sessionId, prompt: [{ type: 'text', text }] });
-/** @param {string[]} executions @param {import('@slop-lab/part/reference').Tools.Definition['effects']} [effects] */
+/** @param {string[]} executions @param {import('@slop-lab/part/reference/index.js').Tools.Definition['effects']} [effects] */
 function toolOptions(executions, effects = 'write') {
   return {
     model: fakeModel([
@@ -69,7 +69,7 @@ function toolOptions(executions, effects = 'write') {
     toolSchemas: { save_note: parameters },
   };
 }
-/** @param {{configureSession?: import('@slop-lab/part-plugins/acp').AcpAgentOptions['configureSession'], permission?: (params: import('@agentclientprotocol/sdk').RequestPermissionRequest, signal: AbortSignal) => import('@agentclientprotocol/sdk').RequestPermissionResponse | Promise<import('@agentclientprotocol/sdk').RequestPermissionResponse>, options?: Partial<import('@slop-lab/part-plugins/acp').AcpAgentOptions>, transport?: Partial<Parameters<typeof startAcpStdio>[0]>}} settings
+/** @param {{configureSession?: import('@slop-lab/part-plugins/acp/index.js').AcpAgentOptions['configureSession'], permission?: (params: import('@agentclientprotocol/sdk').RequestPermissionRequest, signal: AbortSignal) => import('@agentclientprotocol/sdk').RequestPermissionResponse | Promise<import('@agentclientprotocol/sdk').RequestPermissionResponse>, options?: Partial<import('@slop-lab/part-plugins/acp/index.js').AcpAgentOptions>, transport?: Partial<Parameters<typeof startAcpStdio>[0]>}} settings
  * @param {Function} run
  */
 async function withSdk(

@@ -1,7 +1,6 @@
-/** @public */
-import { createArtifactStore } from '@slop-lab/part/artifacts';
-import { isJsonObject } from '@slop-lab/part/contracts';
-import type { Storage } from '@slop-lab/part/reference';
+import { createArtifactStore } from '@slop-lab/part/artifacts/index.js';
+import { isJsonObject } from '@slop-lab/part/contracts/index.js';
+import type { Storage } from '@slop-lab/part/reference/index.js';
 import { mkdir, open, readFile, rename, rm, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 /** A bounded reference backend. One fsynced atomic record owns metadata and bytes. */
@@ -63,7 +62,7 @@ export async function openFileArtifacts(
           return {
             ...value,
             bytes,
-          } as unknown as import('@slop-lab/part/artifacts').ArtifactRecord;
+          } as unknown as import('@slop-lab/part/artifacts/index.js').ArtifactRecord;
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
           throw error;

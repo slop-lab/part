@@ -3,15 +3,15 @@ import { expectProperty } from '../fixtures/assertions.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { alternateBoundary } from '../experiments/alternate-boundary.mjs';
-import { createBoundary, managedAttempt } from '@slop-lab/part/runtime';
-import { localContext } from '@slop-lab/part/contracts';
+import { createBoundary, managedAttempt } from '@slop-lab/part/runtime/index.js';
+import { localContext } from '@slop-lab/part/contracts/index.js';
 test('C12/G08: independent source boundary variant preserves nominal effect count and single-use settlement', async () => {
   const counts = [];
   for (const create of [createBoundary, alternateBoundary]) {
     let count = 0;
     const boundary = create(),
       context = localContext(),
-      /** @type {import('@slop-lab/part/reference').Runtime.EffectPlan} */
+      /** @type {import('@slop-lab/part/reference/index.js').Runtime.EffectPlan} */
       plan = {
         operationId: 'o',
         attemptId: 'a',

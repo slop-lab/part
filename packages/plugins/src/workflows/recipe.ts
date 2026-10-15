@@ -1,6 +1,5 @@
-/** @public */
-import { digest, fail, isJson, ok } from '@slop-lab/part/contracts';
-import type { Composition, Contracts, Workflows } from '@slop-lab/part/reference';
+import { digest, fail, isJson, ok } from '@slop-lab/part/contracts/index.js';
+import type { Composition, Contracts, Workflows } from '@slop-lab/part/reference/index.js';
 import { callIdentity } from './memory/identity.js';
 import { createMemoryWorkflowEngine } from './memory/index.js';
 import type { WorkflowServices } from './memory/types.js';

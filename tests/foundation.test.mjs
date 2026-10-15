@@ -9,18 +9,18 @@ import {
   jsonSchema,
   stringSchema,
   canonical,
-} from '@slop-lab/part/contracts';
-import { createPlanner, createScopeManager } from '@slop-lab/part/composition';
+} from '@slop-lab/part/contracts/index.js';
+import { createPlanner, createScopeManager } from '@slop-lab/part/composition/index.js';
 import {
   createOperations,
   createBoundary,
   managedAttempt,
   createBudget,
   createProgress,
-} from '@slop-lab/part/runtime';
-import { createSuspensions } from '@slop-lab/part/runtime/waits';
+} from '@slop-lab/part/runtime/index.js';
+import { createSuspensions } from '@slop-lab/part/runtime/waits.js';
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-/** @template T @param {T} result @returns {import('@slop-lab/part/reference').Runtime.ManagedOutcome<T>} */
+/** @template T @param {T} result @returns {import('@slop-lab/part/reference/index.js').Runtime.ManagedOutcome<T>} */
 const completed = (result) => ({
   phase: 'completed',
   result,
@@ -28,10 +28,10 @@ const completed = (result) => ({
   unsettledChildren: [],
   commit: [],
 });
-/** @type {import('@slop-lab/part/reference').Runtime.OperationSpec} */
+/** @type {import('@slop-lab/part/reference/index.js').Runtime.OperationSpec} */
 const spec = { kind: 'test', retryOwner: 'test', childPolicy: 'attached' };
 const context = localContext();
-/** @type {import('@slop-lab/part/reference').Runtime.EffectPlan} */
+/** @type {import('@slop-lab/part/reference/index.js').Runtime.EffectPlan} */
 const plan = {
   operationId: 'o',
   attemptId: 'a',
@@ -42,7 +42,7 @@ const plan = {
   compositionRevision: 'r',
   classification: 'write',
 };
-/** @type {import('@slop-lab/part/reference').Composition.ExtensionPoint<number>} */
+/** @type {import('@slop-lab/part/reference/index.js').Composition.ExtensionPoint<number>} */
 const point = {
   id: 'test/registry',
   owner: 'test',
@@ -50,7 +50,7 @@ const point = {
   kind: 'registry',
   scope: 'runtime',
 };
-/** @returns {import('@slop-lab/part/reference').Composition.ComponentFactory} */
+/** @returns {import('@slop-lab/part/reference/index.js').Composition.ComponentFactory} */
 const component = (id, register, requires = [], provides = [], lifecycle = {}) => ({
   descriptor: { id, version: '1', scope: 'runtime', surfaces: ['test'], requires, provides },
   register,
@@ -329,7 +329,7 @@ test('waits validate authority, revision, schema and deduplicate responses', asy
 
 test('synchronous composition hashing matches native SHA-256', async () => {
   const { sha256 } = await import('../packages/core/dist/foundation/hash.js');
-  const { digest } = await import('@slop-lab/part/contracts');
+  const { digest } = await import('@slop-lab/part/contracts/index.js');
   for (const text of ['', 'abc', '한국어', 'x'.repeat(1000)]) {
     const bytes = new TextEncoder().encode(text);
     assert.equal(sha256(bytes), await digest(bytes));
@@ -416,7 +416,7 @@ test('long wait expiry does not overflow into immediate expiration', async () =>
 });
 
 test('factory replacement preserves dependent service construction and exposes cleanup evidence', async () => {
-  /** @type {import('@slop-lab/part/reference').Composition.ExtensionPoint<number>} */
+  /** @type {import('@slop-lab/part/reference/index.js').Composition.ExtensionPoint<number>} */
   const servicePoint = {
       id: 'test/service',
       owner: 'test',
@@ -512,7 +512,7 @@ test('E05: a child cannot widen its parent deadline', async () => {
 test('Attached work from a separately configured service joins the parent supervisor', async () => {
   const owner = createOperations({ cancellationGraceMs: 5 }),
     separate = createOperations({ cancellationGraceMs: 100 });
-  /** @type {import('@slop-lab/part/reference').Runtime.ExecutionHandle<any>} */
+  /** @type {import('@slop-lab/part/reference/index.js').Runtime.ExecutionHandle<any>} */
   let child;
   const parent = await owner.begin(
     { kind: 'test/parent', childPolicy: 'attached', retryOwner: 'test' },
@@ -544,7 +544,7 @@ test('Attached work from a separately configured service joins the parent superv
 });
 
 test('Unresolved driver cleanup is abandoned and retains the actual resource reference', async () => {
-  const { createRunService, installDriver } = await import('@slop-lab/part/runtime/runs');
+  const { createRunService, installDriver } = await import('@slop-lab/part/runtime/runs.js');
   const operations = createOperations();
   let disposals = 0;
   const ref = { owner: 'test/driver', kind: 'test/resource', id: 'unclosed' };

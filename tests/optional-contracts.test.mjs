@@ -6,24 +6,31 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Window } from 'happy-dom';
-import { localContext, jsonSchema, schema, ok, fail, digest } from '@slop-lab/part/contracts';
-import { createMemoryStore } from '@slop-lab/part/storage/memory';
-import { createNamespaceMigrations } from '@slop-lab/part/storage/migrations';
-import { createCheckpointStore } from '@slop-lab/part-plugins/workflows/checkpoints';
-import { createNodeScripts } from '@slop-lab/part-node/scripts';
-import { createMarkdownView } from '@slop-lab/part-browser/markdown';
-import { createRendererRegistry, orderSlots } from '@slop-lab/part-browser/registry';
-import { createObservability } from '@slop-lab/part/runtime/observability';
-import { createHistory } from '@slop-lab/part/context/history';
-import { createChatHistoryAttachment } from '@slop-lab/part/context/run-history';
-import { createRunService, installDriver } from '@slop-lab/part/runtime/runs';
-import { createBasicDriver } from '@slop-lab/part-plugins/agent/drivers/basic';
-import { createPlanner } from '@slop-lab/part/composition';
-import { createOperations, createBudget, budgetKey } from '@slop-lab/part/runtime';
-import { createModelGateway } from '@slop-lab/part/model';
-import { fakeModel } from '@slop-lab/part-plugins/testing';
-import { createContextCompiler, provenance } from '@slop-lab/part/context';
-import { createRecipeEngine } from '@slop-lab/part-plugins/workflows/recipe';
+import {
+  localContext,
+  jsonSchema,
+  schema,
+  ok,
+  fail,
+  digest,
+} from '@slop-lab/part/contracts/index.js';
+import { createMemoryStore } from '@slop-lab/part/storage/memory.js';
+import { createNamespaceMigrations } from '@slop-lab/part/storage/migrations.js';
+import { createCheckpointStore } from '@slop-lab/part-plugins/workflows/checkpoints.js';
+import { createNodeScripts } from '@slop-lab/part-node/scripts/index.js';
+import { createMarkdownView } from '@slop-lab/part-browser/markdown.js';
+import { createRendererRegistry, orderSlots } from '@slop-lab/part-browser/registry.js';
+import { createObservability } from '@slop-lab/part/runtime/observability.js';
+import { createHistory } from '@slop-lab/part/context/history.js';
+import { createChatHistoryAttachment } from '@slop-lab/part/context/run-history.js';
+import { createRunService, installDriver } from '@slop-lab/part/runtime/runs.js';
+import { createBasicDriver } from '@slop-lab/part-plugins/agent/drivers/basic.js';
+import { createPlanner } from '@slop-lab/part/composition/index.js';
+import { createOperations, createBudget, budgetKey } from '@slop-lab/part/runtime/index.js';
+import { createModelGateway } from '@slop-lab/part/model/index.js';
+import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
+import { createContextCompiler, provenance } from '@slop-lab/part/context/index.js';
+import { createRecipeEngine } from '@slop-lab/part-plugins/workflows/recipe.js';
 const context = localContext();
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 const outcome = (result) => ({
@@ -207,7 +214,7 @@ test('Safe Markdown caches completed blocks and renderer/slot registries enforce
   window.happyDOM.cancelAsync();
 });
 test('Trace metadata strips body/credentials, bounds retention and authorizes manifest access', async () => {
-  /** @type {import('@slop-lab/part/reference').Observability.TracePolicy} */
+  /** @type {import('@slop-lab/part/reference/index.js').Observability.TracePolicy} */
   const policy = {
     mode: 'metadata',
     destinations: ['memory'],
@@ -216,7 +223,7 @@ test('Trace metadata strips body/credentials, bounds retention and authorizes ma
   };
   const trace = createObservability({ policy, maxEvents: 2 });
   const ref = { owner: 'test', kind: 'run', id: 'one' };
-  /** @type {import('@slop-lab/part/reference').Observability.InvocationManifest} */
+  /** @type {import('@slop-lab/part/reference/index.js').Observability.InvocationManifest} */
   const manifest = {
     execution: ref,
     runtimeVersion: 'test',
@@ -366,7 +373,7 @@ test('Recipe retries explicit read-only validation, but never retries failed or 
     /** @param {unknown} value @returns {value is {answer: 42}} */ (value) =>
       value !== null && typeof value === 'object' && 'answer' in value && value.answer === 42,
   );
-  /** @type {import('@slop-lab/part-plugins/workflows/recipe').RecipeDefinition} */
+  /** @type {import('@slop-lab/part-plugins/workflows/recipe.js').RecipeDefinition} */
   const definition = {
     id: 'recipe',
     format: 'part.recipe',
@@ -434,9 +441,9 @@ test('Recipe retries explicit read-only validation, but never retries failed or 
 });
 
 test('Estimated cost ceilings reserve before transport, require explicit pricing and preserve actual effect evidence', async () => {
-  const { createAgent } = await import('@slop-lab/part-plugins/agent');
-  const { functionTool } = await import('@slop-lab/part/tools');
-  const { costUnits } = await import('@slop-lab/part/runtime/costs');
+  const { createAgent } = await import('@slop-lab/part-plugins/agent/index.js');
+  const { functionTool } = await import('@slop-lab/part/tools.js');
+  const { costUnits } = await import('@slop-lab/part/runtime/costs.js');
   assert.equal(expectProperty(costUnits('0.000001'), 'value'), 1);
   assert.equal(costUnits('0.0000001').ok, false);
   assert.equal(costUnits('-1').ok, false);
@@ -490,11 +497,11 @@ test('Estimated cost ceilings reserve before transport, require explicit pricing
 
 test('DOM components, ordered slots, inspector and artifact viewers use only public client contracts', async () => {
   const { createWatchHub, createLocalPort, createController } =
-    await import('@slop-lab/part/client');
-  const { createChat } = await import('@slop-lab/part-browser/dom');
-  const { createInspector } = await import('@slop-lab/part-browser/inspector');
+    await import('@slop-lab/part/client/index.js');
+  const { createChat } = await import('@slop-lab/part-browser/dom.js');
+  const { createInspector } = await import('@slop-lab/part-browser/inspector.js');
   const hub = createWatchHub({ revision: '1', entries: [] });
-  /** @type {import('@slop-lab/part/reference').Client.Endpoint} */
+  /** @type {import('@slop-lab/part/reference/index.js').Client.Endpoint} */
   const endpoint = {
     watch: (_request, c) => hub.watch(c),
     query: async () => ok(null),
@@ -606,7 +613,7 @@ test('Script source/workspace resolvers pin packaged bytes and capture only decl
       workspace: async (ref) =>
         ref.id === 'allowed' ? ok(root) : fail('test.workspace', 'Workspace denied', 'permission'),
     });
-    /** @type {import('@slop-lab/part/reference').Scripts.Request} */
+    /** @type {import('@slop-lab/part/reference/index.js').Scripts.Request} */
     const request = {
       requestId: 'one',
       executorId: 'part/node-process',

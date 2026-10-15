@@ -5,11 +5,11 @@ as Zed. The portable plugin owns managed agents and tool permissions; the Node
 adapter owns newline-delimited JSON-RPC and optional stdio MCP processes.
 Calling an external ACP agent from part is outside this implementation.
 
-| Import                        | Factory                | Responsibility                                        |
-| ----------------------------- | ---------------------- | ----------------------------------------------------- |
-| `@slop-lab/part-plugins/acp`  | `createAcpAgent`       | Sessions, prompts, updates, permissions, cancellation |
-| `@slop-lab/part-node/acp`     | `startAcpStdio`        | Concurrent, bounded stdio JSON-RPC peer               |
-| `@slop-lab/part-node/acp/mcp` | `connectAcpMcpServers` | Authorized session-owned MCP tool processes           |
+| Import                                | Factory                | Responsibility                                        |
+| ------------------------------------- | ---------------------- | ----------------------------------------------------- |
+| `@slop-lab/part-plugins/acp/index.js` | `createAcpAgent`       | Sessions, prompts, updates, permissions, cancellation |
+| `@slop-lab/part-node/acp/index.js`    | `startAcpStdio`        | Concurrent, bounded stdio JSON-RPC peer               |
+| `@slop-lab/part-node/acp/mcp.js`      | `connectAcpMcpServers` | Authorized session-owned MCP tool processes           |
 
 Each optional package depends only on `@slop-lab/part`. The official ACP TypeScript
 SDK is a workspace **development dependency** for interoperability tests and the
@@ -84,10 +84,10 @@ stdio. The Zed GUI itself has not been exercised in this environment.
 ## Embed an agent
 
 ```js
-import { createAcpAgent } from '@slop-lab/part-plugins/acp';
-import { fakeModel } from '@slop-lab/part-plugins/testing';
-import { startAcpStdio } from '@slop-lab/part-node/acp';
-import { connectAcpMcpServers } from '@slop-lab/part-node/acp/mcp';
+import { createAcpAgent } from '@slop-lab/part-plugins/acp/index.js';
+import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
+import { startAcpStdio } from '@slop-lab/part-node/acp/index.js';
+import { connectAcpMcpServers } from '@slop-lab/part-node/acp/mcp.js';
 
 const host = startAcpStdio({
   createHandler: (connection) =>

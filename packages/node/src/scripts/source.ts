@@ -1,5 +1,5 @@
-import { digest, fail, ok } from '@slop-lab/part/contracts';
-import type { Contracts, Scripts } from '@slop-lab/part/reference';
+import { digest, fail, ok } from '@slop-lab/part/contracts/index.js';
+import type { Contracts, Scripts } from '@slop-lab/part/reference/index.js';
 import { readFile, realpath, stat } from 'node:fs/promises';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import type { NodeScriptOptions } from './types.js';

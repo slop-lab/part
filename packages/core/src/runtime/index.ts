@@ -1,4 +1,3 @@
-/** @public */
 export { createBoundary, managedAttempt } from './boundary.js';
 export { budgetKey, createBudget, reserve } from './budget.js';
 export { combineEffects } from './effects.js';

@@ -1,4 +1,3 @@
-/** @public */
 import type { Contracts } from '../reference/contracts.js';
 export type { Contracts } from '../reference/contracts.js';
 export const ok = <T>(value: T): Contracts.Result<T> => ({ ok: true, value });

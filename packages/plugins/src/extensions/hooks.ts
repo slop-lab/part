@@ -1,6 +1,5 @@
-/** @public */
-import { canonical, fail, isJsonObject, ok } from '@slop-lab/part/contracts';
-import type { Contracts, Hooks, Runtime, Scripts } from '@slop-lab/part/reference';
+import { canonical, fail, isJsonObject, ok } from '@slop-lab/part/contracts/index.js';
+import type { Contracts, Hooks, Runtime, Scripts } from '@slop-lab/part/reference/index.js';
 export function createScriptHooks(
   points: readonly Hooks.Point<unknown, unknown>[],
   scripts: Scripts.Service,

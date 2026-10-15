@@ -4,18 +4,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
 import { build } from 'esbuild';
-import { createAgent } from '@slop-lab/part-plugins/agent';
-import { fakeModel } from '@slop-lab/part-plugins/testing';
-import { createEmbeddedEndpoint } from '@slop-lab/part/host/embedded';
+import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
+import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
+import { createEmbeddedEndpoint } from '@slop-lab/part/host/embedded.js';
 import {
   createLocalPort,
   createWatchHub,
   createController,
   jsonCodec,
-} from '@slop-lab/part/client';
-import { createComposer } from '@slop-lab/part-browser/headless';
-import { createChat } from '@slop-lab/part-browser/dom';
-import { localContext } from '@slop-lab/part/contracts';
+} from '@slop-lab/part/client/index.js';
+import { createComposer } from '@slop-lab/part-browser/headless.js';
+import { createChat } from '@slop-lab/part-browser/dom.js';
+import { localContext } from '@slop-lab/part/contracts/index.js';
 const context = localContext();
 const command = (text, id = crypto.randomUUID()) => ({
   protocolVersion: 1,
@@ -99,7 +99,7 @@ test('DU05/DU06/DU08: snapshot subscription includes intervening updates and aut
 });
 test('DU07: not-sent and delivery-unknown are distinct; disconnect does not cancel runs', async () => {
   let count = 0;
-  /** @type {import('@slop-lab/part/reference').Client.Endpoint} */
+  /** @type {import('@slop-lab/part/reference/index.js').Client.Endpoint} */
   const endpoint = stub({
     command: async () => {
       count++;
@@ -234,7 +234,7 @@ test('C01/C10: browser entrypoint excludes storage, executor, provider and crede
   const result = await build({
     stdin: {
       contents:
-        "export { createChat } from '@slop-lab/part-browser/dom'; export { createController } from '@slop-lab/part/client';",
+        "export { createChat } from '@slop-lab/part-browser/dom.js'; export { createController } from '@slop-lab/part/client/index.js';",
       resolveDir: process.cwd(),
     },
     bundle: true,

@@ -1,9 +1,9 @@
 // @ts-check
 import { performance } from 'node:perf_hooks';
 import { Window } from 'happy-dom';
-import { createWatchHub, createLocalPort, createController } from '@slop-lab/part/client';
-import { createChat } from '@slop-lab/part-browser/dom';
-import { localContext, ok } from '@slop-lab/part/contracts';
+import { createWatchHub, createLocalPort, createController } from '@slop-lab/part/client/index.js';
+import { createChat } from '@slop-lab/part-browser/dom.js';
+import { localContext, ok } from '@slop-lab/part/contracts/index.js';
 const window =
     /** @type {globalThis.Window & typeof globalThis & { happyDOM: import('happy-dom').Window['happyDOM'] }} */ (
       /** @type {unknown} */ (new Window())
@@ -30,7 +30,7 @@ items.push({
   artifacts: [],
 });
 const hub = createWatchHub({ revision: '1', entries: [] }, items);
-/** @type {import('@slop-lab/part/reference').Client.Endpoint} */
+/** @type {import('@slop-lab/part/reference/index.js').Client.Endpoint} */
 const endpoint = {
   watch: (_request, c) => hub.watch(c),
   query: async () => ok(null),

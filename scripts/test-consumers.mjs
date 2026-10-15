@@ -1,4 +1,5 @@
 // @ts-check
+import { packageEntrypoints } from './package-build.mjs';
 import { npmSync } from './npm.mjs';
 import { build } from 'esbuild';
 import { spawnSync } from 'node:child_process';
@@ -11,7 +12,7 @@ const temporary = mkdtempSync(join(tmpdir(), 'part-consumers-'));
 const packages = ['core', 'plugins', 'node', 'browser'].map((directory) => ({
   directory,
   tarball: '',
-  manifest: JSON.parse(readFileSync(`packages/${directory}/package.json`, 'utf8')),
+  manifest: JSON.parse(readFileSync(`packages/${directory}/dist/package.json`, 'utf8')),
 }));
 const consumers = {
   core: ['core'],
@@ -46,12 +47,21 @@ try {
   cpSync(join(root, 'fixtures'), join(temporary, 'fixtures'), { recursive: true });
   for (const pkg of packages) {
     const packed = JSON.parse(
-      run(
-        'npm',
-        ['pack', '--json', '--pack-destination', temporary],
-        join(root, 'packages', pkg.directory),
-      ),
+      run('npm', [
+        'pack',
+        join(root, 'packages', pkg.directory, 'dist'),
+        '--json',
+        '--pack-destination',
+        temporary,
+      ]),
     );
+    if (
+      packed[0].files.some(
+        ({ path }) =>
+          path.startsWith('src/') || path.startsWith('dist/') || path.endsWith('.tsbuildinfo'),
+      )
+    )
+      throw Error(`${pkg.manifest.name} was not packed from its clean distribution root`);
     pkg.tarball = join(temporary, packed[0].filename);
   }
   for (const [name, selected] of Object.entries(consumers)) {
@@ -75,7 +85,11 @@ try {
     );
     run('npm', ['install', '--ignore-scripts', '--offline', '--no-audit', '--no-fund'], directory);
     const entries = installed.flatMap((pkg) =>
-      Object.entries(pkg.manifest.exports).map(([name, entry]) => ({ pkg, name, entry })),
+      packageEntrypoints(join(root, 'packages', pkg.directory, 'dist')).map(({ name, entry }) => ({
+        pkg,
+        name,
+        entry,
+      })),
     );
     if (['core', 'contracts', 'node', 'browser'].includes(name)) {
       writeFileSync(
@@ -108,7 +122,11 @@ try {
       run(process.execPath, [name === 'contracts' ? 'out/index.js' : 'index.mjs'], directory),
     );
     const modules = entries
-      .filter(({ entry }) => entry.default?.endsWith('.js'))
+      .filter(
+        ({ pkg, entry }) =>
+          entry.default?.endsWith('.js') &&
+          !Object.values(pkg.manifest.bin ?? {}).includes(entry.default),
+      )
       .map(({ pkg, name }) => publicPath(pkg, name));
     run(
       process.execPath,
@@ -136,7 +154,7 @@ try {
       const bundle = await build({
         stdin: {
           contents:
-            "export { createChat } from '@slop-lab/part-browser/dom'; export { createController } from '@slop-lab/part/client';",
+            "export { createChat } from '@slop-lab/part-browser/dom.js'; export { createController } from '@slop-lab/part/client/index.js';",
           resolveDir: directory,
         },
         bundle: true,

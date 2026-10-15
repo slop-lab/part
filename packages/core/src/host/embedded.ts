@@ -1,4 +1,3 @@
-/** @public */
 import { createControl, installAction, installQuery } from '../client/control.js';
 import { createWatchHub } from '../client/watch.js';
 import { fail, jsonSchema, localContext, ok, schema, stringSchema } from '../contracts/index.js';

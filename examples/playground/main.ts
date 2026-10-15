@@ -1,9 +1,9 @@
-import { createChat } from '@slop-lab/part-browser/dom';
-import { createInspector } from '@slop-lab/part-browser/inspector';
-import { createController } from '@slop-lab/part/client';
-import { createHttpPort } from '@slop-lab/part/client/http';
-import { fail, ok } from '@slop-lab/part/contracts';
-import type { Contracts } from '@slop-lab/part/reference';
+import { createChat } from '@slop-lab/part-browser/dom.js';
+import { createInspector } from '@slop-lab/part-browser/inspector.js';
+import { createController } from '@slop-lab/part/client/index.js';
+import { createHttpPort } from '@slop-lab/part/client/http.js';
+import { fail, ok } from '@slop-lab/part/contracts/index.js';
+import type { Contracts } from '@slop-lab/part/reference/index.js';
 import catalog from './catalog.json' with { type: 'json' };
 import { command, deliveryError, playgroundRenderers } from './renderers.js';
 

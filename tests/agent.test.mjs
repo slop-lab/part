@@ -2,15 +2,15 @@
 import { expectProperty } from '../fixtures/assertions.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAgent, contextPoint } from '@slop-lab/part-plugins/agent';
-import { functionTool } from '@slop-lab/part/tools';
-import { fakeModel } from '@slop-lab/part-plugins/testing';
-import { schema, stringSchema, ok, fail } from '@slop-lab/part/contracts';
+import { createAgent, contextPoint } from '@slop-lab/part-plugins/agent/index.js';
+import { functionTool } from '@slop-lab/part/tools.js';
+import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
+import { schema, stringSchema, ok, fail } from '@slop-lab/part/contracts/index.js';
 import {
   createBasicDriver,
   createValidatingDriver,
-} from '@slop-lab/part-plugins/agent/drivers/basic';
-import { createContextCompiler } from '@slop-lab/part/context';
+} from '@slop-lab/part-plugins/agent/drivers/basic.js';
+import { createContextCompiler } from '@slop-lab/part/context/index.js';
 const input = schema(
   'test/text',
   /** @param {unknown} v @returns {v is {text: string}} */ (v) =>
@@ -151,10 +151,11 @@ test('shared invocation/attempt budgets stop the next effect before execution', 
 });
 
 test('C07: preset and expanded manual composition execute through the same public parts', async () => {
-  const { expandAgent, modelPoint, toolsPoint } = await import('@slop-lab/part-plugins/agent');
-  const { createPlanner, createScopeManager } = await import('@slop-lab/part/composition');
-  const { createRunService, installDriver } = await import('@slop-lab/part/runtime/runs');
-  const { localContext } = await import('@slop-lab/part/contracts');
+  const { expandAgent, modelPoint, toolsPoint } =
+    await import('@slop-lab/part-plugins/agent/index.js');
+  const { createPlanner, createScopeManager } = await import('@slop-lab/part/composition/index.js');
+  const { createRunService, installDriver } = await import('@slop-lab/part/runtime/runs.js');
+  const { localContext } = await import('@slop-lab/part/contracts/index.js');
   const automatic = expectProperty(
     createAgent({ model: fakeModel([{ text: 'equivalent' }]) }),
     'value',
@@ -207,9 +208,9 @@ test('C07: preset and expanded manual composition execute through the same publi
 });
 
 test('C09: context-owned registry accepts a new semantic type without replacing the compiler', async () => {
-  const { lowerersPoint } = await import('@slop-lab/part/context');
-  const { emptyCleanup } = await import('@slop-lab/part/contracts');
-  /** @type {import('@slop-lab/part/reference').Context.Lowerer} */
+  const { lowerersPoint } = await import('@slop-lab/part/context/index.js');
+  const { emptyCleanup } = await import('@slop-lab/part/contracts/index.js');
+  /** @type {import('@slop-lab/part/reference/index.js').Context.Lowerer} */
   const lowerer = {
     id: 'third-party/lowerer',
     accepts: { id: 'third-party/item', version: 1 },
@@ -228,7 +229,7 @@ test('C09: context-owned registry accepts a new semantic type without replacing 
         ],
       }),
   };
-  /** @type {import('@slop-lab/part/reference').Composition.ComponentFactory} */
+  /** @type {import('@slop-lab/part/reference/index.js').Composition.ComponentFactory} */
   const component = {
     descriptor: {
       id: 'third-party',
@@ -253,7 +254,7 @@ test('C09: context-owned registry accepts a new semantic type without replacing 
         dispose: async () => emptyCleanup(),
       }),
   };
-  const { semanticItem } = await import('@slop-lab/part/context');
+  const { semanticItem } = await import('@slop-lab/part/context/index.js');
   const model = fakeModel([{ text: 'extension result' }]);
   const agent = expectProperty(createAgent({ model, components: [component] }), 'value');
   const result = await agent.generate([
@@ -269,8 +270,8 @@ test('C09: context-owned registry accepts a new semantic type without replacing 
 
 test('disposing an agent during admission blocks new driver effects', async () => {
   let calls = 0;
-  const { emptyCleanup } = await import('@slop-lab/part/contracts');
-  /** @type {import('@slop-lab/part/reference').Driver.Factory<string, string>} */
+  const { emptyCleanup } = await import('@slop-lab/part/contracts/index.js');
+  /** @type {import('@slop-lab/part/reference/index.js').Driver.Factory<string, string>} */
   const driver = {
     id: 'test/dispose-race',
     version: '1',

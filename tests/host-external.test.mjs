@@ -2,15 +2,15 @@
 import { expectProperty, stub } from '../fixtures/assertions.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { localContext, ok, fail, jsonSchema } from '@slop-lab/part/contracts';
-import { createOperations, createProgress } from '@slop-lab/part/runtime';
-import { createResourceManager } from '@slop-lab/part/host/resources';
-import { createRuntimeHost } from '@slop-lab/part/host/runtime';
-import { createExternalEngine } from '@slop-lab/part-plugins/workflows/external';
-import { provenance } from '@slop-lab/part/context';
+import { localContext, ok, fail, jsonSchema } from '@slop-lab/part/contracts/index.js';
+import { createOperations, createProgress } from '@slop-lab/part/runtime/index.js';
+import { createResourceManager } from '@slop-lab/part/host/resources.js';
+import { createRuntimeHost } from '@slop-lab/part/host/runtime.js';
+import { createExternalEngine } from '@slop-lab/part-plugins/workflows/external.js';
+import { provenance } from '@slop-lab/part/context/index.js';
 const context = localContext();
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
-/** @template T @param {T} result @returns {import('@slop-lab/part/reference').Runtime.ManagedOutcome<T>} */
+/** @template T @param {T} result @returns {import('@slop-lab/part/reference/index.js').Runtime.ManagedOutcome<T>} */
 const terminal = (result) => ({
   phase: 'completed',
   result,
@@ -154,7 +154,7 @@ test('External adapter attaches native owner state after unknown submission and 
     actions = 0;
   const records = new Map(),
     keys = new Map();
-  /** @type {import('@slop-lab/part/reference').Workflows.EngineDescriptor} */
+  /** @type {import('@slop-lab/part/reference/index.js').Workflows.EngineDescriptor} */
   const descriptor = {
     id: 'test/native',
     version: '1',
@@ -162,7 +162,7 @@ test('External adapter attaches native owner state after unknown submission and 
     formats: [{ id: 'native', versions: ['1'] }],
     capabilities: { revision: '1', entries: [] },
   };
-  /** @type {import('@slop-lab/part/reference').Workflows.Guarantees} */
+  /** @type {import('@slop-lab/part/reference/index.js').Workflows.Guarantees} */
   const guarantees = {
     control: 'runner-enforced',
     effects: 'runner-path-only',

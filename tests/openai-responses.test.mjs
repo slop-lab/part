@@ -3,12 +3,12 @@ import { expectProperty, stub } from '../fixtures/assertions.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { createOpenAIResponsesAdapter } from '@slop-lab/part-plugins/providers/openai-responses';
-import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible';
-import { createAgent } from '@slop-lab/part-plugins/agent';
-import { createFetchTransport, noAuth } from '@slop-lab/part/model';
-import { functionTool } from '@slop-lab/part/tools';
-import { digest, schema, stringSchema } from '@slop-lab/part/contracts';
+import { createOpenAIResponsesAdapter } from '@slop-lab/part-plugins/providers/openai-responses/index.js';
+import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible/index.js';
+import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
+import { createFetchTransport, noAuth } from '@slop-lab/part/model/index.js';
+import { functionTool } from '@slop-lab/part/tools.js';
+import { digest, schema, stringSchema } from '@slop-lab/part/contracts/index.js';
 
 const adapter = createOpenAIResponsesAdapter();
 const profile = {
@@ -22,7 +22,7 @@ const profile = {
   defaults: {},
   capabilities: { revision: '1', entries: [] },
 };
-/** @returns {import('@slop-lab/part/reference').Model.Invocation} */
+/** @returns {import('@slop-lab/part/reference/index.js').Model.Invocation} */
 const invocation = (fragments = [], options = {}) => ({
   profileId: profile.id,
   context: stub({ fragments }),

@@ -1,4 +1,3 @@
-/** @public */
 import { provenance } from '../context/index.js';
 import { canonical, digest, fail, freeze, isJson, ok } from '../contracts/index.js';
 import type { Contracts } from '../reference/contracts.js';

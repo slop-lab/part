@@ -1,9 +1,9 @@
 // @ts-check
 import { setTimeout } from 'node:timers/promises';
-import { fakeModel } from '@slop-lab/part-plugins/testing';
-import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible';
-import { createOpenAIResponsesAdapter } from '@slop-lab/part-plugins/providers/openai-responses';
-import { bearerAuth, createFetchTransport } from '@slop-lab/part/model';
+import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
+import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible/index.js';
+import { createOpenAIResponsesAdapter } from '@slop-lab/part-plugins/providers/openai-responses/index.js';
+import { bearerAuth, createFetchTransport } from '@slop-lab/part/model/index.js';
 
 export function providerOptions(environment = {}) {
   return [

@@ -1,8 +1,8 @@
-import { provenance } from '@slop-lab/part/context';
-import { fail, freeze } from '@slop-lab/part/contracts';
-import type { Contracts, Runtime, Workflows } from '@slop-lab/part/reference';
-import type { OperationContext } from '@slop-lab/part/runtime';
-import { combineEffects } from '@slop-lab/part/runtime';
+import { provenance } from '@slop-lab/part/context/index.js';
+import { fail, freeze } from '@slop-lab/part/contracts/index.js';
+import type { Contracts, Runtime, Workflows } from '@slop-lab/part/reference/index.js';
+import type { OperationContext } from '@slop-lab/part/runtime/index.js';
+import { combineEffects } from '@slop-lab/part/runtime/index.js';
 import { createStepContext } from './context.js';
 import type { Execution, PreparedRunner, WorkflowServices } from './types.js';
 export async function executeWorkflow(

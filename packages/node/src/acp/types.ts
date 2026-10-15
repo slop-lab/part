@@ -1,4 +1,4 @@
-import type { Contracts } from '@slop-lab/part/reference';
+import type { Contracts } from '@slop-lab/part/reference/index.js';
 import type { Readable, Writable } from 'node:stream';
 
 export interface AcpPeer {

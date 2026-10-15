@@ -19,12 +19,12 @@ export function expectProperty(value, key) {
 /** Validate structural records at the JSON serialization boundary.
  * @template T
  * @param {T} value
- * @returns {T & import('@slop-lab/part/reference').Contracts.Json}
+ * @returns {T & import('@slop-lab/part/reference/index.js').Contracts.Json}
  */
 export function json(value) {
   const decoded = JSON.parse(JSON.stringify(value));
   assert.deepEqual(decoded, value, 'Expected lossless JSON data');
-  return /** @type {T & import('@slop-lab/part/reference').Contracts.Json} */ (decoded);
+  return /** @type {T & import('@slop-lab/part/reference/index.js').Contracts.Json} */ (decoded);
 }
 
 /** A partial test double; omitted methods must not be called by the test.

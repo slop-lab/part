@@ -2,7 +2,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import ts from 'typescript';
-import { publicEntrypoints, exportMap } from './package-exports.mjs';
+import { packageEntrypoints } from './package-build.mjs';
 
 const root = process.cwd();
 const failures = [];
@@ -52,7 +52,7 @@ function resolveDependency(file, specifier, runtime) {
       .replace(/\.js$/, '.ts');
     if (!graph.has(target)) failures.push(`${file}: missing source ${target}`);
     else if (owner(target) !== pkg)
-      failures.push(`${file}: cross-package imports must use public exports`);
+      failures.push(`${file}: cross-package imports must use package paths`);
     return target;
   }
   const match = /^(@[^/]+\/[^/]+)(?:\/(.*))?$/.exec(specifier);
@@ -67,17 +67,13 @@ function resolveDependency(file, specifier, runtime) {
     pkg.manifest.dependencies?.[dependency.manifest.name] !== dependency.manifest.version
   )
     failures.push(`${file}: undeclared or unpinned dependency ${dependency.manifest.name}`);
-  const name = match[2] ? `./${match[2]}` : '.';
-  const entry = dependency.manifest.exports[name];
-  if (!entry || (runtime && !entry.default)) {
-    failures.push(`${file}: missing public ${runtime ? 'runtime' : 'type'} export ${specifier}`);
+  const path = match[2] ?? 'index.js';
+  const target = `${dependency.path}/src/${path}`.replace(/\.js$/, '.ts');
+  if (!path.endsWith('.js') || !graph.has(target)) {
+    failures.push(`${file}: missing package file or explicit .js path ${specifier}`);
     return undefined;
   }
-  const output = entry.types ?? entry.default;
-  return `${dependency.path}/${output.slice(2)}`
-    .replace('/dist/', '/src/')
-    .replace(/\.d\.ts$/, '.ts')
-    .replace(/\.js$/, '.ts');
+  return target;
 }
 for (const file of sources) {
   const source = ts.createSourceFile(
@@ -191,34 +187,36 @@ for (const pkg of packages) {
       : { '@slop-lab/part': byName.get('@slop-lab/part').manifest.version };
   if (JSON.stringify(pkg.manifest.dependencies ?? {}) !== JSON.stringify(expectedDependencies))
     failures.push(`${pkg.path}: dependencies must follow the core/plugin/environment boundary`);
-  if (
-    JSON.stringify(pkg.manifest.exports) !== JSON.stringify(exportMap(publicEntrypoints(pkg.path)))
-  )
-    failures.push(`${pkg.path}: exports must be generated from @public sources by the build`);
-  const targets = new Set();
-  for (const [name, entry] of Object.entries(pkg.manifest.exports)) {
+  const hasRoot = existsSync(`${pkg.path}/src/index.ts`);
+  const expectedWorkspace = {
+    ...(hasRoot ? { '.': { types: './dist/index.d.ts', default: './dist/index.js' } } : {}),
+    './*': './dist/*',
+  };
+  if (JSON.stringify(pkg.manifest.exports) !== JSON.stringify(expectedWorkspace))
+    failures.push(`${pkg.path}: workspace exports must use fixed dist routing`);
+  const distribution = JSON.parse(readFileSync(`${pkg.path}/dist/package.json`, 'utf8'));
+  const expectedPublished = {
+    ...(hasRoot ? { '.': { types: './index.d.ts', default: './index.js' } } : {}),
+    './*': './*',
+  };
+  if (JSON.stringify(distribution.exports) !== JSON.stringify(expectedPublished))
+    failures.push(`${pkg.path}: distribution exports must expose root-relative files`);
+  if (distribution.scripts || distribution.devDependencies || distribution.files)
+    failures.push(`${pkg.path}: distribution metadata includes workspace-only fields`);
+  for (const { name, entry } of packageEntrypoints(`${pkg.path}/dist`)) {
     entries++;
-    if (name.includes('*')) failures.push(`${pkg.path}: wildcard exports expose internal helpers`);
-    const output = entry.default ?? entry.types;
-    const source = `${pkg.path}/${output.slice(2)}`
-      .replace('/dist/', '/src/')
-      .replace(/\.d\.ts$/, '.ts')
-      .replace(/\.js$/, '.ts');
-    if (!existsSync(source)) failures.push(`${pkg.path}/${name}: missing source ${source}`);
-    if (targets.has(output)) failures.push(`${pkg.path}/${name}: duplicate public entrypoint`);
-    targets.add(output);
-    const path = source.slice(`${pkg.path}/src/`.length);
-    const expected = path === 'index.ts' ? '.' : './' + path.replace(/(?:\/index)?\.ts$/, '');
-    if (name !== expected)
-      failures.push(`${pkg.path}/${name}: public path must follow source domain (${expected})`);
-    if (entry.default?.endsWith('.js') && entry.types !== entry.default.replace(/\.js$/, '.d.ts'))
-      failures.push(`${pkg.path}/${name}: code/declaration targets disagree`);
+    for (const output of Object.values(entry))
+      if (!existsSync(`${pkg.path}/dist/${output.slice(2)}`))
+        failures.push(`${pkg.path}/${name}: missing build output ${output}`);
   }
+  for (const output of Object.values(distribution.bin ?? {}))
+    if (typeof output !== 'string' || !existsSync(`${pkg.path}/dist/${output.slice(2)}`))
+      failures.push(`${pkg.path}: missing distribution executable ${output}`);
 }
 if (failures.length) {
   console.error(failures.join('\n'));
   process.exitCode = 1;
 } else
   console.log(
-    `Architecture checks passed (${packages.length} packages, ${sources.length} source modules, ${entries} public entrypoints)`,
+    `Architecture checks passed (${packages.length} packages, ${sources.length} source modules, ${entries} built entrypoints)`,
   );

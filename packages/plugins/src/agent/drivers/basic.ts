@@ -1,8 +1,13 @@
-/** @public */
-import { messageItem } from '@slop-lab/part/context';
-import { emptyCleanup, fail, isJson, isJsonObject, schema } from '@slop-lab/part/contracts';
-import type { Context, Contracts, Driver, Model, Runtime } from '@slop-lab/part/reference';
-import { combineEffects } from '@slop-lab/part/runtime';
+import { messageItem } from '@slop-lab/part/context/index.js';
+import {
+  emptyCleanup,
+  fail,
+  isJson,
+  isJsonObject,
+  schema,
+} from '@slop-lab/part/contracts/index.js';
+import type { Context, Contracts, Driver, Model, Runtime } from '@slop-lab/part/reference/index.js';
+import { combineEffects } from '@slop-lab/part/runtime/index.js';
 export type BasicInput = string | readonly Context.SemanticItem[];
 export const basicInputSchema = schema<BasicInput>(
   'part/basic-input',

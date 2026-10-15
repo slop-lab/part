@@ -11,8 +11,8 @@ plugins and separate Node and browser packages.
 | `@slop-lab/part-browser` | DOM/headless UI, renderers, workflow forms, Inspector/Workbench and CSS                                     | `@slop-lab/part`     |
 
 The repository root is a private npm workspace, not an installable aggregate SDK.
-Each package generates explicit exports from its `@public` source entries and has
-independent build output and a local tarball.
+Each package publishes its `dist` directory as the package root, with independent
+build output and a local tarball.
 Plugins are grouped in one package; individual plugins do not each need a package.
 Core does not import the other packages, and browser/Node adapters communicate
 through core contracts rather than depending on each other or the plugin bundle.
@@ -31,9 +31,10 @@ Try conversation, tools, approval gates, immutable reports, validation failures 
 cancellation, with request/event inspection. Scripted mode needs no key; optional
 R4U Chat Completions and Responses run through a server that keeps credentials out
 of the browser. Use `npm run test:browser` after `npx playwright install chromium`.
-Add `/** @public */` at the top of a public TypeScript entrypoint, or `/* @public */`
-for CSS. `npm run build` updates package exports automatically; do not maintain the
-`exports` field by hand. See [build rules](docs/architecture.md#public-entrypoints).
+Import subpaths by their emitted filenames, including `.js` and directory `index.js`.
+The build generates `dist/package.json` with a root export when `index.js` exists
+and `"./*": "./*"` for all files, without rewriting workspace metadata.
+See [build rules](docs/architecture.md#package-builds).
 
 JS/MJS sources use `// @ts-check`; `npm run check:js` builds declarations and checks them
 with `jsconfig.json`. Git enforces LF line endings on every platform. Windows CI runs
@@ -47,8 +48,8 @@ not require Node types; Node HTTP host declarations are checked with explicit
 Node typings.
 
 ```js
-import { createAgent } from '@slop-lab/part-plugins/agent';
-import { fakeModel } from '@slop-lab/part-plugins/testing';
+import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
+import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
 
 const created = createAgent({ model: fakeModel([{ text: 'Hello from part' }]) });
 if (!created.ok) throw new Error(created.error.message);
@@ -62,8 +63,8 @@ registered operator tools. Requests wait for explicit decisions; successful tran
 can become exact fixed fixtures for automated tests. Run `npm run example:mock:fixed`
 for the complete tool flow, or see [mock provider workflows](docs/mock-provider.md).
 
-Run part as an ACP agent for editor clients with `@slop-lab/part-plugins/acp` and the
-`@slop-lab/part-node/acp` stdio adapter. `npm run example:acp` demonstrates conversation and
+Run part as an ACP agent for editor clients with `@slop-lab/part-plugins/acp/index.js` and the
+`@slop-lab/part-node/acp/index.js` stdio adapter. `npm run example:acp` demonstrates conversation and
 tool permission requests using the official SDK client. See [ACP integration](docs/acp.md)
 for Zed settings, session-owned MCP tools and optional live R4U providers.
 

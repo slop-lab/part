@@ -1,5 +1,4 @@
-/** @public */
-import type { Client, Contracts, Projection, UI } from '@slop-lab/part/reference';
+import type { Client, Contracts, Projection, UI } from '@slop-lab/part/reference/index.js';
 import { createComposer, createScroll } from './headless.js';
 import { createMarkdownView } from './markdown.js';
 import { orderSlots } from './registry.js';

@@ -4,13 +4,13 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { digest, localContext } from '@slop-lab/part/contracts';
-import { createNodeScripts } from '@slop-lab/part-node/scripts';
+import { digest, localContext } from '@slop-lab/part/contracts/index.js';
+import { createNodeScripts } from '@slop-lab/part-node/scripts/index.js';
 import { expectProperty } from '../fixtures/assertions.mjs';
 
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** @param {string} root @param {string} source @param {Partial<import('@slop-lab/part/reference').Scripts.Request>} [options] */
+/** @param {string} root @param {string} source @param {Partial<import('@slop-lab/part/reference/index.js').Scripts.Request>} [options] */
 async function start(root, source, options = {}, interpreter = process.execPath) {
   await writeFile(join(root, 'task.cjs'), source);
   const scripts = createNodeScripts({ root, interpreters: { node: interpreter } });

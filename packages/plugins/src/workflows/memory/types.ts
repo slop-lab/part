@@ -5,8 +5,8 @@ import type {
   Runtime,
   Scripts,
   Workflows,
-} from '@slop-lab/part/reference';
-import type { OperationContext, Operations } from '@slop-lab/part/runtime';
+} from '@slop-lab/part/reference/index.js';
+import type { OperationContext, Operations } from '@slop-lab/part/runtime/index.js';
 export interface WorkflowServices {
   readonly operations?: Operations;
   readonly model?: Model.Gateway;

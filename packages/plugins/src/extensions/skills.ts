@@ -1,7 +1,6 @@
-/** @public */
-import { semanticItem } from '@slop-lab/part/context';
-import { canonical, fail, freeze, ok } from '@slop-lab/part/contracts';
-import type { Context, Contracts, Packages, Skills } from '@slop-lab/part/reference';
+import { semanticItem } from '@slop-lab/part/context/index.js';
+import { canonical, fail, freeze, ok } from '@slop-lab/part/contracts/index.js';
+import type { Context, Contracts, Packages, Skills } from '@slop-lab/part/reference/index.js';
 interface Decoded {
   name: string;
   description: string;

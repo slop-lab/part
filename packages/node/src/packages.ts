@@ -1,6 +1,5 @@
-/** @public */
-import { digest, fail, freeze, ok } from '@slop-lab/part/contracts';
-import type { Contracts, Packages } from '@slop-lab/part/reference';
+import { digest, fail, freeze, ok } from '@slop-lab/part/contracts/index.js';
+import type { Contracts, Packages } from '@slop-lab/part/reference/index.js';
 import { lstat, readdir, readFile, realpath } from 'node:fs/promises';
 import { basename, join, relative, resolve } from 'node:path';
 export function createDirectoryPackages(options: { maxBytes?: number } = {}): Packages.Source {

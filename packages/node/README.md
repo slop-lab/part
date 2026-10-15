@@ -10,9 +10,9 @@ Normal exit, cancellation and timeouts terminate descendants, including Windows
 children detached from their immediate parent. Result channel fd 3 is preserved.
 
 ```js
-import { createNodeScripts } from '@slop-lab/part-node/scripts';
-import { startHttpHost } from '@slop-lab/part-node/host/http';
-import { openSqliteStore } from '@slop-lab/part-node/storage/sqlite';
+import { createNodeScripts } from '@slop-lab/part-node/scripts/index.js';
+import { startHttpHost } from '@slop-lab/part-node/host/http.js';
+import { openSqliteStore } from '@slop-lab/part-node/storage/sqlite.js';
 ```
 
 Resources open only through explicit factory calls. The bridge accepts core ports,
@@ -22,14 +22,14 @@ using the HTTP host need Node typings for its IncomingMessage callback.
 Build in the workspace with `npm run build --workspace @slop-lab/part-node`.
 This is a private experimental package; pin its exact version and its core dependency.
 
-Local OpenAI-compatible mocks are available from `@slop-lab/part-node/testing/mock-provider`,
-with operator tools at `@slop-lab/part-node/testing/mock-provider/tools`. Installed packages
+Local OpenAI-compatible mocks are available from `@slop-lab/part-node/testing/mock-provider/index.js`,
+with operator tools at `@slop-lab/part-node/testing/mock-provider/tools.js`. Installed packages
 provide `part-mock-provider --help`; interactive sessions wait for working-agent
 decisions, and fixed sessions replay exact fixtures. See `docs/mock-provider.md` in
 the repository for CLI flows, transcript export and noninteractive replay.
 
-`@slop-lab/part-node/acp` exports `startAcpStdio`, a bounded concurrent NDJSON JSON-RPC
-transport accepting a structural handler. `@slop-lab/part-node/acp/mcp` exports
+`@slop-lab/part-node/acp/index.js` exports `startAcpStdio`, a bounded concurrent NDJSON JSON-RPC
+transport accepting a structural handler. `@slop-lab/part-node/acp/mcp.js` exports
 `connectAcpMcpServers` for explicitly authorized, session-owned stdio MCP tools.
 These adapters do not depend on the plugin bundle or the ACP SDK.
 See [ACP integration](../../docs/acp.md) for agent composition and Zed settings.

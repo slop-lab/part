@@ -1,6 +1,5 @@
-/** @public */
-import { isJsonObject, jsonSchema, schema } from '@slop-lab/part/contracts';
-import { functionTool } from '@slop-lab/part/tools';
+import { isJsonObject, jsonSchema, schema } from '@slop-lab/part/contracts/index.js';
+import { functionTool } from '@slop-lab/part/tools.js';
 import { readReply } from './protocol.js';
 import type { MockProviderClient } from './types.js';
 /** Bind these tools to one project session; callers cannot supply arbitrary endpoints. */

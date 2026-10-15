@@ -4,10 +4,10 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, relative } from 'node:path';
-import { createAgent } from '@slop-lab/part-plugins/agent';
-import { functionTool } from '@slop-lab/part/tools';
-import { schema, stringSchema } from '@slop-lab/part/contracts';
-import { fakeModel } from '@slop-lab/part-plugins/testing';
+import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
+import { functionTool } from '@slop-lab/part/tools.js';
+import { schema, stringSchema } from '@slop-lab/part/contracts/index.js';
+import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
 const workspace = mkdtempSync(join(tmpdir(), 'part-consumer-workspace-'));
 try {
   writeFileSync(join(workspace, 'input.txt'), 'consumer-owned workspace');

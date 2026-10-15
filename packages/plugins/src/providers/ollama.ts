@@ -1,6 +1,5 @@
-/** @public */
-import { digest, fail, isJson, isJsonObject, ok } from '@slop-lab/part/contracts';
-import type { Contracts, Model } from '@slop-lab/part/reference';
+import { digest, fail, isJson, isJsonObject, ok } from '@slop-lab/part/contracts/index.js';
+import type { Contracts, Model } from '@slop-lab/part/reference/index.js';
 
 /** Ollama /api/chat NDJSON adapter; streaming text, thinking, and function tools. */
 export function createOllamaAdapter(): Model.Adapter {

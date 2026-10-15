@@ -1,4 +1,3 @@
-/** @public */
 /** Chunk long deadlines so platform timeout overflow cannot cause early expiry. */
 export function scheduleDeadline(deadline: number, action: () => void): () => void {
   let timer: ReturnType<typeof setTimeout> | undefined,

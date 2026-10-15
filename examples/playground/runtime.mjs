@@ -1,11 +1,18 @@
 // @ts-check
-import { createAgent } from '@slop-lab/part-plugins/agent';
-import { createWatchHub } from '@slop-lab/part/client';
-import { messageItem } from '@slop-lab/part/context';
-import { canonical, fail, localContext, ok, schema, stringSchema } from '@slop-lab/part/contracts';
-import { createMemoryArtifacts } from '@slop-lab/part/artifacts';
-import { createSuspensions } from '@slop-lab/part/runtime/waits';
-import { functionTool } from '@slop-lab/part/tools';
+import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
+import { createWatchHub } from '@slop-lab/part/client/index.js';
+import { messageItem } from '@slop-lab/part/context/index.js';
+import {
+  canonical,
+  fail,
+  localContext,
+  ok,
+  schema,
+  stringSchema,
+} from '@slop-lab/part/contracts/index.js';
+import { createMemoryArtifacts } from '@slop-lab/part/artifacts/index.js';
+import { createSuspensions } from '@slop-lab/part/runtime/waits.js';
+import { functionTool } from '@slop-lab/part/tools.js';
 import catalog from './catalog.json' with { type: 'json' };
 import { createPlaygroundModel, providerOptions } from './models.mjs';
 

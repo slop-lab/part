@@ -5,21 +5,21 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { localContext, ok, fail, jsonSchema, digest } from '@slop-lab/part/contracts';
-import { createOperations, createBudget, budgetKey } from '@slop-lab/part/runtime';
-import { createPlanner } from '@slop-lab/part/composition';
-import { createBasicDriver } from '@slop-lab/part-plugins/agent/drivers/basic';
-import { createRunService, installDriver } from '@slop-lab/part/runtime/runs';
-import { createModelGateway } from '@slop-lab/part/model';
-import { fakeModel } from '@slop-lab/part-plugins/testing';
-import { createContextCompiler } from '@slop-lab/part/context';
-import { createNodeScripts } from '@slop-lab/part-node/scripts';
-import { createResults } from '@slop-lab/part/results';
-import { createSuspensions } from '@slop-lab/part/runtime/waits';
-import { createCodeEngine, defineCodeWorkflow } from '@slop-lab/part-plugins/workflows/code';
-import { callIdentity } from '@slop-lab/part-plugins/workflows/memory';
-import { createScriptBridge } from '@slop-lab/part-plugins/scripts/bridge';
-import { createScriptHooks } from '@slop-lab/part-plugins/extensions/hooks';
+import { localContext, ok, fail, jsonSchema, digest } from '@slop-lab/part/contracts/index.js';
+import { createOperations, createBudget, budgetKey } from '@slop-lab/part/runtime/index.js';
+import { createPlanner } from '@slop-lab/part/composition/index.js';
+import { createBasicDriver } from '@slop-lab/part-plugins/agent/drivers/basic.js';
+import { createRunService, installDriver } from '@slop-lab/part/runtime/runs.js';
+import { createModelGateway } from '@slop-lab/part/model/index.js';
+import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
+import { createContextCompiler } from '@slop-lab/part/context/index.js';
+import { createNodeScripts } from '@slop-lab/part-node/scripts/index.js';
+import { createResults } from '@slop-lab/part/results/index.js';
+import { createSuspensions } from '@slop-lab/part/runtime/waits.js';
+import { createCodeEngine, defineCodeWorkflow } from '@slop-lab/part-plugins/workflows/code.js';
+import { callIdentity } from '@slop-lab/part-plugins/workflows/memory/index.js';
+import { createScriptBridge } from '@slop-lab/part-plugins/scripts/bridge/index.js';
+import { createScriptHooks } from '@slop-lab/part-plugins/extensions/hooks.js';
 const context = localContext();
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function until(predicate) {
@@ -104,7 +104,7 @@ test('GW03/GW06: actual script -> managed child agent -> typed result -> approva
       ]),
       'value',
     );
-    /** @type {import('@slop-lab/part/reference').Scripts.Request} */
+    /** @type {import('@slop-lab/part/reference/index.js').Scripts.Request} */
     const collect = {
       requestId: 'collect',
       executorId: 'part/node-process',
@@ -119,7 +119,7 @@ test('GW03/GW06: actual script -> managed child agent -> typed result -> approva
       retry: 'never',
     };
     const composed = composition();
-    /** @type {import('@slop-lab/part/reference').Runtime.WaitTicket} */
+    /** @type {import('@slop-lab/part/reference/index.js').Runtime.WaitTicket} */
     let ticket;
     let applied = 0;
     const code = await defineCodeWorkflow({
@@ -148,7 +148,7 @@ test('GW03/GW06: actual script -> managed child agent -> typed result -> approva
           request,
         );
         if (review.phase !== 'completed') return fail('test.agent', 'Agent failed');
-        /** @type {import('@slop-lab/part/reference').Results.Submission} */
+        /** @type {import('@slop-lab/part/reference/index.js').Results.Submission} */
         const submission = {
           submissionId: 'result',
           expectedType: jsonSchema.ref,
@@ -284,7 +284,7 @@ test('GW08: hook timeout/failure policies, matcher, scope and concurrent once ad
     const source = 'setTimeout(()=>console.log(JSON.stringify({kind:"allow"})),1000);';
     await writeFile(join(root, 'slow.cjs'), source);
     const scripts = createNodeScripts({ root, interpreters: { node: process.execPath } });
-    /** @type {import('@slop-lab/part/reference').Hooks.Point<unknown, unknown>} */
+    /** @type {import('@slop-lab/part/reference/index.js').Hooks.Point<unknown, unknown>} */
     const point = {
       id: 'test/observe',
       version: 1,
@@ -303,7 +303,7 @@ test('GW08: hook timeout/failure policies, matcher, scope and concurrent once ad
       }),
       'value',
     );
-    /** @type {import('@slop-lab/part/reference').Hooks.Binding} */
+    /** @type {import('@slop-lab/part/reference/index.js').Hooks.Binding} */
     const binding = {
       id: 'timeout',
       pointId: point.id,
@@ -379,7 +379,7 @@ test('GW09: bridge expiry/revocation propagate cancellation and never widen pare
       get: (key) => (key.id === budgetKey.id ? ok(upstream) : fail('missing', 'Missing service')),
     }),
   });
-  /** @type {import('@slop-lab/part/reference').Runtime.ExecutionHandle<any>} */
+  /** @type {import('@slop-lab/part/reference/index.js').Runtime.ExecutionHandle<any>} */
   let child;
   const bridge = createScriptBridge({
     'run.start': {
@@ -414,7 +414,7 @@ test('GW09: bridge expiry/revocation propagate cancellation and never widen pare
       },
     },
   });
-  /** @type {Omit<import('@slop-lab/part/reference').Scripts.BridgeGrant, "id">} */
+  /** @type {Omit<import('@slop-lab/part/reference/index.js').Scripts.BridgeGrant, "id">} */
   const policy = {
     version: 1,
     audience: 'test',
@@ -471,10 +471,12 @@ test('GW09: bridge expiry/revocation propagate cancellation and never widen pare
 });
 
 test('Pinned pipeline skill binding contributes explicit user instructions and releases the activation', async () => {
-  const { createDirectoryPackages } = await import('@slop-lab/part-node/packages');
-  const { createSkills, skillLowerer } = await import('@slop-lab/part-plugins/extensions/skills');
-  const { messageItem, messageLowerer } = await import('@slop-lab/part/context');
-  const { createPipelineEngine } = await import('@slop-lab/part-plugins/workflows/pipeline');
+  const { createDirectoryPackages } = await import('@slop-lab/part-node/packages.js');
+  const { createSkills, skillLowerer } =
+    await import('@slop-lab/part-plugins/extensions/skills.js');
+  const { messageItem, messageLowerer } = await import('@slop-lab/part/context/index.js');
+  const { createPipelineEngine } =
+    await import('@slop-lab/part-plugins/workflows/pipeline/index.js');
   const root = await mkdtemp(join(tmpdir(), 'part-skill-'));
   try {
     const name = 'review-skill',
@@ -488,7 +490,7 @@ test('Pinned pipeline skill binding contributes explicit user instructions and r
       snapshots = expectProperty(await source.discover([skillRoot], context), 'value'),
       skills = createSkills(source, snapshots);
     const descriptor = expectProperty(await skills.list(context), 'value')[0];
-    /** @type {import('@slop-lab/part/reference').Skills.Activation} */
+    /** @type {import('@slop-lab/part/reference/index.js').Skills.Activation} */
     let activated;
     let release = 0;
     const tracked = {
@@ -563,7 +565,7 @@ test('Pinned pipeline skill binding contributes explicit user instructions and r
           bind: (input, activations) =>
             ok(
               json([
-                .../** @type {import('@slop-lab/part/reference').Context.SemanticItem[]} */ (
+                .../** @type {import('@slop-lab/part/reference/index.js').Context.SemanticItem[]} */ (
                   /** @type {unknown} */ (input)
                 ),
                 ...activations.flatMap((activation) => activation.contextItems),
@@ -618,8 +620,8 @@ test('Pinned pipeline skill binding contributes explicit user instructions and r
 });
 
 test('Bridge service adapter executes the configured gateway and exposes only its owner handles', async () => {
-  const { createBridgeMethods } = await import('@slop-lab/part-plugins/scripts/bridge/services');
-  const { messageItem } = await import('@slop-lab/part/context');
+  const { createBridgeMethods } = await import('@slop-lab/part-plugins/scripts/bridge/services.js');
+  const { messageItem } = await import('@slop-lab/part/context/index.js');
   const operations = createOperations(),
     model = fakeModel([{ text: 'bridge response' }]),
     gateway = expectProperty(
@@ -664,7 +666,7 @@ test('Bridge service adapter executes the configured gateway and exposes only it
       ),
       'value',
     );
-    /** @type {import('@slop-lab/part/reference').Scripts.BridgeRequest} */
+    /** @type {import('@slop-lab/part/reference/index.js').Scripts.BridgeRequest} */
     const request = {
       id: 'invoke',
       grantId: grant.id,
@@ -676,7 +678,7 @@ test('Bridge service adapter executes the configured gateway and exposes only it
     };
     const receipt = await bridge.invoke(request, owner);
     assert.equal(receipt.kind, 'accepted');
-    /** @type {import('@slop-lab/part/reference').Contracts.CommandReceipt<any>} */
+    /** @type {import('@slop-lab/part/reference/index.js').Contracts.CommandReceipt<any>} */
     let read;
     await until(async () => {
       read = await bridge.invoke(
@@ -721,7 +723,7 @@ test('Bridge service adapter executes the configured gateway and exposes only it
 });
 
 test('W12: native logical step keys attach the same managed agent run and reject changed input', async () => {
-  const { createAgentStepBinding } = await import('@slop-lab/part-plugins/workflows/agent-step');
+  const { createAgentStepBinding } = await import('@slop-lab/part-plugins/workflows/agent-step.js');
   const operations = createOperations(),
     model = fakeModel([{ text: 'attached once' }]),
     gateway = expectProperty(

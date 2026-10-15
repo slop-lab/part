@@ -1,6 +1,5 @@
-/** @public */
-import { fail, ok } from '@slop-lab/part/contracts';
-import type { Contracts, UI } from '@slop-lab/part/reference';
+import { fail, ok } from '@slop-lab/part/contracts/index.js';
+import type { Contracts, UI } from '@slop-lab/part/reference/index.js';
 /** Highest layer wins; equal-layer collisions fail at installation. */
 export function createRendererRegistry<View>(
   layers: readonly (readonly UI.Renderer<Contracts.Json, View>[])[],

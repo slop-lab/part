@@ -13,21 +13,21 @@ import {
   stringSchema,
   schema,
   digest,
-} from '@slop-lab/part/contracts';
-import { createOperations, createBoundary } from '@slop-lab/part/runtime';
-import { createNodeScripts } from '@slop-lab/part-node/scripts';
-import { createResults } from '@slop-lab/part/results';
-import { createSuspensions } from '@slop-lab/part/runtime/waits';
-import { createCodeEngine, defineCodeWorkflow } from '@slop-lab/part-plugins/workflows/code';
+} from '@slop-lab/part/contracts/index.js';
+import { createOperations, createBoundary } from '@slop-lab/part/runtime/index.js';
+import { createNodeScripts } from '@slop-lab/part-node/scripts/index.js';
+import { createResults } from '@slop-lab/part/results/index.js';
+import { createSuspensions } from '@slop-lab/part/runtime/waits.js';
+import { createCodeEngine, defineCodeWorkflow } from '@slop-lab/part-plugins/workflows/code.js';
 import {
   createPipelineEngine,
   installStepHandler,
-} from '@slop-lab/part-plugins/workflows/pipeline';
-import { createWorkflowHost } from '@slop-lab/part-plugins/workflows/host';
-import { callIdentity } from '@slop-lab/part-plugins/workflows/memory';
-import { fakeModel } from '@slop-lab/part-plugins/testing';
-import { createModelGateway } from '@slop-lab/part/model';
-import { messageItem, createContextCompiler } from '@slop-lab/part/context';
+} from '@slop-lab/part-plugins/workflows/pipeline/index.js';
+import { createWorkflowHost } from '@slop-lab/part-plugins/workflows/host.js';
+import { callIdentity } from '@slop-lab/part-plugins/workflows/memory/index.js';
+import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
+import { createModelGateway } from '@slop-lab/part/model/index.js';
+import { messageItem, createContextCompiler } from '@slop-lab/part/context/index.js';
 const context = localContext(),
   delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const ref = (id, format, digest) => ({
@@ -62,7 +62,7 @@ test('SR03-SR05/SR08: standalone scripts pin bytes, capture explicit JSON and re
   try {
     await writeFile(join(root, 'collect.cjs'), source);
     const scripts = createNodeScripts({ root, interpreters: { node: process.execPath } }),
-      /** @type {import('@slop-lab/part/reference').Scripts.Request} */
+      /** @type {import('@slop-lab/part/reference/index.js').Scripts.Request} */
       request = {
         requestId: 'collect',
         executorId: 'part/node-process',
@@ -95,7 +95,7 @@ test('SR03-SR05/SR08: standalone scripts pin bytes, capture explicit JSON and re
     await writeFile(join(root, 'collect.cjs'), source + 'process.stdout.write("extra");');
     assert.equal((await scripts.execute(request, context)).ok, false);
     const newSource = source + 'process.stdout.write("extra");',
-      /** @type {import('@slop-lab/part/reference').Scripts.Request} */
+      /** @type {import('@slop-lab/part/reference/index.js').Scripts.Request} */
       changed = {
         ...request,
         source: { ...request.source, digest: await digest(new TextEncoder().encode(newSource)) },
@@ -137,7 +137,7 @@ test('GW03/W01: code workflow executes script -> managed model -> validated resu
       'value',
     );
   await writeFile(join(root, 'collect.cjs'), source);
-  /** @type {import('@slop-lab/part/reference').Scripts.Request} */
+  /** @type {import('@slop-lab/part/reference/index.js').Scripts.Request} */
   const request = {
     requestId: 'collect',
     executorId: 'part/node-process',
@@ -185,7 +185,7 @@ test('GW03/W01: code workflow executes script -> managed model -> validated resu
         invocation,
       );
       if (invoked.phase !== 'completed') return fail('fixture.model', 'Model failed');
-      /** @type {import('@slop-lab/part/reference').Results.Submission} */
+      /** @type {import('@slop-lab/part/reference/index.js').Results.Submission} */
       const submission = {
         submissionId: 'result',
         expectedType: jsonSchema.ref,

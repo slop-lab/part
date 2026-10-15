@@ -1,5 +1,4 @@
-/** @public */
-import type { Model } from '@slop-lab/part/reference';
+import type { Model } from '@slop-lab/part/reference/index.js';
 import { createResponsesDecoder } from './decode.js';
 import { encodeResponses } from './encode.js';
 

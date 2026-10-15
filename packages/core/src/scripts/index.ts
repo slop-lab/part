@@ -1,4 +1,3 @@
-/** @public */
 import { isJson, isJsonObject } from '../contracts/index.js';
 import type { Scripts } from '../reference/scripts.js';
 /** Structural validation can run during workflow preparation without launching a process. */

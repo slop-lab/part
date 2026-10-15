@@ -1,4 +1,4 @@
-import { isJsonObject } from '@slop-lab/part/contracts';
+import { isJsonObject } from '@slop-lab/part/contracts/index.js';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import type { IncomingMessage, ServerResponse } from 'node:http';

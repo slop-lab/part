@@ -1,12 +1,12 @@
 // @ts-check
 import { expectProperty } from '../fixtures/assertions.mjs';
 import assert from 'node:assert/strict';
-import { createAgent } from '@slop-lab/part-plugins/agent';
-import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible';
-import { createOpenAIResponsesAdapter } from '@slop-lab/part-plugins/providers/openai-responses';
-import { bearerAuth, createFetchTransport } from '@slop-lab/part/model';
-import { schema, stringSchema } from '@slop-lab/part/contracts';
-import { functionTool } from '@slop-lab/part/tools';
+import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
+import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible/index.js';
+import { createOpenAIResponsesAdapter } from '@slop-lab/part-plugins/providers/openai-responses/index.js';
+import { bearerAuth, createFetchTransport } from '@slop-lab/part/model/index.js';
+import { schema, stringSchema } from '@slop-lab/part/contracts/index.js';
+import { functionTool } from '@slop-lab/part/tools.js';
 
 // Opt-in only: never run as part of the credential-free test suite.
 async function main() {

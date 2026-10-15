@@ -1,8 +1,7 @@
-/** @public */
-import { fail, isJson, ok } from '@slop-lab/part/contracts';
-import type { Contracts } from '@slop-lab/part/reference';
-import type { LocalStore, StoreData } from '@slop-lab/part/storage/memory';
-import { initialStoreData, storeFacade } from '@slop-lab/part/storage/memory';
+import { fail, isJson, ok } from '@slop-lab/part/contracts/index.js';
+import type { Contracts } from '@slop-lab/part/reference/index.js';
+import type { LocalStore, StoreData } from '@slop-lab/part/storage/memory.js';
+import { initialStoreData, storeFacade } from '@slop-lab/part/storage/memory.js';
 import { DatabaseSync } from 'node:sqlite';
 /** Explicitly opens a single local database. No resource is created on import. */
 export function openSqliteStore(path: string, id = 'part/sqlite'): Contracts.Result<LocalStore> {

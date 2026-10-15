@@ -4,14 +4,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
-import { createAgent } from '@slop-lab/part-plugins/agent';
-import { fakeModel } from '@slop-lab/part-plugins/testing';
-import { createFetchTransport, noAuth } from '@slop-lab/part/model';
-import { createOllamaAdapter } from '@slop-lab/part-plugins/providers/ollama';
-import { createEmbeddedEndpoint } from '@slop-lab/part/host/embedded';
-import { startHttpHost } from '@slop-lab/part-node/host/http';
-import { createHttpPort } from '@slop-lab/part/client/http';
-import { localContext, ok, fail } from '@slop-lab/part/contracts';
+import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
+import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
+import { createFetchTransport, noAuth } from '@slop-lab/part/model/index.js';
+import { createOllamaAdapter } from '@slop-lab/part-plugins/providers/ollama.js';
+import { createEmbeddedEndpoint } from '@slop-lab/part/host/embedded.js';
+import { startHttpHost } from '@slop-lab/part-node/host/http.js';
+import { createHttpPort } from '@slop-lab/part/client/http.js';
+import { localContext, ok, fail } from '@slop-lab/part/contracts/index.js';
 const context = localContext();
 test('G03: provider adapter uses a real HTTP custom endpoint with a local fake response', async () => {
   /** @type {Record<string, any>} */
