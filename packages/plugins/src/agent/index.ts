@@ -1,3 +1,4 @@
+import { version } from '../version.js';
 import { createPlanner, createScopeManager } from '@slop-lab/part/composition/index.js';
 import {
   createContextCompiler,
@@ -119,7 +120,7 @@ export function expandAgent(options: AgentOptions & { driver?: Driver.Factory<un
   const base: Composition.ComponentFactory = {
     descriptor: {
       id: 'part/base',
-      version: '0.1.0-alpha.2',
+      version,
       surfaces: ['local', 'server', 'test'],
       scope: 'runtime',
       requires: [],

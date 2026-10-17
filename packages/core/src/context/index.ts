@@ -1,3 +1,4 @@
+import { version } from '../version.js';
 import { digest, fail, freeze, isJson, ok } from '../contracts/index.js';
 import type { Composition } from '../reference/composition.js';
 import type { Context } from '../reference/context.js';
@@ -30,7 +31,7 @@ export const transformsKey: Contracts.ServiceKey<readonly Context.SetTransform[]
 };
 export const provenance: Contracts.Provenance = Object.freeze({
   component: 'part/context',
-  componentVersion: '0.1.0-alpha.2',
+  componentVersion: version,
   origin: 'module',
 });
 const sourceKey = (source: Context.SourceRef) => JSON.stringify(source);

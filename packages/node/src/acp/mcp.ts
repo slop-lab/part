@@ -1,3 +1,4 @@
+import { version } from '../version.js';
 import { digest, fail, isJsonObject, schema } from '@slop-lab/part/contracts/index.js';
 import type { Contracts, Model, Runtime, Tools } from '@slop-lab/part/reference/index.js';
 import { reserve } from '@slop-lab/part/runtime/index.js';
@@ -39,7 +40,7 @@ export async function connectAcpMcpServers(options: AcpMcpOptions): Promise<AcpM
         'initialize',
         {
           protocolVersion: '2025-11-25',
-          clientInfo: { name: 'part', version: '0.1.0-alpha.2' },
+          clientInfo: { name: 'part', version },
           capabilities: {},
         },
         { signal: options.signal },

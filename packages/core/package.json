@@ -1,7 +1,6 @@
 {
   "name": "@slop-lab/part",
-  "version": "0.1.0-alpha.2",
-  "private": true,
+  "version": "0.1.0",
   "type": "module",
   "description": "Environment-independent progressive agent runtime",
   "files": [
@@ -18,5 +17,22 @@
       "default": "./dist/index.js"
     },
     "./*": "./dist/*"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=24.22.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/slop-lab/part.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/slop-lab/part#readme",
+  "bugs": {
+    "url": "https://github.com/slop-lab/part/issues"
   }
 }

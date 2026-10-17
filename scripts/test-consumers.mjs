@@ -90,6 +90,17 @@ try {
       ),
     );
     run('npm', ['install', '--ignore-scripts', '--offline', '--no-audit', '--no-fund'], directory);
+    if (name === 'node') {
+      // Install the LTS declarations under their real name so their transitive
+      // "node" references cannot resolve to the development DOM toolchain's types.
+      cpSync(
+        join(root, 'node_modules/@types/node-lts'),
+        join(directory, 'node_modules/@types/node'),
+        {
+          recursive: true,
+        },
+      );
+    }
     const entries = installed.flatMap((pkg) =>
       packageEntrypoints(join(root, 'packages', pkg.directory, 'dist')).map(({ name, entry }) => ({
         pkg,
@@ -117,7 +128,7 @@ try {
             outDir: 'out',
             lib: ['ES2022', 'DOM', 'DOM.Iterable'],
             types: name === 'node' ? ['node'] : [],
-            ...(name === 'node' ? { typeRoots: [join(root, 'node_modules/@types')] } : {}),
+            ...(name === 'node' ? { typeRoots: [join(directory, 'node_modules/@types')] } : {}),
           },
           include: ['index.ts', 'entrypoints.ts'],
         }),

@@ -1,6 +1,14 @@
 # Changelog
 
-## 0.1.0-alpha.2 (unreleased)
+## 0.1.0 (2026-10-18)
+
+- Require Node.js 24.22.0, the latest LTS at release preparation. Check the exact
+  minimum and latest Node 24/26 on Linux and Windows, and compile consumer declarations
+  with Node 24 types separately from the development DOM toolchain.
+- Prepare four public MIT packages. Include LICENSE in each distribution, generate
+  runtime version modules from package metadata, and document publication from dist.
+- Add a release gate for package versions, public metadata, licenses, actual tarball
+  contents and checksum integrity.
 
 - Enforce strict JS/MJS checks, checked indexed access, unused-code checks and full
   dependency declaration checks. Type runtime state, callbacks, protocol fixtures and
@@ -68,7 +76,7 @@
 - Keep separately configured nested services under the actual parent supervisor and
   share one prepared executor attempt between script tools and the script host.
 - Enforce principal ownership and resolved run composition handles.
-- Verify local fixtures; actual-provider smoke remains explicitly deferred.
+- Verify local fixtures; live provider checks remain opt-in and adapter-specific.
 
 Migration: existing basic/embedded start inputs remain strings. Script bridge grants
 must use the script relative path as audience and send the new audience header.

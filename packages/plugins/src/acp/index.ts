@@ -1,3 +1,4 @@
+import { version } from '../version.js';
 import { emptyCleanup, isJsonObject } from '@slop-lab/part/contracts/index.js';
 import type { Contracts } from '@slop-lab/part/reference/index.js';
 import { mcpServers, positiveLimit, sessionParams } from './content.js';
@@ -58,7 +59,7 @@ export function createAcpAgent(options: AcpAgentOptions): AcpAgent {
           protocolVersion: 1,
           agentInfo: options.agentInfo ?? {
             name: 'part',
-            version: '0.1.0-alpha.2',
+            version,
             title: 'Progressive agent runtime',
           },
           agentCapabilities: {

@@ -25,18 +25,21 @@
     "smoke:responses": "npm run build && node --env-file=.env scripts/smoke-provider.mjs responses",
     "test:browser": "npm run preview:build && node scripts/test-playground-browser.mjs",
     "example:acp": "npm run build && node examples/acp/client.mjs",
-    "check:js": "npm run build && tsc -p jsconfig.json"
+    "check:js": "npm run build && tsc -p jsconfig.json",
+    "release:check": "npm run format:check && npm run check && npm test && npm run test:consumers && npm run pack:local && node scripts/check-release.mjs"
   },
   "engines": {
-    "node": ">=22.18"
+    "node": ">=24.22.0"
   },
   "devDependencies": {
     "@agentclientprotocol/sdk": "1.8.0",
     "@types/node": "^26.6.5",
+    "@types/node-lts": "npm:@types/node@^24.19.2",
     "esbuild": "^0.28.2",
     "happy-dom": "^21.0.2",
     "playwright": "1.64.1",
     "prettier": "^3.9.10",
     "typescript": "^5.9.0"
-  }
+  },
+  "license": "MIT"
 }

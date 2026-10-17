@@ -38,7 +38,7 @@ permission/cancellation races, bounded transport and session-owned MCP tools are
 covered by the test suite. This does not certify a specific editor GUI or every
 ACP/MCP capability. Calling external ACP agents remains separate scope.
 
-Dependent projects can start local development against selected alpha.2 workspace
+Dependent projects can start local development against the 0.1.0
 packages and a lockfile, using fake endpoints or their own configured provider.
 `npm run pack:local` creates four independent tarballs. Seven isolated consumers
 cover core-only, non-coding, SWE, public TypeScript extensions, workflow, Node-only

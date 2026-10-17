@@ -56,10 +56,12 @@ function resolveDependency(file, specifier, _runtime) {
     return specifier;
   }
   if (specifier.startsWith('.')) {
-    const target = relative(root, resolve(dirname(file), specifier))
+    let target = relative(root, resolve(dirname(file), specifier))
       .split('\\')
       .join('/')
       .replace(/\.js$/, '.ts');
+    if (!graph.has(target) && graph.has(target.replace(/\.ts$/, '.d.ts')))
+      target = target.replace(/\.ts$/, '.d.ts');
     if (!graph.has(target)) failures.push(`${file}: missing source ${target}`);
     else if (owner(target) !== pkg)
       failures.push(`${file}: cross-package imports must use package paths`);
@@ -78,7 +80,9 @@ function resolveDependency(file, specifier, _runtime) {
   )
     failures.push(`${file}: undeclared or unpinned dependency ${dependency.manifest.name}`);
   const path = match[2] ?? 'index.js';
-  const target = `${dependency.path}/src/${path}`.replace(/\.js$/, '.ts');
+  let target = `${dependency.path}/src/${path}`.replace(/\.js$/, '.ts');
+  if (!graph.has(target) && graph.has(target.replace(/\.ts$/, '.d.ts')))
+    target = target.replace(/\.ts$/, '.d.ts');
   if (!path.endsWith('.js') || !graph.has(target)) {
     failures.push(`${file}: missing package file or explicit .js path ${specifier}`);
     return undefined;

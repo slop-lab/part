@@ -1,6 +1,6 @@
 # Implemented contracts
 
-Version: `0.1.0-alpha.2`, experimental local integration profile.
+Version: `0.1.0`, experimental API profile. Node.js usage requires 24.22.0 or newer.
 All concrete JavaScript APIs are generated from `packages/*/src/**/*.ts`. `@slop-lab/part/reference/index.js` is a
 **type-only design reference**, including future optional contracts; it does not
 mean every namespace has an implementation.

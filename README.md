@@ -13,6 +13,7 @@ plugins and separate Node and browser packages.
 The repository root is a private npm workspace, not an installable aggregate SDK.
 Each package publishes its `dist` directory as the package root, with independent
 build output and a local tarball.
+Node.js 24.22.0 or newer is required. Packages use the MIT license.
 Plugins are grouped in one package; individual plugins do not each need a package.
 Core does not import the other packages, and browser/Node adapters communicate
 through core contracts rather than depending on each other or the plugin bundle.
@@ -76,16 +77,19 @@ Build local packages and install only the packages a dependent repository needs:
 ```sh
 npm run pack:local
 # In the consumer repository, for an agent application:
-npm install /path/to/part/artifacts/slop-lab-part-0.1.0-alpha.2.tgz \
-  /path/to/part/artifacts/slop-lab-part-plugins-0.1.0-alpha.2.tgz
+npm install /path/to/part/artifacts/slop-lab-part-0.1.0.tgz \
+  /path/to/part/artifacts/slop-lab-part-plugins-0.1.0.tgz
 # Add slop-lab-part-node-*.tgz for Node adapters or slop-lab-part-browser-*.tgz for DOM UI.
 ```
 
-Commit the consumer lockfile and pin package versions exactly. Packages are private
-and have not been published to npm. APIs are experimental; there are no compatibility
+Commit the consumer lockfile and pin package versions exactly. The release version
+is 0.1.0. APIs are experimental; there are no compatibility
 aliases for the former flat imports. The browser stylesheet is
 `@slop-lab/part-browser/styles.css`. Run a single package build with
 `npm run build --workspace @slop-lab/part-browser` (or another workspace name).
+
+See [release preparation and publication](docs/releasing.md) for version updates,
+verification, public npm publication and post-release checks.
 
 Dependent projects can begin development against the pinned package tarballs.
 APIs remain experimental. See

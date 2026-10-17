@@ -5,7 +5,7 @@ The local 0.2 design is the requirements baseline; its former `car` prefix is
 renamed to `part`. Reference declarations are design contracts, not a claim that
 all optional modules are implemented.
 
-1. TypeScript, ESM, Node >=22.18 for the reference server. Core uses portable
+1. TypeScript, ESM, Node >=24.22.0 for the reference server. Core uses portable
    JavaScript APIs and has no runtime dependencies. Browser entrypoints must not
    import Node executors, storage, or credentials. npm provides reproducible installs.
 2. Runtime schemas validate unknown values. Strict JSON codecs reject lossy values,
@@ -94,6 +94,10 @@ route to its compiled index. New files require no metadata edits. Single-package
 builds also rebuild referenced workspace dependencies. Packing uses the `dist`
 directories directly, so installed packages have no enclosing `dist` directory.
 The Windows supervisor source is copied alongside its runtime module.
+Each distribution also includes the root MIT LICENSE and generated `version.js`
+and `version.d.ts`. Runtime provenance and ACP/MCP identities import that generated
+module, so each workspace package's version is maintained only in its package metadata.
+See [release preparation and publication](releasing.md) for the release procedure.
 
 ## Provider and runtime boundaries
 

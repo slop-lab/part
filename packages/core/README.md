@@ -15,4 +15,5 @@ it does not claim every contract has an implementation. All built files are acce
 through their explicit package subpaths.
 
 Build in the workspace with `npm run build --workspace @slop-lab/part`.
-This is a private experimental package; pin its exact version.
+MIT licensed. Requires Node.js 24.22.0 or newer for Node-based usage.
+APIs are experimental; pin its exact version.

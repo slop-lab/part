@@ -1,7 +1,6 @@
 {
   "name": "@slop-lab/part-browser",
-  "version": "0.1.0-alpha.2",
-  "private": true,
+  "version": "0.1.0",
   "type": "module",
   "description": "Browser UI for part",
   "files": [
@@ -9,7 +8,7 @@
     "README.md"
   ],
   "dependencies": {
-    "@slop-lab/part": "0.1.0-alpha.2"
+    "@slop-lab/part": "0.1.0"
   },
   "scripts": {
     "build": "node ../../scripts/build.mjs browser",
@@ -17,5 +16,22 @@
   },
   "exports": {
     "./*": "./dist/*"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=24.22.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/slop-lab/part.git",
+    "directory": "packages/browser"
+  },
+  "homepage": "https://github.com/slop-lab/part#readme",
+  "bugs": {
+    "url": "https://github.com/slop-lab/part/issues"
   }
 }

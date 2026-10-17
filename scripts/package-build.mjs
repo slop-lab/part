@@ -30,6 +30,7 @@ export function copyPackageAssets(directory) {
   }
   if (existsSync(join(directory, 'README.md')))
     cpSync(join(directory, 'README.md'), join(directory, 'dist/README.md'));
+  cpSync(new URL('../LICENSE', import.meta.url), join(directory, 'dist/LICENSE'));
 }
 
 /** Write publishing metadata only inside dist. Workspace routing stays static.
@@ -39,6 +40,11 @@ export function writePackageMetadata(directory) {
   const { scripts, devDependencies, workspaces, exports, files, bin, ...metadata } =
     readPackageMetadata(join(directory, 'package.json'));
   const output = join(directory, 'dist');
+  writeFileSync(
+    join(output, 'version.js'),
+    `export const version = ${JSON.stringify(metadata.version)};\n`,
+  );
+  writeFileSync(join(output, 'version.d.ts'), 'export declare const version: string;\n');
   const root = existsSync(join(output, 'index.js'))
     ? { '.': { types: './index.d.ts', default: './index.js' } }
     : {};

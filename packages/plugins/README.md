@@ -15,7 +15,8 @@ remain explicit and opt-in. Trusted code and memory workflows do not provide dur
 stack recovery. Ollama real-provider smoke remains unverified.
 
 Build in the workspace with `npm run build --workspace @slop-lab/part-plugins`.
-This is a private experimental package; pin its exact version and its core dependency.
+MIT licensed. Requires Node.js 24.22.0 or newer for Node-based usage.
+APIs are experimental; pin its exact version and its core dependency.
 
 `@slop-lab/part-plugins/providers/openai-compatible/index.js` exports `createOpenAICompatibleAdapter`
 for text/function-tool Chat Completions over JSON or SSE. It works with the local
@@ -33,5 +34,5 @@ background requests and stored conversation/continuation handles are unsupported
 `@slop-lab/part-plugins/acp/index.js` exports `createAcpAgent` for ACP v1 sessions, text streaming,
 tool permission requests and cancellation over a structural connection port.
 Hosts configure an agent per session; the plugin installs permission middleware.
-It has no Node or ACP SDK dependency. See [ACP integration](../../docs/acp.md)
+It has no Node or ACP SDK dependency. See [ACP integration](https://github.com/slop-lab/part/blob/main/docs/acp.md)
 for the Node transport, MCP connector, executable examples and profile limits.

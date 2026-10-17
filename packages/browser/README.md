@@ -14,4 +14,5 @@ Connect through core client contracts. Browser UI does not own execution; closin
 observer does not cancel a run. The CSS import assumes a bundler with CSS support.
 
 Build in the workspace with `npm run build --workspace @slop-lab/part-browser`.
-This is a private experimental package; pin its exact version and its core dependency.
+MIT licensed. Requires Node.js 24.22.0 or newer for Node-based usage.
+APIs are experimental; pin its exact version and its core dependency.

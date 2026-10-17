@@ -68,6 +68,11 @@ test('Distribution metadata uses root-relative exports and bins without rewritin
     });
     assert.deepEqual(published.bin, { example: './bin/cli.js' });
     assert.deepEqual(published.dependencies, {});
+    assert.match(readFileSync(join(output, 'LICENSE'), 'utf8'), /MIT License/);
+    assert.equal(
+      (await import(pathToFileURL(join(output, 'version.js')).href)).version,
+      published.version,
+    );
     for (const key of ['files', 'scripts', 'devDependencies'])
       assert.equal(key in published, false);
     assert.equal(readFileSync(join(directory, 'package.json'), 'utf8'), manifest);

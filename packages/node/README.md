@@ -2,7 +2,7 @@
 
 Node.js adapters for part: cross-platform script processes, authenticated loopback bridge,
 HTTP hosting, SQLite, immutable file artifacts and directory package snapshots.
-Depends only on the matching `@slop-lab/part` version. Node >=22.18 is required;
+Depends only on the matching `@slop-lab/part` version. Node >=24.22.0 is required;
 scripts use process groups on POSIX and a Job Object supervisor on Windows.
 The Windows supervisor is compiled once and cached using the C# compiler included
 with .NET Framework 4.x; no separate native build tools or npm dependencies are needed.
@@ -20,7 +20,8 @@ so this package does not require the portable plugin bundle. TypeScript applicat
 using the HTTP host need Node typings for its IncomingMessage callback.
 
 Build in the workspace with `npm run build --workspace @slop-lab/part-node`.
-This is a private experimental package; pin its exact version and its core dependency.
+MIT licensed. Requires Node.js 24.22.0 or newer for Node-based usage.
+APIs are experimental; pin its exact version and its core dependency.
 
 Local OpenAI-compatible mocks are available from `@slop-lab/part-node/testing/mock-provider/index.js`,
 with operator tools at `@slop-lab/part-node/testing/mock-provider/tools.js`. Installed packages
@@ -32,4 +33,4 @@ the repository for CLI flows, transcript export and noninteractive replay.
 transport accepting a structural handler. `@slop-lab/part-node/acp/mcp.js` exports
 `connectAcpMcpServers` for explicitly authorized, session-owned stdio MCP tools.
 These adapters do not depend on the plugin bundle or the ACP SDK.
-See [ACP integration](../../docs/acp.md) for agent composition and Zed settings.
+See [ACP integration](https://github.com/slop-lab/part/blob/main/docs/acp.md) for agent composition and Zed settings.
