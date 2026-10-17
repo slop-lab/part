@@ -18,7 +18,7 @@ const packages = ['core', 'plugins', 'node', 'browser'].map((directory) => ({
 const consumers = {
   core: ['core'],
   'non-coding': ['core', 'plugins'],
-  swe: ['core', 'plugins'],
+  swe: ['core', 'plugins', 'node'],
   contracts: ['core', 'plugins', 'browser'],
   workflow: ['core', 'plugins'],
   node: ['core', 'node'],
