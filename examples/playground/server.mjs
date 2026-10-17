@@ -108,7 +108,7 @@ export async function startPlayground({
         }
         return json(200, {
           providers: providerOptions(environment),
-          model: environment.R4U_MODEL || 'gpt-6-luna',
+          model: environment.OPENAI_MODEL || 'gpt-4.1-mini',
         });
       }
       const asset = assets.get(path);

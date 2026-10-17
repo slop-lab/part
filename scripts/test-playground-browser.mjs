@@ -8,7 +8,11 @@ const serverKey = 'browser-test-server-only-key';
 const server = await startPlayground({
   port: 0,
   delayScale: 0.15,
-  environment: { R4U_API_KEY: serverKey, R4U_BASE_URL: 'http://127.0.0.1:9/v1' },
+  environment: {
+    OPENAI_API_KEY: serverKey,
+    OPENAI_BASE_URL: 'http://127.0.0.1:9/v1',
+    OPENAI_MODEL: 'browser-test-model',
+  },
 });
 let browser;
 try {

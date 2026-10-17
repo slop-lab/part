@@ -268,7 +268,7 @@ export function createPlaygroundSession({
     try {
       const model = createPlaygroundModel({
         ...input,
-        model: input.model || environment.R4U_MODEL || 'gpt-6-luna',
+        model: input.model || environment.OPENAI_MODEL || 'gpt-4.1-mini',
         environment,
         delayScale,
         trace,
