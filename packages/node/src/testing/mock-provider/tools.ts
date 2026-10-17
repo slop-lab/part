@@ -1,10 +1,11 @@
 import { isJsonObject, jsonSchema, schema } from '@slop-lab/part/contracts/index.js';
 import { functionTool } from '@slop-lab/part/tools.js';
+import type { Contracts } from '@slop-lab/part/reference/index.js';
 import { readReply } from './protocol.js';
 import type { MockProviderClient } from './types.js';
 /** Bind these tools to one project session; callers cannot supply arbitrary endpoints. */
 export function createMockProviderTools(client: MockProviderClient) {
-  const replySchema = {
+  const replySchema: Contracts.Json = {
     oneOf: [
       {
         type: 'object',
@@ -64,7 +65,14 @@ export function createMockProviderTools(client: MockProviderClient) {
       },
     ],
   };
-  const definitions = [
+  const definitions: readonly {
+    readonly id: string;
+    readonly description: string;
+    readonly validate: (value: unknown) => boolean;
+    readonly execute: (value: Record<string, unknown>) => Promise<unknown>;
+    readonly properties: Readonly<Record<string, Contracts.Json>>;
+    readonly required?: readonly string[];
+  }[] = [
     {
       id: 'mock_provider_status',
       description: 'Inspect the project-bound mock provider session.',
