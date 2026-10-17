@@ -30,6 +30,14 @@ into six executable scenarios, with Scripted and opt-in server-side R4U provider
 It uses bounded memory history and approval middleware; it is not a workflow engine
 or a durable product host.
 
+The private [CAR software-engineering profile](car.md) composes the public packages
+into a single-workspace coding root with managed children, digest-preconditioned
+workspace tools, supervised processes, durable conversation/archive state,
+data-only pipeline loading, authenticated HTTP/SSE, and a browser/headless
+inspector. It has local mock and fake-backend integration evidence, not live paid
+inference certification. CAR remains downstream: the root and SDK packages do not
+depend on it.
+
 ## Dependent-project readiness
 
 The optional [ACP agent plugin](acp.md) exposes configured part agents to editor
@@ -60,6 +68,8 @@ The following remain later or adapter-specific work:
   scheduler and must expose its actual guarantees.
 - Graph editors, collaboration products, full file editors/PTY/diff/worktree behavior
   and domain-specific business schemas. Those remain application/plugin-owned.
+- CAR does not turn optional toolset PTY/LSP/kernel/workcopy capabilities into a
+  complete IDE, Git-worktree team orchestrator, or durable arbitrary-stack resume.
 - Full YAML/CommonMark/provider media dialects, framework-specific React/Vue bindings,
   broad browser/device audits and production-scale persistence/history tuning.
 

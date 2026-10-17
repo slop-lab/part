@@ -27,6 +27,13 @@ npm run measure
 npm run preview
 ```
 
+The private [`car`](car) workspace is the initial single-host software-engineering
+application built on all four packages; no SDK package depends on it. Build and
+start its local interactive profile with `npm run car:build` and
+`npm run car -- serve --root ABS --state PRIVATE --mock-session UNIQUE --workflows true`.
+The startup JSON contains the browser URL, bearer token, and local mock-control
+credentials. See [CAR usage, APIs, evidence, and limits](docs/car.md).
+
 The [browser playground](docs/playground.md) opens at `http://127.0.0.1:4173`.
 Try conversation, tools, approval gates, immutable reports, validation failures and
 cancellation, with request/event inspection. Scripted mode needs no key; optional

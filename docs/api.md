@@ -70,6 +70,14 @@ The separate `@slop-lab/part-plugins/providers/openai-responses/index.js` adapte
 Responses text/function calls over JSON/SSE and native reasoning replay. See
 [Responses usage and limits](openai-responses.md).
 
+The private `@slop-lab/car` workspace is an application composition rather than
+an SDK dependency. Its sole declared package export is `openCar` from
+`car/src/runtime.mjs`; the result exposes `agent`, `endpoint`, `hub`, `archive`,
+startup `recovery`, and `close()`. Its authenticated version-1 inspector queries,
+CLI options, local SWE tools, workflow forms, Router4u/toolset adapters, ownership
+rules, and limits are documented in [the CAR profile](car.md). Other `car/src`
+files are source-level helpers, not declared package exports.
+
 `@slop-lab/part-plugins/acp/index.js` exports `createAcpAgent` for the ACP v1 agent profile:
 initialization, per-session managed agents, text/embedded-text prompts, streaming
 updates, permission-gated tools, cancellation and advertised session close.

@@ -1,0 +1,32 @@
+{
+  "format": "part.pipeline",
+  "version": 1,
+  "id": "car.review-with-approval",
+  "input": { "id": "part/json", "version": 1 },
+  "output": { "id": "part/json", "version": 1 },
+  "steps": [
+    {
+      "id": "review",
+      "after": [],
+      "kind": "agent",
+      "profile": "coding",
+      "input": { "input": "/prompt" }
+    },
+    {
+      "id": "approval",
+      "after": ["review"],
+      "kind": "wait",
+      "response": { "id": "part/json", "version": 1 },
+      "binding": { "step": "review", "pointer": "" },
+      "prompt": "Approve this review result? Respond with {\"approved\":true} or {\"approved\":false}."
+    },
+    {
+      "id": "approved",
+      "after": ["approval"],
+      "kind": "assert",
+      "value": { "step": "approval", "pointer": "/approved" },
+      "equals": true
+    }
+  ],
+  "result": { "step": "review", "pointer": "" }
+}
