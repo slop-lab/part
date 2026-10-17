@@ -3,12 +3,70 @@ import { bearerAuth, createFetchTransport } from '@slop-lab/part/model/index.js'
 import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible/index.js';
 import { createOpenAIResponsesAdapter } from '@slop-lab/part-plugins/providers/openai-responses/index.js';
 
-/** Router4u and other explicitly configured compatible endpoints, not an embedded router.
+const protectedHeaders = new Set([
+  'authorization',
+  'content-type',
+  'host',
+  'content-length',
+  'connection',
+]);
+
+/** @param {Readonly<Record<string, string>>} input */
+function checkedHeaders(input) {
+  const headers = new Headers();
+  for (const [name, value] of Object.entries(input)) {
+    if (protectedHeaders.has(name.toLowerCase()))
+      throw new TypeError(`Cannot set protected header ${name}`);
+    if (typeof value !== 'string') throw new TypeError('Custom header values must be strings');
+    try {
+      headers.set(name, value);
+    } catch (error) {
+      if (error instanceof TypeError) throw new TypeError(`Invalid custom header ${name}`);
+      throw error;
+    }
+  }
+  return Object.fromEntries(headers.entries());
+}
+
+/** @param {string | undefined} source */
+function parseHeaders(source) {
+  if (!source) return {};
+  /** @type {unknown} */
+  let parsed;
+  try {
+    parsed = JSON.parse(source);
+  } catch {
+    throw new TypeError('OPENAI_HEADERS must be a JSON object of string values');
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+    throw new TypeError('OPENAI_HEADERS must be a JSON object of string values');
+  /** @type {Record<string,string>} */
+  const headers = {};
+  for (const [name, value] of Object.entries(parsed)) {
+    if (typeof value !== 'string') throw new TypeError('OPENAI_HEADERS values must be strings');
+    Object.defineProperty(headers, name, { value, enumerable: true });
+  }
+  return checkedHeaders(headers);
+}
+
+/** @param {Readonly<Record<string,string|undefined>>} environment
+ * @param {{baseURL?: string, apiKey?: string, model?: string, headers?: string}} [overrides] */
+export function readCarModelEnvironment(environment, overrides = {}) {
+  return {
+    baseURL: overrides.baseURL ?? environment.OPENAI_BASE_URL ?? 'https://api.openai.com/v1',
+    apiKey: overrides.apiKey ?? environment.OPENAI_API_KEY ?? '',
+    model: overrides.model ?? environment.OPENAI_MODEL ?? '',
+    headers: parseHeaders(overrides.headers ?? environment.OPENAI_HEADERS),
+  };
+}
+
+/** Configure a generic OpenAI-compatible HTTP API.
  * @param {{baseURL: string, apiKey: string, model: string, protocol?: 'chat'|'responses',
- * route?: string, timeoutMs?: number}} options
+ * headers?: Readonly<Record<string,string>>, timeoutMs?: number}} options
  * @returns {import('@slop-lab/part/reference/index.js').Convenience.ConfiguredModel}
  */
 export function createCarModel(options) {
+  const extraHeaders = checkedHeaders(options.headers ?? {});
   const base = new URL(options.baseURL);
   if (
     !['http:', 'https:'].includes(base.protocol) ||
@@ -46,12 +104,11 @@ export function createCarModel(options) {
     transport: createFetchTransport({
       allowedOrigins: [base.origin],
       fetch(url, init = {}) {
+        const headers = new Headers(init.headers);
+        for (const [name, value] of Object.entries(extraHeaders)) headers.set(name, value);
         return fetch(url, {
           ...init,
-          headers: {
-            ...init.headers,
-            ...(options.route ? { 'X-Router4u-Route': options.route } : {}),
-          },
+          headers,
           signal: AbortSignal.any([
             ...(init.signal ? [init.signal] : []),
             AbortSignal.timeout(options.timeoutMs ?? 300_000),

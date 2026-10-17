@@ -93,7 +93,7 @@ test('CAR resolves ordinary host command aliases without copying provider creden
     const policy = await resolveCommands(root);
     assert.equal(policy.commands.node, process.execPath);
     assert.ok(policy.environment.PATH);
-    assert.equal('R4U_API_KEY' in policy.environment, false);
+    assert.equal('OPENAI_API_KEY' in policy.environment, false);
     assert.equal(policy.environment.HOME, join(root, 'process-home'));
   } finally {
     await rm(root, { recursive: true, force: true });

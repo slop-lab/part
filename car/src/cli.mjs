@@ -9,7 +9,7 @@ import {
   createMockProviderClient,
   readMockSession,
 } from '@slop-lab/part-node/testing/mock-provider/index.js';
-import { createCarModel } from './model.mjs';
+import { createCarModel, readCarModelEnvironment } from './model.mjs';
 import { connectLocalToolsetCheckout } from './infrastructure.mjs';
 import { openCar } from './runtime.mjs';
 import { startCarServer } from './server.mjs';
@@ -24,9 +24,9 @@ node car/src/cli.mjs recover-lock --state PATH
   --port NUMBER             Browser/API port (default: ephemeral)
   --host ADDRESS            Bind address (default: 127.0.0.1)
   --provider interactive|chat|responses  Default: interactive, no paid model
-  --base-url URL            Router4u/compatible URL, or R4U_BASE_URL
-  --model NAME              Model name, or R4U_MODEL
-  --route NAME              Optional Router4u route, or R4U_ROUTE
+  --base-url URL            OpenAI-compatible API URL, or OPENAI_BASE_URL
+  --model NAME              Model name, or OPENAI_MODEL
+  --headers JSON            Optional HTTP headers, or OPENAI_HEADERS
   --edit-mode hash|exact    Select local file edit ACI
   --trace metadata|full     Full explicitly stores model input/request bodies
   --mock-session PATH       Write interactive session exclusively, mode 0600
@@ -39,7 +39,7 @@ node car/src/cli.mjs recover-lock --state PATH
   --check JSON_ARGV         Completion test command (host alias or absolute executable)
 
 Set CAR_TOKEN for a stable API token (at least 16 characters).
-Set R4U_API_KEY for chat/responses. Secrets stay server-side.
+Set OPENAI_API_KEY for chat/responses. Secrets stay server-side.
 DIM is never started or contacted. Stop with SIGINT/SIGTERM.
 `;
 
@@ -53,7 +53,7 @@ function parse(argv) {
     'provider',
     'base-url',
     'model',
-    'route',
+    'headers',
     'edit-mode',
     'trace',
     'mock-session',
@@ -143,13 +143,16 @@ export async function main(argv) {
         });
     }
     const model = createCarModel({
-      baseURL: mock?.session.baseURL ?? args['base-url'] ?? process.env.R4U_BASE_URL ?? '',
-      apiKey: mock?.session.apiKey ?? process.env.R4U_API_KEY ?? '',
-      model: args.model ?? process.env.R4U_MODEL ?? 'car-test',
+      ...readCarModelEnvironment(process.env, {
+        ...(mock
+          ? { baseURL: mock.session.baseURL, apiKey: mock.session.apiKey }
+          : args['base-url']
+            ? { baseURL: args['base-url'] }
+            : {}),
+        ...(args.model ? { model: args.model } : mock ? { model: 'car-test' } : {}),
+        ...(args.headers ? { headers: args.headers } : {}),
+      }),
       protocol: provider === 'responses' ? 'responses' : 'chat',
-      ...((args.route ?? process.env.R4U_ROUTE)
-        ? { route: args.route ?? process.env.R4U_ROUTE }
-        : {}),
     });
     if (args['toolset-checkout']) {
       const state = resolve(args.state ?? '');
