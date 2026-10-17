@@ -4,7 +4,8 @@
   "type": "module",
   "description": "Progressive agent runtime workspace",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "car"
   ],
   "scripts": {
     "build": "node scripts/build.mjs",
@@ -14,9 +15,12 @@
     "test:consumers": "npm run build && node scripts/test-consumers.mjs",
     "preview:build": "npm run build && node scripts/build-preview.mjs",
     "preview": "npm run preview:build && node scripts/serve-preview.mjs",
+    "car:build": "npm run build && node car/scripts/build-ui.mjs",
+    "car": "node car/src/cli.mjs",
+    "car:demo": "npm run car:build && node car/scripts/demo.mjs",
     "measure": "npm run build && node scripts/measure.mjs",
-    "format": "prettier --write packages tests scripts examples fixtures consumers experiments docs README.md CHANGELOG.md package.json tsconfig.json tsconfig.base.json .github jsconfig.json",
-    "format:check": "prettier --check packages tests scripts examples fixtures consumers experiments docs README.md CHANGELOG.md package.json tsconfig.json tsconfig.base.json .github jsconfig.json",
+    "format": "prettier --write car packages tests scripts examples fixtures consumers experiments docs README.md CHANGELOG.md package.json tsconfig.json tsconfig.base.json .github jsconfig.json",
+    "format:check": "prettier --check car packages tests scripts examples fixtures consumers experiments docs README.md CHANGELOG.md package.json tsconfig.json tsconfig.base.json .github jsconfig.json",
     "measure:ui": "npm run build && node scripts/measure-ui.mjs",
     "pack:local": "npm run build && node scripts/pack.mjs",
     "mock:provider": "node packages/node/dist/testing/mock-provider/cli.js",

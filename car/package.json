@@ -1,0 +1,25 @@
+{
+  "name": "@slop-lab/car",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Software engineering consumer of the part agent runtime",
+  "exports": {
+    ".": "./src/runtime.mjs"
+  },
+  "scripts": {
+    "start": "node src/cli.mjs",
+    "build": "node scripts/build-ui.mjs",
+    "demo": "node scripts/demo.mjs"
+  },
+  "dependencies": {
+    "@slop-lab/part": "0.1.0",
+    "@slop-lab/part-plugins": "0.1.0",
+    "@slop-lab/part-node": "0.1.0",
+    "@slop-lab/part-browser": "0.1.0"
+  },
+  "engines": {
+    "node": ">=24.22.0"
+  },
+  "license": "MIT"
+}

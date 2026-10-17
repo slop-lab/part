@@ -15,6 +15,7 @@
     "noUnusedParameters": true
   },
   "include": [
+    "car/**/*.mjs",
     "scripts/**/*.js",
     "scripts/**/*.mjs",
     "scripts/**/*.cjs",

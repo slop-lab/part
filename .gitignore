@@ -16,3 +16,6 @@ preview/
 /docs/*.evidence.json
 /docs/evidence.json
 /docs/validation.log
+
+# Local agent continuation state, never a product artifact.
+/.omo/run-continuation/
