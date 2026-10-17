@@ -8,6 +8,7 @@ import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
 import { schema, stringSchema } from '@slop-lab/part/contracts/index.js';
 import { bearerAuth, createFetchTransport } from '@slop-lab/part/model/index.js';
 import { functionTool } from '@slop-lab/part/tools.js';
+import { openAIEndpoint, readOpenAIProvider, withOpenAIHeaders } from '../openai-provider.mjs';
 
 try {
   process.loadEnvFile(new URL('../../.env', import.meta.url));
@@ -26,21 +27,7 @@ function configuredModel() {
       { text: 'The note was approved and saved in this process memory.' },
       { text: 'The ACP example has completed its scripted turns. Start a new session to repeat.' },
     ]);
-  const { R4U_BASE_URL: baseUrl, R4U_API_KEY: key } = process.env;
-  if (!baseUrl || !key) throw Error('Configure R4U_API_KEY and R4U_BASE_URL');
-  const base = new URL(baseUrl);
-  if (
-    !process.env.R4U_API_KEY ||
-    !['http:', 'https:'].includes(base.protocol) ||
-    base.username ||
-    base.password ||
-    base.search ||
-    base.hash
-  )
-    throw Error('Configure R4U_API_KEY and a valid R4U_BASE_URL');
-  base.pathname = base.pathname
-    .replace(/\/$/, '')
-    .replace(/\/(?:responses|chat\/completions)$/, '');
+  const { base, key, model, headers } = readOpenAIProvider(process.env);
   const adapter =
     provider === 'responses' ? createOpenAIResponsesAdapter() : createOpenAICompatibleAdapter();
   return {
@@ -50,8 +37,8 @@ function configuredModel() {
       adapterId: adapter.id,
       transportId: 'part/fetch',
       authStrategyId: 'bearer',
-      model: process.env.R4U_MODEL || 'gpt-6-luna',
-      endpoint: `${base}/${provider === 'responses' ? 'responses' : 'chat/completions'}`,
+      model,
+      endpoint: openAIEndpoint(base, provider === 'responses' ? 'responses' : 'chat/completions'),
       defaults:
         provider === 'responses' ? { max_output_tokens: 512 } : { max_completion_tokens: 512 },
       capabilities: { revision: '1', entries: [] },
@@ -63,10 +50,8 @@ function configuredModel() {
       fetch(url, init = {}) {
         return fetch(url, {
           ...init,
-          headers: {
-            ...init.headers,
-            ...(process.env.R4U_ROUTE ? { 'X-Router4u-Route': process.env.R4U_ROUTE } : {}),
-          },
+          headers: withOpenAIHeaders(init.headers, headers),
+          redirect: 'error',
           signal: AbortSignal.any([
             ...(init.signal ? [init.signal] : []),
             AbortSignal.timeout(90000),
