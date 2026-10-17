@@ -1,5 +1,6 @@
 import { lstat, readdir, realpath } from 'node:fs/promises';
-import { isAbsolute, relative, resolve, sep } from 'node:path';
+import { resolve } from 'node:path';
+import { assertWorkspacePath, workspaceRelativePath } from './files-paths.js';
 import { WorkspaceFileError } from './files-error.js';
 import { atomicWrite, BoundedFileError, readUtf8Bounded, withPathMutation } from './files-io.js';
 import {
@@ -186,40 +187,25 @@ export class WorkspaceFiles {
   }
 
   async #existing(path: string): Promise<{ readonly absolute: string; readonly relative: string }> {
-    const relativePath = this.#relative(path);
+    const relativePath = workspaceRelativePath(path);
     const root = await realpath(this.#root);
     const absolute = await realpath(resolve(root, relativePath));
-    this.#assertInside(root, absolute);
+    assertWorkspacePath(root, absolute);
     return { absolute, relative: relativePath };
   }
 
   async #writable(path: string): Promise<{ readonly absolute: string; readonly relative: string }> {
-    const relativePath = this.#relative(path);
+    const relativePath = workspaceRelativePath(path);
     const root = await realpath(this.#root);
     const candidate = resolve(root, relativePath);
     const parent = await realpath(resolve(candidate, '..'));
-    this.#assertInside(root, parent);
+    assertWorkspacePath(root, parent);
     if (await this.#exists(candidate)) {
       if ((await lstat(candidate)).isSymbolicLink())
         throw new WorkspaceFileError('workspace.symlink', 'Writable path must not be a symlink');
-      this.#assertInside(root, await realpath(candidate));
+      assertWorkspacePath(root, await realpath(candidate));
     }
     return { absolute: candidate, relative: relativePath };
-  }
-
-  #relative(path: string): string {
-    if (!path || path.includes('\0') || isAbsolute(path))
-      throw new WorkspaceFileError('workspace.path', 'Path must be workspace-relative');
-    const normalized = relative('.', resolve('.', path)).split(sep).join('/');
-    if (normalized === '..' || normalized.startsWith('../'))
-      throw new WorkspaceFileError('workspace.escape', 'Path escapes workspace root');
-    return normalized || '.';
-  }
-
-  #assertInside(root: string, target: string): void {
-    const path = relative(root, target);
-    if (path === '..' || path.startsWith(`..${sep}`) || isAbsolute(path))
-      throw new WorkspaceFileError('workspace.escape', 'Resolved path escapes workspace root');
   }
 
   async #readBounded(path: string): Promise<string> {
