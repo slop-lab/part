@@ -33,12 +33,21 @@ start its local interactive profile with `npm run car:build` and
 `npm run car -- serve --root ABS --state PRIVATE --mock-session UNIQUE --workflows true`.
 The startup JSON contains the browser URL, bearer token, and local mock-control
 credentials. See [CAR usage, APIs, evidence, and limits](docs/car.md).
+For a real OpenAI-compatible endpoint, select `--provider chat` or `responses`,
+set `OPENAI_API_KEY` and `OPENAI_MODEL`, and optionally set `OPENAI_BASE_URL`
+(default `https://api.openai.com/v1`) or an `OPENAI_HEADERS` JSON string such as
+`{"x-project":"example"}`. The equivalent CLI options are `--base-url`,
+`--model`, and `--headers`; generic headers cannot override `Authorization`,
+`Content-Type`, `Host`, `Content-Length`, or `Connection`. This is configuration
+guidance, not a claim that paid model access or deployment authentication has
+been verified.
 
 The [browser playground](docs/playground.md) opens at `http://127.0.0.1:4173`.
 Try conversation, tools, approval gates, immutable reports, validation failures and
 cancellation, with request/event inspection. Scripted mode needs no key; optional
-R4U Chat Completions and Responses run through a server that keeps credentials out
-of the browser. Use `npm run test:browser` after `npx playwright install chromium`.
+OpenAI-compatible Chat Completions and Responses run through a server that keeps
+credentials out of the browser. Use `npm run test:browser` after
+`npx playwright install chromium`.
 Import subpaths by their emitted filenames, including `.js` and directory `index.js`.
 The build generates `dist/package.json` with a root export when `index.js` exists
 and `"./*": "./*"` for all files, without rewriting workspace metadata.
@@ -77,7 +86,7 @@ for the complete tool flow, or see [mock provider workflows](docs/mock-provider.
 Run part as an ACP agent for editor clients with `@slop-lab/part-plugins/acp/index.js` and the
 `@slop-lab/part-node/acp/index.js` stdio adapter. `npm run example:acp` demonstrates conversation and
 tool permission requests using the official SDK client. See [ACP integration](docs/acp.md)
-for Zed settings, session-owned MCP tools and optional live R4U providers.
+for Zed settings, session-owned MCP tools and optional live OpenAI-compatible providers.
 
 Build local packages and install only the packages a dependent repository needs:
 

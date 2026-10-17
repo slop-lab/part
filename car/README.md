@@ -48,16 +48,21 @@ npm run car -- serve --root /abs/repo --state /private/state \
 # Explicit recovery only after the old owner has exited.
 npm run car -- recover-lock --state /private/state
 
-# Router4u or another explicitly configured compatible endpoint.
-R4U_BASE_URL=https://router.example/v1 R4U_API_KEY=secret \
-R4U_MODEL=model R4U_ROUTE=route npm run car -- serve \
-  --root /abs/repo --state /private/state --provider responses
+# A generic OpenAI-compatible Responses endpoint. The base URL shown is the default.
+OPENAI_API_KEY=set-locally OPENAI_MODEL=model-id npm run car -- serve \
+  --root /abs/repo --state /private/state --provider responses \
+  --base-url https://api.openai.com/v1 --headers '{"x-project":"example"}'
 ```
 
 `--check` accepts a nonempty JSON argv array. Its first element must be either a
 host-resolved alias (`node`, and any found `git`, `npm`, `npx`, or `pnpm`) or an
 absolute executable path; no shell command string is accepted. Provider secrets
-are not copied into the process environment.
+are not copied into the process environment. Real `chat` and `responses` modes
+require an explicit model and `OPENAI_API_KEY`; `OPENAI_BASE_URL` defaults to
+`https://api.openai.com/v1`. Generic headers may instead be supplied as an
+`OPENAI_HEADERS` JSON string. They cannot override `Authorization`,
+`Content-Type`, `Host`, `Content-Length`, or `Connection`. No paid-model call is
+claimed by the repository's local verification.
 
 For the complete CLI, embedded API, operator-session walkthrough, workflow
 format, inspector queries, integration evidence, security properties, and

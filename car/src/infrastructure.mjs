@@ -6,7 +6,7 @@ import { isAbsolute, join } from 'node:path';
 /**
  * Connect an already-built local toolset checkout, or an explicitly configured published command.
  * This never installs dependencies, builds a checkout, starts DIM, or starts proprietary services.
- * Router4u remains ordinary API-origin configuration supplied elsewhere by the host.
+ * Model services use ordinary API-origin configuration supplied elsewhere by the host.
  *
  * @param {{
  *   root: string,

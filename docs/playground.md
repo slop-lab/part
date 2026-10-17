@@ -99,20 +99,21 @@ The example permits 24 runs and 500 command IDs per session, and 16 browser sess
 per server process. Clearing does not forget command receipts; restart if those
 capacity limits are reached. Late approvals against a closed run are rejected.
 
-## Use R4U
+## Use an OpenAI-compatible provider
 
 Create or update the workspace-root `.env`:
 
 ```dotenv
-R4U_API_KEY=your-project-key
-R4U_BASE_URL=http://127.0.0.1:9470/v1
-# Optional:
-R4U_MODEL=gpt-6-luna
-# R4U_ROUTE=your-route
+OPENAI_API_KEY=your-api-key
+OPENAI_BASE_URL=https://provider.example/v1
+OPENAI_MODEL=your-model
+# Optional provider-specific headers; every value must be a string:
+# OPENAI_HEADERS={"x-project":"example"}
 ```
 
-Restart the playground, select **R4U · Responses** or **R4U · Chat Completions**,
-and enter a model supported by the configured route. The validation-failure scenario
+Restart the playground, select **OpenAI-compatible · Responses** or
+**OpenAI-compatible · Chat Completions**, and enter a model supported by the endpoint.
+The validation-failure scenario
 is intentionally Scripted-only. Other examples use their scenario instructions with
 the selected real model; model compliance and results may vary.
 
@@ -128,6 +129,9 @@ The server reads `.env` with Node's environment-file parser. The browser cannot
 supply a provider endpoint or retrieve a key. Only the server builds authentication
 headers and invokes the configured endpoint. `.env` is ignored by Git. Provider
 failures expose structured codes and a generic message, not upstream error bodies.
+`OPENAI_HEADERS` cannot override `Authorization`, `Content-Type`, `Host`,
+`Content-Length` or `Connection`. Provider URLs cannot contain credentials, queries
+or fragments, and redirects are rejected.
 
 The application binds to `127.0.0.1`, uses same-origin commands and an HttpOnly,
 SameSite cookie, and proxies the public Node HTTP host through a server-only token.

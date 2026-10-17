@@ -56,8 +56,8 @@ endpoint:
 ```sh
 npm run mock:provider -- serve --mode fixed --project car-fixed \
   --fixture /tmp/car.fixture.json --session /tmp/car-fixed-session.json
-# Pass that session's baseURL/apiKey as R4U_BASE_URL/R4U_API_KEY and use
-# --provider chat. Fixed mode compares complete ordered request JSON.
+# Pass that session's baseURL/apiKey as OPENAI_BASE_URL/OPENAI_API_KEY, set
+# OPENAI_MODEL, and use --provider chat. Fixed mode compares ordered request JSON.
 ```
 
 `npm run car:demo` builds the UI and runs a credential-free end-to-end example
@@ -71,26 +71,45 @@ node car/src/cli.mjs serve --root PATH --state PATH [options]
 node car/src/cli.mjs recover-lock --state PATH
 ```
 
-| Option                                           | Implemented behavior                                                                                            |
-| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| `--host ADDRESS`, `--port NUMBER`                | Bind the browser/API server; defaults to `127.0.0.1` and an ephemeral port.                                     |
-| `--provider interactive\|chat\|responses`        | Interactive local mock by default; otherwise use Chat Completions or Responses.                                 |
-| `--base-url URL`, `--model NAME`, `--route NAME` | Model settings, falling back to `R4U_BASE_URL`, `R4U_MODEL`, and `R4U_ROUTE`. Route becomes `X-Router4u-Route`. |
-| `--edit-mode hash\|exact`                        | Select the input contract of local `swe_edit`; default `hash`.                                                  |
-| `--trace metadata\|full`                         | Metadata is default. Full mode persists compiled model context and encoded request bodies.                      |
-| `--mock-session PATH`                            | Exclusively write credentials for CAR's interactive mock.                                                       |
-| `--operator-session PATH`                        | Bind six mock-control tools to a separate target mock session; managed children may use them.                   |
-| `--toolset-checkout PATH`                        | Start an already-built `PATH/dist/mcp.js` over stdio MCP. It does not install or build the checkout.            |
-| `--tools ID,ID`, `--toolset-profile p0\|p1`      | Exact remote allowlist and server profile (`p0` default). An empty list grants no installed remote tools.       |
-| `--workspace-provider local\|external`           | Keep built-in workspace tools, or require the configured external toolset. Process tools remain local.          |
-| `--workflows true`                               | Load pinned `*.pipeline.json` definitions from `.agents/workflows`. Other values are rejected.                  |
-| `--check JSON_ARGV`                              | Run a host-selected completion command for every proposed completion; timeout 120 seconds.                      |
+| Option                                      | Implemented behavior                                                                                      |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `--host ADDRESS`, `--port NUMBER`           | Bind the browser/API server; defaults to `127.0.0.1` and an ephemeral port.                               |
+| `--provider interactive\|chat\|responses`   | Interactive local mock by default; otherwise use Chat Completions or Responses.                           |
+| `--base-url URL`, `--model NAME`            | OpenAI-compatible endpoint and model, falling back to `OPENAI_BASE_URL` and `OPENAI_MODEL`.               |
+| `--headers JSON`                            | Additional request headers as a JSON object, falling back to `OPENAI_HEADERS`.                            |
+| `--edit-mode hash\|exact`                   | Select the input contract of local `swe_edit`; default `hash`.                                            |
+| `--trace metadata\|full`                    | Metadata is default. Full mode persists compiled model context and encoded request bodies.                |
+| `--mock-session PATH`                       | Exclusively write credentials for CAR's interactive mock.                                                 |
+| `--operator-session PATH`                   | Bind six mock-control tools to a separate target mock session; managed children may use them.             |
+| `--toolset-checkout PATH`                   | Start an already-built `PATH/dist/mcp.js` over stdio MCP. It does not install or build the checkout.      |
+| `--tools ID,ID`, `--toolset-profile p0\|p1` | Exact remote allowlist and server profile (`p0` default). An empty list grants no installed remote tools. |
+| `--workspace-provider local\|external`      | Keep built-in workspace tools, or require the configured external toolset. Process tools remain local.    |
+| `--workflows true`                          | Load pinned `*.pipeline.json` definitions from `.agents/workflows`. Other values are rejected.            |
+| `--check JSON_ARGV`                         | Run a host-selected completion command for every proposed completion; timeout 120 seconds.                |
 
-Set `CAR_TOKEN` to a stable token of at least 16 characters. Chat/Responses require
-`R4U_API_KEY`; credentials remain in the server process. The base URL must be an
-HTTP(S) origin/path without embedded credentials, query, or fragment. Plain HTTP
-is accepted only for loopback. The default model is `car-test`; the transport
-streams and has a five-minute default timeout.
+Set `CAR_TOKEN` to a stable token of at least 16 characters. The default
+`interactive` provider remains a local mock and needs no upstream credentials.
+Real `chat` and `responses` modes require an explicit model (through `--model` or
+`OPENAI_MODEL`) and `OPENAI_API_KEY`; credentials remain in the server process.
+The base URL defaults to `https://api.openai.com/v1` and may be changed with
+`--base-url` or `OPENAI_BASE_URL`. It must be an HTTP(S) origin/path without
+embedded credentials, query, or fragment; plain HTTP is accepted only for
+loopback. The transport streams and has a five-minute default timeout.
+
+Additional deployment-specific headers may be supplied with `--headers` or the
+`OPENAI_HEADERS` JSON string, for example `{"x-project":"example"}`. Generic
+headers cannot override `Authorization`, `Content-Type`, `Host`,
+`Content-Length`, or `Connection`. Keep gateway onboarding details and private
+credentials out of product configuration and the repository. For example:
+
+```sh
+OPENAI_API_KEY=set-locally OPENAI_MODEL=model-id npm run car -- serve \
+  --root /abs/repo --state /private/state --provider responses \
+  --headers '{"x-project":"example"}'
+```
+
+This documents configuration only; it does not claim that paid model access or
+deployment authentication has been verified.
 
 `--check` is a nonempty ordinary JSON argv array, not shell syntax. The first
 element must be an absolute executable or a resolved host alias. CAR always adds
@@ -271,7 +290,7 @@ the injected engine. The independent native fixtures establish the port contract
 not compatibility with a named external workflow product. Durable pipeline/code
 stack resume is not implemented.
 
-## Toolset-server and Router4u
+## Toolset-server and optional gateway evidence
 
 `--toolset-checkout /absolute/checkout` starts only the already-built
 `dist/mcp.js` with fixed launch environment: CAR's root, principal `part-car`,
@@ -289,19 +308,14 @@ See the pinned toolset-server
 [host integration reference](https://github.com/slop-lab/toolset-server/blob/107ea919f1ea25ea4c67d9fdcad5642438421497/docs/host-integration.md)
 and [P1 hashline API](https://github.com/slop-lab/toolset-server/blob/107ea919f1ea25ea4c67d9fdcad5642438421497/docs/p1-hashline.md).
 
-For Router4u, choose `--provider chat` or `responses`, and set CLI options or:
-
-```sh
-export R4U_BASE_URL=https://router.example/v1
-export R4U_API_KEY=project-key
-export R4U_MODEL=model-id
-export R4U_ROUTE=route-id       # optional when Router4u has one route
-```
-
-CAR is an ordinary client; it does not embed or start Router4u. Both protocol
-paths stream. The pinned Router4u
+Historical integration research used Router4u as an optional service through the
+same generic OpenAI-compatible HTTP interface documented above. Router4u is not
+embedded, started, or represented by dedicated product configuration in CAR;
+deployment-specific onboarding and private credentials remain external. Both
+protocol paths stream. The pinned Router4u
 [API reference](https://github.com/slop-lab/router4u/blob/a6709ad6e892d4b26bd7d7cf611a76b29436c0a0/docs/api.md)
-documents Chat/Responses boundaries and `X-Router4u-Route`.
+is retained as the source for the Chat/Responses boundaries evaluated in that
+research, not as current setup guidance.
 
 DIM is different: CAR never starts, probes, or contacts it. The integration
 surface evaluated at

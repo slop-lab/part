@@ -10,7 +10,19 @@ import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
 import { createOpenAIResponsesAdapter } from '@slop-lab/part-plugins/providers/openai-responses/index.js';
 import { bearerAuth, createFetchTransport } from '@slop-lab/part/model/index.js';
 
-const endpoint = `${process.env.R4U_BASE_URL.replace(/\/$/, '')}/responses`;
+const { OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL } = process.env;
+if (!OPENAI_API_KEY || !OPENAI_BASE_URL || !OPENAI_MODEL) throw Error('Provider is not configured');
+const base = new URL(OPENAI_BASE_URL);
+if (
+  !['http:', 'https:'].includes(base.protocol) ||
+  base.username ||
+  base.password ||
+  base.search ||
+  base.hash
+)
+  throw Error('Invalid OPENAI_BASE_URL');
+base.pathname = base.pathname.replace(/\/$/, '').replace(/\/responses$/, '');
+const endpoint = `${base}/responses`;
 const created = createAgent({
   model: {
     profile: {
@@ -19,14 +31,14 @@ const created = createAgent({
       adapterId: 'part/openai-responses',
       transportId: 'part/fetch',
       authStrategyId: 'bearer',
-      model: process.env.R4U_MODEL ?? 'gpt-6-luna',
+      model: OPENAI_MODEL,
       endpoint,
       defaults: { max_output_tokens: 256 },
       capabilities: { revision: '1', entries: [] },
     },
     adapter: createOpenAIResponsesAdapter(),
     transport: createFetchTransport({ allowedOrigins: [new URL(endpoint).origin] }),
-    auth: bearerAuth(async () => process.env.R4U_API_KEY),
+    auth: bearerAuth(async () => OPENAI_API_KEY),
   },
 });
 if (!created.ok) throw Error(created.error.message);
@@ -39,9 +51,10 @@ try {
 }
 ```
 
-For multiple R4U routes, inject the configured `X-Router4u-Route` header through
-the fetch transport's `fetch` option, as the [live smoke script](../scripts/smoke-provider.mjs)
-does. The portable adapter itself does not read environment variables.
+For provider-specific routing or tenancy metadata, set `OPENAI_HEADERS` to a JSON
+object with string values. The runnable examples validate and inject those headers
+through the fetch transport while forbidding overrides of authentication, content
+framing and connection headers. The portable adapter itself does not read environment variables.
 
 ## Supported profile
 
@@ -92,8 +105,9 @@ These tests use a fixed fetch implementation and require no provider credentials
 The interactive Node mock remains a Chat Completions mock.
 
 Run the opt-in live test with `npm run smoke:responses`. It uses the existing `.env`
-R4U credentials, discovers protocol/model capabilities and caps the run at four
-short requests: JSON text, SSE text and a two-request function-tool loop.
+OpenAI-compatible settings and caps the run at four short requests: JSON text, SSE
+text and a two-request function-tool loop. It directly exercises the explicitly
+configured model rather than relying on proprietary capability discovery.
 [Provider smoke](provider-smoke.md) explains request bounds and usage accounting.
 Run this check against your configured model; support varies by provider and model.
 

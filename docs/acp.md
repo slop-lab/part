@@ -31,7 +31,7 @@ does not execute. `--approve` selects allow-once and completes the second turn.
 Scripted mode needs no credentials and starts with a fresh model per session.
 Its fixture has a finite number of replies; start a new session to repeat it.
 
-The agent also supports the existing server-side R4U configuration:
+The agent also supports a server-side OpenAI-compatible provider:
 
 ```sh
 npm run build
@@ -40,8 +40,11 @@ PART_ACP_PROVIDER=chat node examples/acp/client.mjs --live
 ```
 
 The agent reads the repository `.env` with Node's environment-file parser.
-Set `R4U_BASE_URL`, `R4U_API_KEY` and optionally `R4U_MODEL` (default
-`gpt-6-luna`) and `R4U_ROUTE`. `--live` sends one bounded text request;
+Set `OPENAI_BASE_URL`, `OPENAI_API_KEY` and `OPENAI_MODEL`. Optional
+`OPENAI_HEADERS` is a JSON object of string header values for provider-specific
+routing or tenancy metadata. It cannot override authentication, content framing or
+connection headers. URLs containing credentials, queries or fragments and HTTP
+redirects are rejected. `--live` sends one bounded text request;
 it does not exercise live function calls. The default client always selects
 scripted mode unless `--live` is supplied. Keys remain in the agent process.
 
@@ -65,9 +68,9 @@ using absolute paths to your Node executable and this checkout:
 
 Select part when starting an external-agent thread. The first prompt returns
 text; the next requests permission to save an in-memory note. To use your real
-model instead, set `PART_ACP_PROVIDER` to `responses` or `chat` with the R4U
-configuration above. The example installs only the note tool; it does not
-automatically gain file editing or terminal execution from the editor.
+model instead, set `PART_ACP_PROVIDER` to `responses` or `chat` with the
+OpenAI-compatible configuration above. The example installs only the note tool;
+it does not automatically gain file editing or terminal execution from the editor.
 
 The example rejects forwarded MCP configurations unless `PART_ACP_MCP=1` is set.
 Enable this only when you intend to launch the client's trusted MCP commands;
