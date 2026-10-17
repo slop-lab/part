@@ -26,7 +26,7 @@ import { createMemoryStore } from '@slop-lab/part/storage/memory.js';
 import { createNamespaceMigrations } from '@slop-lab/part/storage/migrations.js';
 import { Window } from 'happy-dom';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -653,7 +653,10 @@ test('Script source/workspace resolvers pin packaged bytes and capture only decl
     };
     const outcome = await expectProperty(await scripts.execute(request, context), 'value').done;
     assert.equal(outcome.phase, 'completed');
-    assert.equal(expectProperty(expectProperty(outcome.result.captured, 'value'), 'cwd'), root);
+    assert.equal(
+      expectProperty(expectProperty(outcome.result.captured, 'value'), 'cwd'),
+      await realpath(root),
+    );
     assert.equal(
       (
         await scripts.execute(
