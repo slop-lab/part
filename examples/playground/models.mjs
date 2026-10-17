@@ -5,6 +5,12 @@ import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
 import { isJson } from '@slop-lab/part/contracts/index.js';
 import { bearerAuth, createFetchTransport } from '@slop-lab/part/model/index.js';
 import { setTimeout } from 'node:timers/promises';
+import {
+  hasOpenAIProvider,
+  openAIEndpoint,
+  readOpenAIProvider,
+  withOpenAIHeaders,
+} from '../openai-provider.mjs';
 
 /** @param {NodeJS.ProcessEnv} environment */
 export function providerOptions(environment = {}) {
@@ -12,13 +18,13 @@ export function providerOptions(environment = {}) {
     { id: 'scripted', label: 'Scripted · no API key', available: true },
     {
       id: 'responses',
-      label: 'R4U · Responses',
-      available: !!(environment.R4U_API_KEY && environment.R4U_BASE_URL),
+      label: 'OpenAI-compatible · Responses',
+      available: hasOpenAIProvider(environment),
     },
     {
       id: 'chat',
-      label: 'R4U · Chat Completions',
-      available: !!(environment.R4U_API_KEY && environment.R4U_BASE_URL),
+      label: 'OpenAI-compatible · Chat Completions',
+      available: hasOpenAIProvider(environment),
     },
   ];
 }
@@ -96,20 +102,7 @@ export function createPlaygroundModel({
       throw Error('Provider is not configured');
     const adapter =
       provider === 'responses' ? createOpenAIResponsesAdapter() : createOpenAICompatibleAdapter();
-    const { R4U_BASE_URL: baseUrl, R4U_API_KEY: key } = environment;
-    if (!baseUrl || !key) throw Error('Provider is not configured');
-    const base = new URL(baseUrl);
-    if (
-      !['http:', 'https:'].includes(base.protocol) ||
-      base.username ||
-      base.password ||
-      base.search ||
-      base.hash
-    )
-      throw Error('Invalid provider base URL');
-    base.pathname = base.pathname
-      .replace(/\/$/, '')
-      .replace(/\/(?:responses|chat\/completions)$/, '');
+    const { base, key, headers } = readOpenAIProvider(environment);
     configured = {
       profile: {
         id: provider,
@@ -118,7 +111,7 @@ export function createPlaygroundModel({
         transportId: 'part/fetch',
         authStrategyId: 'bearer',
         model,
-        endpoint: `${base}/${provider === 'responses' ? 'responses' : 'chat/completions'}`,
+        endpoint: openAIEndpoint(base, provider === 'responses' ? 'responses' : 'chat/completions'),
         defaults:
           provider === 'responses' ? { max_output_tokens: 512 } : { max_completion_tokens: 512 },
         capabilities: { revision: '1', entries: [] },
@@ -130,10 +123,8 @@ export function createPlaygroundModel({
         fetch(url, init = {}) {
           return fetch(url, {
             ...init,
-            headers: {
-              ...init.headers,
-              ...(environment.R4U_ROUTE ? { 'X-Router4u-Route': environment.R4U_ROUTE } : {}),
-            },
+            headers: withOpenAIHeaders(init.headers, headers),
+            redirect: 'error',
             signal: AbortSignal.any([
               ...(init.signal ? [init.signal] : []),
               AbortSignal.timeout(90000),
