@@ -12,6 +12,12 @@ export type HashEdit = {
   readonly newText: string;
 };
 
+export type FileProvenance = {
+  readonly root: string;
+  readonly path: string;
+  readonly digest: string;
+};
+
 export function contentDigest(content: string): string {
   return createHash('sha256').update(content, 'utf8').digest('hex');
 }

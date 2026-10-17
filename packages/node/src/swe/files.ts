@@ -9,20 +9,16 @@ import {
   shortLineHash,
   type HashedLine,
   type HashEdit,
+  type FileProvenance,
 } from './hash.js';
 
 export { WorkspaceFileError } from './files-error.js';
-export type { HashEdit } from './hash.js';
+export type { HashEdit, FileProvenance } from './hash.js';
 
 export type WorkspaceLimits = {
   readonly maxFileBytes: number;
   readonly maxOutputChars: number;
   readonly maxEntries: number;
-};
-export type FileProvenance = {
-  readonly root: string;
-  readonly path: string;
-  readonly digest: string;
 };
 export type FileResult = {
   readonly path: string;
