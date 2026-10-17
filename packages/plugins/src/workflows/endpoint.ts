@@ -1,4 +1,6 @@
 import { createWatchHub } from '@slop-lab/part/client/index.js';
+// allow: SIZE_OK — Command/query/watch closures share one authoritative endpoint owner;
+// independent validation and lifecycle algorithms live in endpoint-lifecycle.ts.
 import { commandSchema, querySchema } from '@slop-lab/part/client/control.js';
 import { canonical, fail, freeze, isJsonObject, ok } from '@slop-lab/part/contracts/index.js';
 import type {
@@ -8,6 +10,13 @@ import type {
   Projection,
   Workflows,
 } from '@slop-lab/part/reference/index.js';
+import {
+  createSettlementTracker,
+  boundedClose,
+  closeWorkflowExecutions,
+  mergeExecutionLimits,
+  withCancelAction,
+} from './endpoint-lifecycle.js';
 export interface WorkflowRegistration {
   readonly definition: Workflows.DefinitionRef;
   readonly engineId: string;
@@ -19,10 +28,13 @@ export function createWorkflowEndpoint(options: {
   registrations: readonly WorkflowRegistration[];
   composition: { id: string; revision: string };
   context: Contracts.InvocationContext;
+  limits?: import('@slop-lab/part/reference/index.js').Runtime.ExecutionLimits;
+  cancellationDrainMs?: number;
   project?: (
     snapshot: Workflows.Snapshot,
     context: Contracts.InvocationContext,
   ) => Promise<Contracts.Result<Projection.Item>>;
+  mirror?: (item: Projection.Item) => void;
 }): Contracts.Result<
   Client.Endpoint & {
     hub: ReturnType<typeof createWatchHub>;
@@ -37,6 +49,12 @@ export function createWorkflowEndpoint(options: {
   );
   if (registrations.size !== options.registrations.length)
     return fail('workflow.registration', 'Duplicate workflow registration');
+  const configuredLimits = mergeExecutionLimits(options.limits, undefined);
+  if (!configuredLimits.ok) return configuredLimits;
+  const hostLimits = configuredLimits.value;
+  const cancellationDrainMs = options.cancellationDrainMs ?? 5_000;
+  if (!Number.isSafeInteger(cancellationDrainMs) || cancellationDrainMs < 0)
+    return fail('workflow.cancellation-drain', 'Invalid cancellation drain duration');
   const rootCancellation = new AbortController(),
     observerCancellation = new AbortController();
   const root = {
@@ -44,8 +62,8 @@ export function createWorkflowEndpoint(options: {
     signal: AbortSignal.any([options.context.signal, rootCancellation.signal]),
   };
   const observeContext = {
-    ...root,
-    signal: AbortSignal.any([root.signal, observerCancellation.signal]),
+    ...options.context,
+    signal: AbortSignal.any([options.context.signal, observerCancellation.signal]),
   };
   const composition = { ...options.composition };
   const capabilities: Contracts.CapabilitySet = {
@@ -68,8 +86,10 @@ export function createWorkflowEndpoint(options: {
     >(),
     observations = new Set<Promise<void>>(),
     admissions = new Set<Promise<Contracts.CommandReceipt>>();
+  const settlements = createSettlementTracker();
   const unknown = new Map<string, { engine: Workflows.Engine; key: string }>();
   let closed = false;
+  let closing: Promise<Contracts.CleanupReport> | undefined;
   const allowed = (c: Contracts.InvocationContext) =>
     !closed && canonical(root.principal) === canonical(c.principal);
   const reject = (
@@ -100,12 +120,18 @@ export function createWorkflowEndpoint(options: {
       : undefined;
   };
   async function publish(entry: { ref: Workflows.ExecutionRef; engine: Workflows.Engine }) {
-    const result = await entry.engine.get(entry.ref, root);
-    if (!result.ok || closed) return;
+    const result = await entry.engine.get(entry.ref, observeContext);
+    if (!result.ok) return;
     const snapshot = result.value;
+    settlements.notify(snapshot);
+    if (closed) return;
     if (options.project) {
-      const projected = await options.project(snapshot, root);
-      if (projected.ok) hub.upsert(projected.value);
+      const projected = await options.project(snapshot, observeContext);
+      if (projected.ok) {
+        const item = withCancelAction(snapshot, projected.value);
+        hub.upsert(item);
+        options.mirror?.(item);
+      }
       return;
     }
     const inspected = await entry.engine.inspect?.(entry.ref, 'waits', root);
@@ -118,30 +144,22 @@ export function createWorkflowEndpoint(options: {
       ...(snapshot.output ? { output: snapshot.output } : {}),
       waits,
     } as unknown as Contracts.Json;
-    const actions = [...snapshot.actions];
-    if (!['succeeded', 'failed', 'cancelled'].includes(snapshot.phase))
-      actions.push({
-        id: 'part.workflow/cancel',
-        version: 1,
-        input: { id: 'part/null', version: 1 },
-        output: { id: 'part/json', version: 1 },
-        execution: 'immediate',
-        availability: { state: 'available', checkedAt: snapshot.revision },
-      });
-    hub.upsert({
-      id: snapshot.ref.id,
-      type: 'part/workflow',
-      schemaVersion: 1,
-      revision: snapshot.revision,
-      source: entity(entry.ref),
-      payload,
-      fallback: {
-        label: 'Workflow',
-        text: `${snapshot.phase} · effect ${snapshot.effect}${snapshot.output ? '\n' + JSON.stringify(snapshot.output) : ''}`,
-      },
-      actions,
-      artifacts: [],
-    });
+    hub.upsert(
+      withCancelAction(snapshot, {
+        id: snapshot.ref.id,
+        type: 'part/workflow',
+        schemaVersion: 1,
+        revision: snapshot.revision,
+        source: entity(entry.ref),
+        payload,
+        fallback: {
+          label: 'Workflow',
+          text: `${snapshot.phase} · effect ${snapshot.effect}${snapshot.output ? '\n' + JSON.stringify(snapshot.output) : ''}`,
+        },
+        actions: snapshot.actions,
+        artifacts: [],
+      }),
+    );
   }
   async function track(ref: Workflows.ExecutionRef) {
     const engine = options.host.resolve(ref.engine);
@@ -172,7 +190,10 @@ export function createWorkflowEndpoint(options: {
       }
     })();
     observations.add(observation);
-    void observation.finally(() => observations.delete(observation));
+    void observation.then(
+      () => observations.delete(observation),
+      () => observations.delete(observation),
+    );
     await publish(entry);
   }
   async function command(request: Contracts.CommandRequest): Promise<Contracts.CommandReceipt> {
@@ -219,6 +240,9 @@ export function createWorkflowEndpoint(options: {
           'permission',
         );
       const selected = input as unknown as ControlCatalog.WorkflowStartInput;
+      const limits = mergeExecutionLimits(hostLimits, input.limits);
+      if (!limits.ok)
+        return { kind: 'rejected', commandId: request.commandId, error: limits.error };
       const prepared = await options.host.prepare(
         {
           definition: registration.definition,
@@ -239,7 +263,7 @@ export function createWorkflowEndpoint(options: {
           idempotencyKey: request.idempotencyKey ?? request.commandId,
           prepared: prepared.value,
           input: selected.input,
-          ...(selected.limits ? { limits: selected.limits } : {}),
+          ...(limits.value ? { limits: limits.value } : {}),
         },
         root,
       );
@@ -396,34 +420,42 @@ export function createWorkflowEndpoint(options: {
         ? hub.watch(caller)
         : fail('workflow.permission', 'Endpoint access denied', 'permission');
     },
-    async close() {
-      if (closed) return { released: [], unresolved: [], errors: [] };
-      closed = true;
-      rootCancellation.abort('endpoint-closed');
-      observerCancellation.abort('endpoint-closed');
-      await Promise.all([...admissions]);
-      const errors: Contracts.Failure[] = [],
-        unresolved: Contracts.EntityRef[] = [],
-        released: Contracts.EntityRef[] = [];
-      for (const entry of executions.values()) {
-        const result = await entry.engine.requestCancel(
-          entry.ref,
-          'endpoint-closed',
-          options.context,
+    close() {
+      return (closing ??= (async () => {
+        closed = true;
+        rootCancellation.abort('endpoint-closed');
+        const admitted = await boundedClose(
+          Promise.allSettled([...admissions]),
+          cancellationDrainMs,
         );
-        if (!result.ok) errors.push(result.error);
-        const snapshot = await entry.engine.get(entry.ref, options.context);
-        if (
-          snapshot.ok &&
-          ['succeeded', 'failed', 'cancelled'].includes(snapshot.value.phase) &&
-          !snapshot.value.activeOperations.length
-        )
-          released.push(entity(entry.ref));
-        else unresolved.push(entity(entry.ref));
-      }
-      // External engines may not confirm cleanup; report those references honestly.
-      hub.close();
-      return { released, unresolved, errors };
+        const report = await closeWorkflowExecutions({
+          entries: [...executions.values()],
+          context: options.context,
+          timeoutMs: cancellationDrainMs,
+          wait: (entry) => settlements.wait(entry, options.context, cancellationDrainMs),
+        });
+        observerCancellation.abort('endpoint-closed');
+        await boundedClose(Promise.allSettled([...observations]), cancellationDrainMs);
+        hub.close();
+        return admitted
+          ? report
+          : {
+              ...report,
+              unresolved: [
+                ...report.unresolved,
+                { owner: 'part/workflow-endpoint', kind: 'admission', id: composition.id },
+              ],
+              errors: [
+                ...report.errors,
+                fail(
+                  'workflow.admission-timeout',
+                  'Workflow admission cleanup timed out',
+                  'timeout',
+                  'unknown',
+                ).error,
+              ],
+            };
+      })());
     },
   });
 }
