@@ -1,11 +1,10 @@
 #!/usr/bin/env sh
 set -eu
 
-exec sudo --preserve-env=DIM_DEVELOPMENT_GATEWAY_PORT \
-  --user dim-agent --set-home \
+exec sudo --user dim-agent --set-home \
   sh -lc '
     cd /workspace
     npm ci
-    export PART_PREVIEW_PORT="${DIM_DEVELOPMENT_GATEWAY_PORT:?}"
+    export PART_PREVIEW_PORT=3000
     exec npm run preview
   '
