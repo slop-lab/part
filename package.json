@@ -10,7 +10,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "npm run build && node --test --test-isolation=none --test-reporter=./scripts/test-reporter.mjs tests/*.test.ts",
-    "check": "npm run check:js && node scripts/check-architecture.mjs && npm run check:qg",
+    "check": "npm run check:qg && tsc -p jsconfig.json && node scripts/check-architecture.mjs",
     "check:qg": "qg check --full",
     "example": "npm run build && node examples/basic.mjs",
     "test:consumers": "npm run build && node scripts/test-consumers.mjs",
@@ -34,7 +34,7 @@
     "example:siwc:cli": "npm run build && node examples/siwc/plan.mjs",
     "example:siwc:website": "npm run build && node examples/siwc/website.mjs",
     "check:js": "npm run build && tsc -p jsconfig.json",
-    "release:check": "npm run format:check && npm run check && npm test && npm run test:consumers && npm run pack:local && node scripts/check-release.mjs"
+    "release:check": "npm run format:check && npm run check && npm run test:consumers && npm run pack:local && node scripts/check-release.mjs"
   },
   "engines": {
     "node": ">=24.22.0"
@@ -42,6 +42,7 @@
   "devDependencies": {
     "@agentclientprotocol/sdk": "1.8.0",
     "@slop-lab/qg": "0.1.1",
+    "@slop-lab/qg-check-node-test": "0.1.0",
     "@types/node": "^26.6.5",
     "@types/node-lts": "npm:@types/node@^24.19.2",
     "esbuild": "^0.28.2",

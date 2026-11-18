@@ -8,6 +8,8 @@ import { join } from 'node:path';
 test('The test reporter hides successful and skipped names while preserving failures, counts and exit status', async () => {
   const root = await mkdtemp(join(tmpdir(), 'part-reporter-'));
   const reporter = new URL('../scripts/test-reporter.mjs', import.meta.url).href;
+  const env = { ...process.env };
+  delete env.NODE_TEST_CONTEXT;
   try {
     const fixture = join(root, 'fixture.mjs');
     for (const fail of [false, true]) {
@@ -23,6 +25,7 @@ test('The test reporter hides successful and skipped names while preserving fail
         ['--test', `--test-reporter=${reporter}`, fixture],
         {
           encoding: 'utf8',
+          env,
           windowsHide: true,
         },
       );

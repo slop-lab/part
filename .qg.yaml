@@ -9,7 +9,9 @@ artifacts:
 rules:
   # Prettier pads Markdown table cells to align columns.
   markdown/no-extra-table-cell-whitespace: off
-  markdown/allowed-characters:
-    severity: error
-    options:
-      allowedCharacters: ['’', '—', '…', '→', '↓']
+
+checks:
+  build: node scripts/build.mjs
+  tests:
+    type: node-test
+    files: ['tests/*.test.ts']

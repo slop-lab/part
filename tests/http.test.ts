@@ -3,7 +3,7 @@ import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
 import { createOllamaAdapter } from '@slop-lab/part-plugins/providers/ollama.js';
 import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
 import { createHttpPort } from '@slop-lab/part/client/http.js';
-import { fail, localContext, ok } from '@slop-lab/part/contracts/index.js';
+import { fail, isJsonObject, localContext, ok } from '@slop-lab/part/contracts/index.js';
 import { createEmbeddedEndpoint } from '@slop-lab/part/host/embedded.js';
 import { createFetchTransport, noAuth } from '@slop-lab/part/model/index.js';
 import assert from 'node:assert/strict';
@@ -80,7 +80,10 @@ test('HTTP/SSE commands, queries, snapshots and owner authentication', async () 
       false,
     );
     assert.equal((await port.discover()).ok, true);
-    watch = expectProperty(await port.watch({ surface: 'chat' }), 'value');
+    watch = expectProperty(
+      await port.watch({ surface: 'chat' }, { signal: AbortSignal.timeout(15_000) }),
+      'value',
+    );
     assert.equal(watch.bootstrap.items.length, 0);
     const iterator = watch.frames[Symbol.asyncIterator]();
     const pending = iterator.next();
@@ -95,7 +98,17 @@ test('HTTP/SSE commands, queries, snapshots and owner authentication', async () 
     const first = await pending;
     assert.equal(first.value.kind, 'event');
     assert.equal(first.value.event.type, 'part.item/upsert');
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    let completed = false;
+    for (let next = await iterator.next(); !next.done; next = await iterator.next()) {
+      const frame = next.value;
+      if (frame.kind !== 'event' || frame.event.type !== 'part.item/upsert') continue;
+      const item = frame.event.payload;
+      if (isJsonObject(item) && isJsonObject(item.payload) && item.payload.phase === 'completed') {
+        completed = true;
+        break;
+      }
+    }
+    assert.ok(completed, 'Expected a completed run projection over SSE');
     const run = await port.query({
       queryId: 'part.run/get',
       version: 1,

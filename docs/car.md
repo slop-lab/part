@@ -128,7 +128,7 @@ npm run car -- serve --root /abs/repo --state /private/state \
 The validator records exit status and passes only for a successful, untruncated
 process result. It is host evidence, not acceptance of a model's prose claim.
 Child processes receive a dedicated state-owned home, selected `PATH`,
-`C.UTF-8`, and explicit per-call environment entries—never provider credentials.
+`C.UTF-8`, and explicit per-call environment entries. Provider credentials stay with the host.
 Shell execution is disabled by the CLI profile.
 
 ## Coding tools and managed subagents
@@ -269,7 +269,7 @@ Waits project `part.workflow/respond`; starts/cancellation use
 definitions, submits JSON input once, shows waits, and does not automatically
 repeat unknown delivery.
 
-To try the checked-in agent → approval → assert example, copy
+To try the checked-in example with agent, approval, and assert steps, copy
 [`car/examples/review.pipeline.json`](../car/examples/review.pipeline.json) into
 your workspace's `.agents/workflows/` before starting CAR with `--workflows true`.
 In the Workflows tab select `car.review-with-approval` and submit
@@ -321,7 +321,7 @@ research, not as current setup guidance.
 
 DIM is different: CAR never starts, probes, or contacts it. The integration
 surface evaluated at
-[`80bcf8c…`](https://github.com/slop-lab/dev-infra-manager/tree/80bcf8c315c923de8f0c53b1ccdde30538e3c215)
+[`80bcf8c`](https://github.com/slop-lab/dev-infra-manager/tree/80bcf8c315c923de8f0c53b1ccdde30538e3c215)
 was a CLI contract; the current environment's older DIM host was not tested against it. The optional
 `part-node` DIM adapter has fake-only tests; it is not wired into CAR and
 establishes no live compatibility.
@@ -331,13 +331,13 @@ establishes no live compatibility.
 This table separates source/test evidence from external probes. It deliberately
 contains no total test count.
 
-| Axis          | Exercised profile                                                      | Evidence and boundary                                                                                                                                                                                                                                                                                                              |
-| ------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Workspace ACI | Local `hash` and `exact`; toolset P1                                   | Repository tests cover local stale-digest/hash/exact behavior. At toolset-server `107ea919…`, an actually built checkout connected through the CAR MCP connector and returned a five-tool catalog including four MCP controls; one read call succeeded. The native effect of that external read was not independently established. |
-| Model source  | Manual interactive mock; exact fixed mock; local Router4u fake backend | Interactive/fixed paths are local mock tests. Router4u `a6709ad…` was run as a real gateway with a local fake backend; both Chat and Responses passed. No paid or live inference was made.                                                                                                                                         |
-| Completion    | Default coding driver; validating driver                               | Default completion accepts a structurally valid terminal model response. Injected validation and CLI `--check` can reject completion; tests cover a rejecting validator. This is not a claim that every run is validated.                                                                                                          |
-| Workflow      | Injected code; loaded pipeline; injected native engine                 | Code and pipeline engines run through shared execution services; CAR's script/agent/wait/approval path is tested. Native tests prove interface boundaries only. Source paths are listed above.                                                                                                                                     |
-| Client        | Headless endpoint/hub; browser HTTP/SSE                                | Runtime and end-to-end tests cover durable reopen, authorization, cancellation, and real loopback HTTP/SSE.                                                                                                                                                                                                                        |
+| Axis          | Exercised profile                                                      | Evidence and boundary                                                                                                                                                                                                                                                                                                             |
+| ------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Workspace ACI | Local `hash` and `exact`; toolset P1                                   | Repository tests cover local stale-digest/hash/exact behavior. At toolset-server `107ea919`, an actually built checkout connected through the CAR MCP connector and returned a five-tool catalog including four MCP controls; one read call succeeded. The native effect of that external read was not independently established. |
+| Model source  | Manual interactive mock; exact fixed mock; local Router4u fake backend | Interactive/fixed paths are local mock tests. Router4u `a6709ad` was run as a real gateway with a local fake backend; both Chat and Responses passed. No paid or live inference was made.                                                                                                                                         |
+| Completion    | Default coding driver; validating driver                               | Default completion accepts a structurally valid terminal model response. Injected validation and CLI `--check` can reject completion; tests cover a rejecting validator. This is not a claim that every run is validated.                                                                                                         |
+| Workflow      | Injected code; loaded pipeline; injected native engine                 | Code and pipeline engines run through shared execution services; CAR's script/agent/wait/approval path is tested. Native tests prove interface boundaries only. Source paths are listed above.                                                                                                                                    |
+| Client        | Headless endpoint/hub; browser HTTP/SSE                                | Runtime and end-to-end tests cover durable reopen, authorization, cancellation, and real loopback HTTP/SSE.                                                                                                                                                                                                                       |
 
 Browser QA recorded Chromium at widths 375/768/1280, 31 screenshots including invalid-token
 handling, Korean input, streaming, `node` alias execution, workflow approval, every inspector tab,
@@ -393,8 +393,7 @@ Hash-addressed editing is similarly related work, not wire compatibility:
 
 ## Programmatic API
 
-`@slop-lab/car` is private and declares only `.` → `src/runtime.mjs`. Its exported
-entry is:
+`@slop-lab/car` is private. Its sole export `.` maps to `src/runtime.mjs`.
 
 ```js
 import { openCar } from '@slop-lab/car';

@@ -39,7 +39,7 @@ With an existing Node.js installation, use the npm commands directly.
 
 ```sh
 npm ci
-npm run check # TypeScript, JS/MJS type checks, package boundaries, and QG rules
+npm run check # QG rules and tests, type checks, and package boundaries
 npm test
 npm run test:consumers
 npm run measure
@@ -86,7 +86,9 @@ dependency declaration checks. `fixtures/type-contracts.mjs` guards against unty
 metadata, unchecked lookups and invalid test-double methods. Git enforces LF line
 endings on every platform. Windows CI runs
 all tests and consumer fixtures, including script execution and process-tree cleanup.
-`npm test` hides successful test names and prints failures plus the full run summary.
+QG builds the workspace and runs the TypeScript suite during `npm run check`
+and pre-commit. `npm test` runs the suite directly and prints failures along with
+the full run summary.
 
 Seven isolated consumer fixtures cover core-only,
 non-coding, SWE, contracts, workflow, Node and browser installations. Every public

@@ -36,18 +36,20 @@ test('G09/G10: in-process and codec loopback have command/query/watch parity', a
     assert.equal(expectProperty(delivery, 'receipt').kind, 'accepted');
     const duplicate = await port.command(request);
     assert.deepEqual(expectProperty(duplicate, 'receipt'), expectProperty(delivery, 'receipt'));
-    await delay(10);
+    const runId = present(expectProperty(expectProperty(delivery, 'receipt'), 'operation')).id;
+    const assistantId = `${runId}/assistant`;
+    const deadline = AbortSignal.timeout(15_000);
+    while (!deadline.aborted && controller.getItem(assistantId)?.fallback.text !== 'reply')
+      await delay(10);
     assert.equal(model.requests.length, 1);
     assert.equal(controller.getState().itemIds.length, 2);
     const snapshot = await port.query({
       queryId: 'part.run/get',
       version: 1,
-      input: present(expectProperty(expectProperty(delivery, 'receipt'), 'operation')).id,
+      input: runId,
     });
     assert.equal(expectProperty(expectProperty(snapshot, 'value'), 'phase'), 'completed');
-    const latest = controller.getItem(
-      `${present(expectProperty(expectProperty(delivery, 'receipt'), 'operation')).id}/assistant`,
-    );
+    const latest = controller.getItem(assistantId);
     assert.equal(present(latest).fallback.text, 'reply');
     assert.equal(
       expectProperty(await port.command({ ...request, input: 'changed' }), 'receipt').kind,

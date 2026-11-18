@@ -85,7 +85,7 @@ The shared Chat component updates once per browser frame and keeps completed
 Markdown blocks in place as the current block grows. A new model call in a tool
 loop starts a fresh preview. Completion replaces it with the verified result;
 cancellation or failure keeps the text already received and displays the outcome.
-When you scroll up, the view holds position and offers **New messages ↓**.
+When you scroll up, the view holds position and offers **New messages ↓**. <!-- qg-suppress-line markdown/allowed-characters: Match the button label shown in the playground. -->
 
 ### Session, refresh and cancellation
 
@@ -159,7 +159,7 @@ are intended for a personal local development environment.
 ## Connect a ChatGPT plan
 
 Select **Connect ChatGPT** from the playground header. After login, use
-**Load ChatGPT models** to show the account’s model list in the connection dialog.
+**Load ChatGPT models** to show the account's model list in the connection dialog.
 Choose a model in that list to use it in the playground.
 If the browser cannot reach its loopback callback, paste the full callback URL
 into the connection dialog. The configured API providers remain selectable.
@@ -167,7 +167,7 @@ Set `PART_PLAYGROUND_SIWC=0` to hide this integration.
 
 The example binds authorizations, model catalogs, and grants to its server-owned
 browser session. When you restart the server, the same browser cookie restores
-its connection from the part SIWC SQLite store. Reload the account’s model list to
+its connection from the part SIWC SQLite store. Reload the account's model list to
 use the plan again. The local default is `~/.config/part-siwc-web/playground`; set
 `PART_SIWC_DIRECTORY` to choose a different base directory. **Disconnect** removes
 the saved connection for that browser. The app separates ChatGPT conversation

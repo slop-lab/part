@@ -95,11 +95,11 @@ cancels its sessions, unlike closing an ordinary runtime observation. See
 Set the protocol to match the endpoint. The same factory handles URL construction, auth,
 request timeouts and headers across these protocols.
 
-| Protocol    | Path under the base URL | Default credential header |
-| ----------- | ----------------------- | ------------------------- |
-| `chat`      | `chat/completions`      | `Authorization: Bearer …` |
-| `responses` | `responses`             | `Authorization: Bearer …` |
-| `messages`  | `messages`              | `x-api-key`               |
+| Protocol    | Path under the base URL | Default credential header   |
+| ----------- | ----------------------- | --------------------------- |
+| `chat`      | `chat/completions`      | `Authorization: Bearer ...` |
+| `responses` | `responses`             | `Authorization: Bearer ...` |
+| `messages`  | `messages`              | `x-api-key`                 |
 
 ```js
 import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
@@ -152,7 +152,7 @@ Create a client with `createChatGPTSignIn({ clientId, redirectURI, clientSecret 
 `begin()` in your sign-in route, save its transaction against the initiating browser
 session and redirect to the returned URL. In the callback, atomically consume that
 transaction and call `complete(callbackURL, transaction)`. The SDK checks state and expiry,
-exchanges the code with PKCE, and verifies the ID token against OpenAI’s signing keys.
+exchanges the code with PKCE, and verifies the ID token against OpenAI's signing keys.
 Link the verified `issuer`, `clientId` and `subject` to your local account and issue your own
 application session. [OpenAI website integration](https://developers.openai.com/siwc/website).
 
@@ -165,7 +165,7 @@ with multiple instances, use a shared store that supports atomic, expiring trans
 
 ### ChatGPT plan usage and Codex
 
-For open-source apps, call `signInWithChatGPTLoopback` with your app’s name, a persistent
+For open-source apps, call `signInWithChatGPTLoopback` with your app's name, a persistent
 host ID and a function that opens the authorization URL. For an existing account, pass its
 saved registration and keep the callback path consistent. `createChatGPTPlanSignIn` exposes
 `begin` and `complete` for apps that manage their own loopback listener. Check
@@ -209,7 +209,7 @@ Runtime failures expose the HTTP status, request ID and structured provider erro
 in `error.details` when available.
 [ChatGPT plan route limitations](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations).
 
-`listModels()` returns the signed-in account’s displayable model IDs.
+`listModels()` returns the signed-in account's displayable model IDs.
 If you use app-server, initialize the child with your stable app identity in
 `clientInfo`. On renewal, restart it with a new `codexAppServer()` configuration and
 resume the thread by ID. [OpenAI inference guide](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference),
@@ -283,7 +283,7 @@ and `npm run example:siwc:website`.
 Open `http://127.0.0.1:4174`, select **Continue with ChatGPT**, and open the
 authorization link in a new tab. This example uses open-source dynamic registration.
 If the callback tab shows a connection error, copy its full
-`http://127.0.0.1:…/auth/callback?…` URL and submit it on the PoC page.
+`http://127.0.0.1:.../auth/callback?...` URL and submit it on the PoC page.
 If the callback reaches the local listener, return to the PoC tab and check its status.
 After signing in with plan access, use the page to load models and try a prompt.
 
@@ -292,7 +292,7 @@ with `ssh -L 4174:127.0.0.1:4174 user@host`, then use the paste field for the ca
 The example listens on loopback. Its signed browser session cookie and private SQLite
 account store preserve a connection across server restarts. Set `PART_SIWC_DIRECTORY`
 to change the local storage location.
-The SDK’s `open(url, submitCallback)` hook lets other apps submit a pasted URL for
+The SDK's `open(url, submitCallback)` hook lets other apps submit a pasted URL for
 the same one-time transaction used by the HTTP listener.
 
 ## Extension contracts
