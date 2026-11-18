@@ -27,6 +27,7 @@ writeFileSync(
   'preview/styles.css',
   readFileSync('packages/browser/dist/styles.css', 'utf8') +
     '\n' +
-    readFileSync('examples/playground/styles.css', 'utf8'),
+    readFileSync('examples/playground/styles.css', 'utf8') +
+    readFileSync('examples/playground/panels.css', 'utf8'),
 );
 console.log('Playground built: preview/ (start with npm run preview)');

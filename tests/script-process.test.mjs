@@ -120,3 +120,62 @@ for (const mode of ['exit', 'cancel', 'timeout']) {
     }
   });
 }
+
+test('SR03-SR05/SR08: standalone scripts pin bytes, capture explicit JSON and reject extra/truncated output', async () => {
+  const context = localContext();
+  const root = await mkdtemp(join(tmpdir(), 'part-script-test-')),
+    source = 'process.stdout.write(JSON.stringify({text:"collected"}));';
+  try {
+    await writeFile(join(root, 'collect.cjs'), source);
+    const scripts = createNodeScripts({ root, interpreters: { node: process.execPath } }),
+      /** @type {import('@slop-lab/part/reference/index.js').Scripts.Request} */
+      request = {
+        requestId: 'collect',
+        executorId: 'part/node-process',
+        source: {
+          relativePath: 'collect.cjs',
+          digest: await digest(new TextEncoder().encode(source)),
+        },
+        interpreter: 'node',
+        args: [],
+        capture: { kind: 'stdout-json', maxBytes: 1024 },
+        effects: 'read',
+        retry: 'never',
+      };
+    const captured = await scripts.execute(request, context);
+    assert.equal(
+      expectProperty(
+        expectProperty(
+          expectProperty(await expectProperty(captured, 'value').done, 'result').captured,
+          'value',
+        ),
+        'text',
+      ),
+      'collected',
+    );
+    const uncaptured = await scripts.execute({ ...request, capture: { kind: 'none' } }, context);
+    assert.equal(
+      expectProperty(await expectProperty(uncaptured, 'value').done, 'result').captured,
+      undefined,
+    );
+    await writeFile(join(root, 'collect.cjs'), source + 'process.stdout.write("extra");');
+    assert.equal((await scripts.execute(request, context)).ok, false);
+    const newSource = source + 'process.stdout.write("extra");',
+      /** @type {import('@slop-lab/part/reference/index.js').Scripts.Request} */
+      changed = {
+        ...request,
+        source: { ...request.source, digest: await digest(new TextEncoder().encode(newSource)) },
+      };
+    assert.equal(
+      (await expectProperty(await scripts.execute(changed, context), 'value').done).phase,
+      'failed',
+    );
+    const large = await scripts.execute(
+      { ...changed, capture: { kind: 'stdout-json', maxBytes: 2 } },
+      context,
+    );
+    assert.equal((await expectProperty(large, 'value').done).phase, 'failed');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

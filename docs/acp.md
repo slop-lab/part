@@ -209,8 +209,8 @@ npm run format:check
 node scripts/check-architecture.mjs
 ```
 
-`tests/acp.test.mjs` covers official SDK 1.8.0 interoperability, byte-split Unicode,
-real child stdio, permission decisions, cancellation races, reused provider call
+`tests/acp.test.mjs` and `tests/acp-stdio.test.mjs` cover official SDK 1.8.0 interoperability,
+byte-split Unicode, real child stdio, permission decisions, cancellation races, reused provider call
 IDs, limits, backpressure, session cleanup and owned MCP processes. Isolated
 consumers exercise portable ACP without Node adapters and Node ACP without the
 plugin bundle.

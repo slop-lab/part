@@ -1,34 +1,24 @@
 // @ts-check
 import { parseObject } from '../fixtures/contracts.mjs';
-import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
 import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible/index.js';
-import { createOpenAIResponsesAdapter } from '@slop-lab/part-plugins/providers/openai-responses/index.js';
-import { digest, schema, stringSchema } from '@slop-lab/part/contracts/index.js';
-import { createFetchTransport, noAuth } from '@slop-lab/part/model/index.js';
-import { functionTool } from '@slop-lab/part/tools.js';
+import { digest } from '@slop-lab/part/contracts/index.js';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { expectProperty, present, stub } from '../fixtures/assertions.mjs';
+import {
+  adapter,
+  profile,
+  message,
+  call,
+  reasoning,
+  completion,
+  event,
+  wire,
+  eventsFor,
+} from '../fixtures/openai-responses.mjs';
 
 /** @import {Context, Model, Contracts} from '@slop-lab/part/reference/index.js' */
-/** @typedef {{id: string, type: 'message', status: string, role: string, content: [{type: string, text: string, annotations: unknown[]}]}} ResponseMessage */
-/** @typedef {{id: string, type: 'function_call', status: string, call_id: string, name: string, arguments: string}} ResponseCall */
-/** @typedef {{id: string, type: 'reasoning', summary: {type: string, text: string}[], encrypted_content: string}} ResponseReasoning */
-/** @typedef {ResponseMessage | ResponseCall | ResponseReasoning} OutputItem */
-/** @typedef {{type: string} & Record<string, unknown>} ResponseEvent */
-const adapter = createOpenAIResponsesAdapter();
-const profile = {
-  id: 'responses',
-  revision: '1',
-  adapterId: adapter.id,
-  transportId: 'part/fetch',
-  authStrategyId: 'none',
-  model: 'fixture-model',
-  endpoint: 'https://fixture.invalid/v1/responses',
-  defaults: {},
-  capabilities: { revision: '1', entries: [] },
-};
+
 /** @param {Context.Fragment[]} fragments @param {Contracts.Json} options @returns {Model.Invocation} */
 const invocation = (fragments = [], options = {}) => ({
   profileId: profile.id,
@@ -46,54 +36,7 @@ const fragment = (role, content, kind = 'message', toolRelation) =>
   });
 /** @param {string} text @returns {Model.ContentPart} */
 const textPart = (text) => ({ kind: 'text', text });
-/** @param {string} text @param {string} id @returns {ResponseMessage} */
-const message = (text, id = 'msg-1') => ({
-  id,
-  type: 'message',
-  status: 'completed',
-  role: 'assistant',
-  content: [{ type: 'output_text', text, annotations: [] }],
-});
-/** @type {ResponseCall} */
-const call = {
-  id: 'fc-1',
-  type: 'function_call',
-  status: 'completed',
-  call_id: 'call-1',
-  name: 'uppercase',
-  arguments: '{"text":"hello"}',
-};
-/** @type {ResponseReasoning} */
-const reasoning = {
-  id: 'rs-1',
-  type: 'reasoning',
-  summary: [{ type: 'summary_text', text: 'Use the tool.' }],
-  encrypted_content: 'opaque-fixture',
-};
-/** @param {Record<string, unknown>[]} [output] */
-const completion = (output = [message('HELLO')]) => ({
-  id: 'resp-1',
-  object: 'response',
-  status: 'completed',
-  error: null,
-  incomplete_details: null,
-  output,
-  usage: {
-    input_tokens: 12,
-    output_tokens: 3,
-    total_tokens: 15,
-    output_tokens_details: { reasoning_tokens: 1 },
-  },
-});
-/** @param {string} type @param {Record<string, unknown>} fields @returns {ResponseEvent} */
-const event = (type, fields) => ({ type, ...fields });
-/** @param {Record<string, unknown>[]} events @param {string} newline */
-const wire = (events, newline = '\n') =>
-  events
-    .map(
-      (value) => `event: ${value.type}${newline}data: ${JSON.stringify(value)}${newline}${newline}`,
-    )
-    .join('');
+
 /** @param {unknown} value @param {boolean} streaming @param {boolean} bytes */
 function decode(value, streaming = false, bytes = false) {
   const decoder = expectProperty(
@@ -114,39 +57,6 @@ function decode(value, streaming = false, bytes = false) {
   }
   const result = decoder.finish();
   return result.ok === true ? { ...result, progress } : result;
-}
-/** @param {OutputItem[]} output */
-function eventsFor(output) {
-  const events = [event('response.created', { response: { id: 'resp-1', status: 'in_progress' } })];
-  output.forEach((item, output_index) => {
-    events.push(
-      event('response.output_item.added', {
-        output_index,
-        item: {
-          ...item,
-          status: 'in_progress',
-          ...(item.type === 'function_call' ? { arguments: '' } : {}),
-        },
-      }),
-    );
-    if (item.type === 'message') {
-      const metadata = { output_index, item_id: item.id, content_index: 0 };
-      for (const delta of item.content[0].text)
-        events.push(event('response.output_text.delta', { ...metadata, delta }));
-      events.push(event('response.output_text.done', { ...metadata, text: item.content[0].text }));
-    }
-    if (item.type === 'function_call') {
-      const metadata = { output_index, item_id: item.id };
-      for (const delta of item.arguments)
-        events.push(event('response.function_call_arguments.delta', { ...metadata, delta }));
-      events.push(
-        event('response.function_call_arguments.done', { ...metadata, arguments: item.arguments }),
-      );
-    }
-    events.push(event('response.output_item.done', { output_index, item }));
-  });
-  events.push(event('response.completed', { response: completion(output) }));
-  return events.map((entry, sequence_number) => ({ ...entry, sequence_number }));
 }
 
 test('Responses encodes text, JSON, function calls/results and native reasoning without hidden state', async () => {
@@ -439,97 +349,6 @@ test('SSE Responses rejects missing terminals, mismatched snapshots, failed even
   assert.equal(utf8.push(Uint8Array.of(0xff)).ok, false);
   assert.equal(utf8.finish().ok, false);
 });
-
-for (const mode of ['json', 'sse', 'truncated']) {
-  test(`Responses fixed ${mode} fixture validates reasoning replay and prevents partial tool execution`, async () => {
-    /** @type {{prompt: string, exchanges: {request: Record<string, Contracts.Json> & {tools: [{parameters: Contracts.Json}], stream: boolean}, response: ReturnType<typeof completion> & {output: OutputItem[]}}[]}} */
-    const fixture = JSON.parse(
-      await readFile(
-        new URL('../fixtures/openai-responses/tool-flow.fixture.json', import.meta.url),
-        'utf8',
-      ),
-    );
-    if (mode === 'json') for (const exchange of fixture.exchanges) exchange.request.stream = false;
-    /** @type {{request: unknown, response: unknown}[]} */
-    const transcript = [];
-    /** @type {string[]} */
-    const executions = [];
-    const model = {
-      profile: { ...profile, defaults: { stream: mode !== 'json' } },
-      adapter,
-      auth: noAuth,
-      transport: createFetchTransport({
-        allowedOrigins: ['https://fixture.invalid'],
-        async fetch(url, init) {
-          const exchange = fixture.exchanges[transcript.length];
-          assert.ok(exchange, 'Unexpected extra request');
-          assert.equal(String(url), profile.endpoint);
-          assert.ok(init?.body instanceof Uint8Array);
-          const request = parseObject(new TextDecoder().decode(init.body));
-          assert.deepEqual(request, exchange.request);
-          transcript.push({ request, response: exchange.response });
-          return new Response(
-            mode === 'json'
-              ? JSON.stringify(exchange.response)
-              : wire(
-                  mode === 'truncated'
-                    ? eventsFor(exchange.response.output).slice(0, -1)
-                    : eventsFor(exchange.response.output),
-                ),
-            {
-              headers: {
-                'content-type': mode === 'json' ? 'application/json' : 'text/event-stream',
-              },
-            },
-          );
-        },
-      }),
-    };
-    const created = createAgent({
-      model,
-      limits: { maxModelInvocations: 2, maxToolDispatches: 1 },
-      tools: [
-        functionTool({
-          id: 'uppercase',
-          description: 'Uppercase text',
-          input: schema(
-            'responses/text',
-            /** @param {unknown} value @returns {value is {text: string}} */ (value) =>
-              value !== null &&
-              typeof value === 'object' &&
-              'text' in value &&
-              typeof value.text === 'string',
-          ),
-          output: stringSchema,
-          execute: ({ text }) => {
-            executions.push(text);
-            return text.toUpperCase();
-          },
-        }),
-      ],
-      toolSchemas: { uppercase: present(fixture.exchanges[0]).request.tools[0].parameters },
-    });
-    assert.equal(created.ok, true);
-    try {
-      const outcome = await created.value.generate(fixture.prompt);
-      assert.equal(outcome.ok, true);
-      if (mode === 'truncated') {
-        assert.equal(outcome.value.phase, 'failed');
-        assert.equal(outcome.value.error.code, 'part.openai-responses.eof');
-        assert.deepEqual(executions, []);
-        assert.equal(transcript.length, 1);
-        return;
-      }
-      assert.equal(outcome.value.phase, 'completed', JSON.stringify(outcome));
-      assert.deepEqual(executions, ['hello']);
-      assert.equal(expectProperty(outcome.value.result.content[0], 'text'), 'HELLO');
-      assert.equal(transcript.length, 2);
-      assert.deepEqual(transcript, fixture.exchanges);
-    } finally {
-      await created.value.dispose();
-    }
-  });
-}
 
 test('Responses SSE accepts auxiliary events, compatible framing and annotations while validating completed output', () => {
   const annotation = {

@@ -4,7 +4,12 @@ This file extracts the existing `@slop-lab/part-browser` DOM system for the CAR 
 
 ## 1. Atmosphere & Identity
 
-CAR is a compact, dependable engineering console: conversation on the left, inspectable execution evidence on the right. The signature is **evidence beside action**—a user can ask for work and immediately inspect runs, context metadata, requests, events, files, diffs, and artifacts without leaving the surface. Primary users are keyboard-oriented software engineers; the stress persona is a user working at 200% zoom or with reduced motion who must still connect, send, refresh, inspect errors, and read long output.
+CAR is a compact, dependable engineering console: conversation on the left, inspectable execution
+evidence on the right. The signature is **evidence beside action**—a user can ask for work and
+immediately inspect runs, context metadata, requests, events, files, diffs, and artifacts without
+leaving the surface. Primary users are keyboard-oriented software engineers; the stress persona is
+a user working at 200% zoom or with reduced motion who must still connect, send, refresh, inspect
+errors, and read long output.
 
 ## 2. Color
 

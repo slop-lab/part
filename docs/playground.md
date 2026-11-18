@@ -178,16 +178,18 @@ and the [OpenAI plan requirements](https://developers.openai.com/siwc/token-shar
 
 ## Extend the example
 
-| File                               | Responsibility                                                                                 |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `examples/playground/catalog.json` | Scenario names, instructions for users and suggested prompts                                   |
-| `examples/playground/models.mjs`   | Delayed scripted replies and configured Chat/Responses transport                               |
-| `examples/playground/runtime.mjs`  | Managed agents, validated tools, approval waits, public projection, history and command dedupe |
-| `examples/playground/server.mjs`   | Static assets, per-session admission, same-origin boundary and public Node host proxy          |
-| `examples/playground/main.ts`      | Public browser Chat/Inspector composition, controller, configuration and inspector tabs        |
-| `examples/playground/renderers.ts` | Optional approval and report presentation plus owner-command helpers                           |
-| `examples/playground/styles.css`   | Application layout and theme; SDK styles are included first                                    |
-| `scripts/build-preview.mjs`        | Browser-only bundle and example type check                                                     |
+| File                                | Responsibility                                                                          |
+| ----------------------------------- | --------------------------------------------------------------------------------------- |
+| `examples/playground/catalog.json`  | Scenario names, instructions for users and suggested prompts                            |
+| `examples/playground/models.mjs`    | Delayed scripted replies and configured Chat/Responses transport                        |
+| `examples/playground/runtime.mjs`   | Managed agents, public projection, history and command dedupe                           |
+| `examples/playground/run-tools.mjs` | Validated tools, approval waits and report artifacts                                    |
+| `examples/playground/server.mjs`    | Static assets, per-session admission, same-origin boundary and public Node host proxy   |
+| `examples/playground/main.ts`       | Public browser Chat/Inspector composition, controller, configuration and inspector tabs |
+| `examples/playground/renderers.ts`  | Optional approval and report presentation plus owner-command helpers                    |
+| `examples/playground/styles.css`    | Application layout, theme and conversation panel; SDK styles are included first         |
+| `examples/playground/panels.css`    | Inspector, dialogs and responsive layout                                                |
+| `scripts/build-preview.mjs`         | Browser-only bundle and example type check                                              |
 
 To add a tool, install it with `functionTool` and supply its model JSON Schema.
 Keep enforcement in the dispatcher/middleware, not in the renderer. To add a

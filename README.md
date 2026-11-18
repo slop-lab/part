@@ -39,7 +39,7 @@ With an existing Node.js installation, use the npm commands directly.
 
 ```sh
 npm ci
-npm run check # TypeScript, JS/MJS type checks, and package boundaries
+npm run check # TypeScript, JS/MJS type checks, package boundaries, and QG rules
 npm test
 npm run test:consumers
 npm run measure

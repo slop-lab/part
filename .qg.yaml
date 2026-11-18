@@ -1,0 +1,15 @@
+hooks:
+  preCommit:
+    installation: auto
+
+artifacts:
+  generated:
+    include: ['preview/**', 'artifacts/**']
+
+rules:
+  # Prettier pads Markdown table cells to align columns.
+  markdown/no-extra-table-cell-whitespace: off
+  markdown/allowed-characters:
+    severity: error
+    options:
+      allowedCharacters: ['’', '—', '…', '→', '↓']

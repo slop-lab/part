@@ -10,13 +10,12 @@ import {
   localContext,
   ok,
   schema,
-  stringSchema,
 } from '@slop-lab/part/contracts/index.js';
 import { createSuspensions } from '@slop-lab/part/runtime/waits.js';
-import { functionTool } from '@slop-lab/part/tools.js';
 import catalog from './catalog.json' with { type: 'json' };
 import { inferenceError } from '../siwc/browser.mjs';
 import { createPlaygroundModel, providerOptions } from './models.mjs';
+import { createRunTools } from './run-tools.mjs';
 
 /** @import {Contracts, Client, Runtime, Model, Context, Projection} from '@slop-lab/part/reference/index.js' */
 /**
@@ -48,22 +47,6 @@ const startInput = schema(
     (!('model' in value) ||
       (typeof value.model === 'string' && !!value.model.trim() && value.model.length <= 120)),
 );
-const textInput = schema(
-  'playground/text',
-  /** @param {unknown} value @returns {value is {text: string}} */ (value) =>
-    value !== null &&
-    typeof value === 'object' &&
-    'text' in value &&
-    typeof value.text === 'string' &&
-    value.text.length <= 4000,
-);
-const decisionSchema = schema('playground/decision', (value) => typeof value === 'boolean');
-const parameters = {
-  type: 'object',
-  properties: { text: { type: 'string' } },
-  required: ['text'],
-  additionalProperties: false,
-};
 /** @type {Record<string, string>} */
 const instructions = {
   tools: 'Call uppercase exactly once with the user text, then explain its result briefly.',
@@ -225,66 +208,21 @@ export function createPlaygroundSession({
       run.events.push({ kind, at: new Date().toISOString(), data });
       if (run.events.length > 64) run.events.shift();
     };
-    const tools = ['uppercase', 'save_note', 'create_report'].map((id) =>
-      functionTool({
-        id,
-        description: {
-          uppercase: 'Convert text to uppercase',
-          save_note: 'Save the session note after explicit user approval',
-          create_report: 'Create an immutable Markdown report',
-        }[id],
-        input: textInput,
-        output: stringSchema,
-        effects: id === 'uppercase' ? 'read' : 'write',
-        async execute({ text }, execution) {
-          trace('tool-start', { tool: id, input: { text } });
-          let result = '';
-          if (id === 'uppercase') result = text.toUpperCase();
-          if (id === 'save_note') {
-            note = text;
-            result = 'Session note saved';
-          }
-          if (id === 'create_report') {
-            const content = `# Runtime field notes\n\n${text}\n\n## Findings\n\n- Keep ownership explicit.\n- Validate before executing tools.\n- Observe progress through public contracts.\n`;
-            const writer = await artifacts.create(
-              {
-                mediaType: 'text/markdown',
-                name: 'runtime-report.md',
-                provenance: {
-                  component: 'playground/report',
-                  componentVersion: '1',
-                  origin: 'agent',
-                },
-              },
-              execution,
-            );
-            if (writer.ok === false) throw Error('Artifact writer unavailable');
-            const written = await writer.value.write(new TextEncoder().encode(content));
-            if (written.ok === false) throw Error('Artifact write failed');
-            const published = await writer.value.finalize();
-            if (published.ok === false) throw Error('Artifact finalization failed');
-            const artifact = published.value;
-            reports.set(artifact.ref.id, artifact);
-            project(
-              `${run.id}/report`,
-              'playground/report',
-              'Runtime field notes',
-              'A finalized Markdown report. Open it in the inspector.',
-              wire({ ...artifact, name: 'runtime-report.md', mediaType: 'text/markdown' }),
-              { source: ref, artifacts: [artifact.ref] },
-            );
-            result = `Report artifact ${artifact.ref.id} finalized (${artifact.bytes} bytes)`;
-          }
-          trace('tool-result', { tool: id, output: result });
-          project(`${run.id}/${id}`, 'part/tool', id, result, {
-            toolId: id,
-            outcome: 'completed',
-            text: result,
-          });
-          return result;
-        },
-      }),
-    );
+    const toolOptions = createRunTools({
+      run,
+      ref,
+      waits,
+      getArtifacts: () => artifacts,
+      reports,
+      saveNote: (text) => {
+        note = text;
+      },
+      trace,
+      project,
+      update,
+      descriptor,
+      wire,
+    });
     /** @type {Agent | undefined} */
     let agent;
     try {
@@ -304,77 +242,13 @@ export function createPlaygroundSession({
       });
       const created = createAgent({
         model,
-        tools,
+        ...toolOptions,
         principal: context.principal,
-        toolSchemas: Object.fromEntries(tools.map((tool) => [tool.id, parameters])),
         limits: {
           maxModelInvocations: 4,
           maxToolDispatches: 4,
           deadline: new Date(Date.now() + 180000).toISOString(),
         },
-        middleware: [
-          {
-            id: 'playground/approval',
-            version: '1',
-            async decide(plan, caller) {
-              if (plan.call.toolId !== 'save_note') return ok({ kind: 'allow' });
-              const argumentsResult = textInput.validate(plan.validatedArguments);
-              if (argumentsResult.ok === false)
-                return fail('playground.arguments', 'Invalid note arguments');
-              const note = argumentsResult.value;
-              const ticket = await waits.open(
-                {
-                  type: 'playground/note-approval',
-                  responseSchema: decisionSchema,
-                  presentation: { text: note.text },
-                  bindingDigest: plan.digest,
-                },
-                caller,
-              );
-              if (ticket.ok === false) return ticket;
-              run.approval = ticket.value;
-              run.phase = 'waiting';
-              trace('approval-open', {
-                ticket: ticket.value.id,
-                text: note.text,
-              });
-              project(
-                `${run.id}/approval`,
-                'playground/approval',
-                'Approve note write',
-                note.text,
-                { phase: 'waiting', text: note.text },
-                {
-                  source: ref,
-                  actions: [descriptor('playground/approve'), descriptor('playground/reject')],
-                },
-              );
-              update();
-              const response = await waits.wait(ticket.value, decisionSchema, caller);
-              run.approval = null;
-              if (response.ok) run.phase = 'running';
-              project(
-                `${run.id}/approval`,
-                'playground/approval',
-                'Note approval',
-                response.ok ? (response.value ? 'Approved' : 'Rejected') : 'Cancelled',
-                { phase: response.ok ? (response.value ? 'approved' : 'rejected') : 'cancelled' },
-              );
-              update();
-              if (response.ok === false) return response;
-              trace('approval-result', { approved: response.value });
-              return ok(
-                response.value
-                  ? { kind: 'allow' }
-                  : {
-                      kind: 'deny',
-                      error: fail('playground.denied', 'The note write was rejected.', 'permission')
-                        .error,
-                    },
-              );
-            },
-          },
-        ],
         inspectRequest: (view) => trace('inspection', wire(view)),
       });
       if (created.ok === false) throw Error('Agent composition failed');
