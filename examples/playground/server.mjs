@@ -5,6 +5,8 @@ import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { readFile } from 'node:fs/promises';
 import { createServer, request } from 'node:http';
+import { createBrowserSignIn } from '../siwc/browser.mjs';
+import { cookieValue } from '../siwc/session-cookie.mjs';
 import { providerOptions } from './models.mjs';
 import { createPlaygroundSession } from './runtime.mjs';
 
@@ -12,15 +14,25 @@ export async function startPlayground({
   port = 4173,
   environment = /** @type {NodeJS.ProcessEnv} */ ({}),
   delayScale = 1,
+  fetch = /** @type {typeof globalThis.fetch | undefined} */ (undefined),
 } = {}) {
-  /** @type {Map<string, ReturnType<typeof createPlaygroundSession>>} */
+  /** @type {Map<string, { token: string, session: ReturnType<typeof createPlaygroundSession> }>} */
   const sessions = new Map();
+  const signIn =
+    environment.PART_PLAYGROUND_SIWC === '0'
+      ? undefined
+      : createBrowserSignIn({
+          environment,
+          appName: 'part Playground',
+          scope: 'playground',
+          fetch,
+        });
   const hostToken = randomUUID();
   /** @param {string} id */
   function sessionFor(id) {
     const session = sessions.get(id);
     if (!session) throw Error('Unknown session');
-    return session;
+    return session.session;
   }
   const assets = new Map(
     await Promise.all(
@@ -39,10 +51,10 @@ export async function startPlayground({
   );
   /** @param {import("node:http").IncomingMessage} request */
   const findSession = (request) => {
-    const id = /(?:^|;\s*)part_playground=([0-9a-f-]{36})(?:;|$)/.exec(
-      request.headers.cookie ?? '',
-    )?.[1];
-    return id ? sessions.get(id) : undefined;
+    const token = cookieValue(request.headers.cookie, 'part_playground');
+    const id = token?.split('.')[0];
+    const entry = id ? sessions.get(id) : undefined;
+    return entry && entry.token === token ? entry.session : undefined;
   };
   const hosted = await startHttpHost(
     {
@@ -92,23 +104,41 @@ export async function startPlayground({
       if (incoming.method === 'GET' && path === '/api/bootstrap') {
         let session = findSession(incoming);
         if (!session) {
-          if (sessions.size >= 16)
-            return json(503, { error: 'Session capacity reached. Restart the playground server.' });
-          const id = randomUUID();
-          session = createPlaygroundSession({
-            environment,
-            delayScale,
-            context: localContext({ principal: { subject: id, authority: 'part/playground' } }),
-          });
-          sessions.set(id, session);
+          const existing = cookieValue(incoming.headers.cookie, 'part_playground');
+          const restored = await signIn?.cookies.restore(existing);
+          const id = restored ?? randomUUID();
+          const token = restored && existing ? existing : ((await signIn?.cookies.issue(id)) ?? id);
+          session = sessions.get(id)?.session;
+          if (!session) {
+            if (sessions.size >= 16)
+              return json(503, {
+                error: 'Session capacity reached. Restart the playground server.',
+              });
+            session = createPlaygroundSession({
+              environment,
+              delayScale,
+              fetch,
+              siwc: signIn?.forUser(id),
+              context: localContext({ principal: { subject: id, authority: 'part/playground' } }),
+            });
+            sessions.set(id, { session, token });
+          }
           response.setHeader(
             'set-cookie',
-            `part_playground=${id}; HttpOnly; SameSite=Strict; Path=/`,
+            `part_playground=${token}; HttpOnly; SameSite=Strict; Path=/${signIn ? '; Max-Age=2592000' : ''}`,
           );
         }
+        const siwc = await session.siwc?.state();
+        const providers = providerOptions(environment, !!siwc, !!siwc?.plan);
+        const preferred = environment.PART_PLAYGROUND_PROVIDER;
         return json(200, {
-          providers: providerOptions(environment),
+          providers,
+          preferred: providers.some(({ id, available }) => id === preferred && available)
+            ? (preferred ?? 'scripted')
+            : 'scripted',
           model: environment.OPENAI_MODEL || 'gpt-4.1-mini',
+          anthropicModel: environment.ANTHROPIC_MODEL || '',
+          siwc: siwc ? { ...siwc, revision: null } : null,
         });
       }
       const asset = assets.get(path);
@@ -124,6 +154,26 @@ export async function startPlayground({
       }
       const session = findSession(incoming);
       if (!session) return json(403, { error: 'Open the playground before using its API.' });
+      if (path.startsWith('/api/siwc/')) {
+        const siwc = session.siwc;
+        if (!siwc) return json(404, { error: 'ChatGPT connection is disabled.' });
+        if (incoming.method === 'POST' && incoming.headers.origin === origin) {
+          if (path === '/api/siwc/begin') await siwc.begin();
+          else if (path === '/api/siwc/models') await siwc.loadModels();
+          else if (path === '/api/siwc/disconnect') await siwc.disconnect();
+          else if (path === '/api/siwc/callback') {
+            const size = Number(incoming.headers['content-length']);
+            if (!Number.isSafeInteger(size) || size < 1 || size > 8192)
+              return json(400, { error: 'Paste the full callback URL.' });
+            const chunks = [];
+            for await (const chunk of incoming) chunks.push(chunk);
+            await siwc.complete(Buffer.concat(chunks).toString('utf8'));
+          } else return json(404, { error: 'Unknown ChatGPT action.' });
+        } else if (incoming.method !== 'GET' || path !== '/api/siwc/state') {
+          return json(403, { error: 'Use the local playground origin.' });
+        }
+        return json(200, { ...(await siwc.state()), revision: null });
+      }
       if (incoming.method === 'GET' && /^\/api\/artifacts\/[0-9a-f-]{36}$/.test(path)) {
         const artifact = await session.artifact(path.slice('/api/artifacts/'.length));
         if (!artifact) return json(404, { error: 'Artifact not found in this session.' });
@@ -184,7 +234,8 @@ export async function startPlayground({
     url: origin,
     close() {
       return (closing ??= (async () => {
-        await Promise.all([...sessions.values()].map((session) => session.close()));
+        await signIn?.close();
+        await Promise.all([...sessions.values()].map(({ session }) => session.close()));
         await hosted.value.close();
         const stopped = new Promise((resolve) => server.close(resolve));
         server.closeAllConnections();

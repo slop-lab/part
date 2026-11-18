@@ -25,6 +25,32 @@ export function isReasoningItem(value: unknown): value is Record<string, Contrac
   );
 }
 
+function isTextAnnotation(value: unknown): boolean {
+  if (!isJsonObject(value)) return false;
+  const offset = (index: unknown) =>
+    typeof index === 'number' && Number.isSafeInteger(index) && index >= 0;
+  if (value.type === 'file_path' || value.type === 'file_citation')
+    return (
+      typeof value.file_id === 'string' &&
+      offset(value.index) &&
+      (value.type === 'file_path' || typeof value.filename === 'string')
+    );
+  if (
+    !offset(value.start_index) ||
+    !offset(value.end_index) ||
+    Number(value.start_index) > Number(value.end_index)
+  )
+    return false;
+  if (value.type === 'url_citation')
+    return typeof value.url === 'string' && typeof value.title === 'string';
+  return (
+    value.type === 'container_file_citation' &&
+    typeof value.container_id === 'string' &&
+    typeof value.file_id === 'string' &&
+    typeof value.filename === 'string'
+  );
+}
+
 export function decodeOutput(value: unknown): Contracts.Result<Model.Response> {
   if (
     !isJsonObject(value) ||
@@ -56,15 +82,13 @@ export function decodeOutput(value: unknown): Contracts.Result<Model.Response> {
           !isJsonObject(part) ||
           part.type !== 'output_text' ||
           typeof part.text !== 'string' ||
-          (part.annotations !== undefined &&
-            (!Array.isArray(part.annotations) || part.annotations.length > 0)) ||
-          (part.logprobs !== undefined &&
-            part.logprobs !== null &&
-            (!Array.isArray(part.logprobs) || part.logprobs.length > 0))
+          (part.annotations != null &&
+            (!Array.isArray(part.annotations) || !part.annotations.every(isTextAnnotation))) ||
+          (part.logprobs != null && !Array.isArray(part.logprobs))
         )
           return fail(
             'openai-responses.content',
-            'Only unannotated text output is supported',
+            'Invalid or unsupported output text',
             'unsupported',
           );
         content.push({ kind: 'text', text: part.text });

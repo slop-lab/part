@@ -886,3 +886,28 @@ dialog h3 {
     scroll-behavior: auto !important;
   }
 }
+
+#siwc-pending form {
+  display: grid;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+#siwc-pending input {
+  width: 100%;
+}
+#siwc-pending button {
+  justify-self: start;
+}
+#siwc-status:empty {
+  display: none;
+}
+
+#siwc-model-picker:not([hidden]) {
+  display: grid;
+  gap: 0.4rem;
+  margin: 1rem 0;
+}
+#siwc-model-list {
+  width: 100%;
+  min-width: 0;
+}

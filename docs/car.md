@@ -71,21 +71,21 @@ node car/src/cli.mjs serve --root PATH --state PATH [options]
 node car/src/cli.mjs recover-lock --state PATH
 ```
 
-| Option                                      | Implemented behavior                                                                                      |
-| ------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `--host ADDRESS`, `--port NUMBER`           | Bind the browser/API server; defaults to `127.0.0.1` and an ephemeral port.                               |
-| `--provider interactive\|chat\|responses`   | Interactive local mock by default; otherwise use Chat Completions or Responses.                           |
-| `--base-url URL`, `--model NAME`            | OpenAI-compatible endpoint and model, falling back to `OPENAI_BASE_URL` and `OPENAI_MODEL`.               |
-| `--headers JSON`                            | Additional request headers as a JSON object, falling back to `OPENAI_HEADERS`.                            |
-| `--edit-mode hash\|exact`                   | Select the input contract of local `swe_edit`; default `hash`.                                            |
-| `--trace metadata\|full`                    | Metadata is default. Full mode persists compiled model context and encoded request bodies.                |
-| `--mock-session PATH`                       | Exclusively write credentials for CAR's interactive mock.                                                 |
-| `--operator-session PATH`                   | Bind six mock-control tools to a separate target mock session; managed children may use them.             |
-| `--toolset-checkout PATH`                   | Start an already-built `PATH/dist/mcp.js` over stdio MCP. It does not install or build the checkout.      |
-| `--tools ID,ID`, `--toolset-profile p0\|p1` | Exact remote allowlist and server profile (`p0` default). An empty list grants no installed remote tools. |
-| `--workspace-provider local\|external`      | Keep built-in workspace tools, or require the configured external toolset. Process tools remain local.    |
-| `--workflows true`                          | Load pinned `*.pipeline.json` definitions from `.agents/workflows`. Other values are rejected.            |
-| `--check JSON_ARGV`                         | Run a host-selected completion command for every proposed completion; timeout 120 seconds.                |
+| Option                                              | Implemented behavior                                                                                      |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `--host ADDRESS`, `--port NUMBER`                   | Bind the browser/API server; defaults to `127.0.0.1` and an ephemeral port.                               |
+| `--provider interactive\|chat\|responses\|messages` | Interactive local mock by default; otherwise use Chat Completions, Responses or Anthropic Messages.       |
+| `--base-url URL`, `--model NAME`                    | Compatible endpoint and model.                                                                            |
+| `--headers JSON`                                    | Additional request headers as a JSON object.                                                              |
+| `--edit-mode hash\|exact`                           | Select the input contract of local `swe_edit`; default `hash`.                                            |
+| `--trace metadata\|full`                            | Metadata is default. Full mode persists compiled model context and encoded request bodies.                |
+| `--mock-session PATH`                               | Exclusively write credentials for CAR's interactive mock.                                                 |
+| `--operator-session PATH`                           | Bind six mock-control tools to a separate target mock session; managed children may use them.             |
+| `--toolset-checkout PATH`                           | Start an already-built `PATH/dist/mcp.js` over stdio MCP. It does not install or build the checkout.      |
+| `--tools ID,ID`, `--toolset-profile p0\|p1`         | Exact remote allowlist and server profile (`p0` default). An empty list grants no installed remote tools. |
+| `--workspace-provider local\|external`              | Keep built-in workspace tools, or require the configured external toolset. Process tools remain local.    |
+| `--workflows true`                                  | Load pinned `*.pipeline.json` definitions from `.agents/workflows`. Other values are rejected.            |
+| `--check JSON_ARGV`                                 | Run a host-selected completion command for every proposed completion; timeout 120 seconds.                |
 
 Set `CAR_TOKEN` to a stable token of at least 16 characters. The default
 `interactive` provider remains a local mock and needs no upstream credentials.
@@ -94,12 +94,14 @@ Real `chat` and `responses` modes require an explicit model (through `--model` o
 The base URL defaults to `https://api.openai.com/v1` and may be changed with
 `--base-url` or `OPENAI_BASE_URL`. It must be an HTTP(S) origin/path without
 embedded credentials, query, or fragment; plain HTTP is accepted only for
-loopback. The transport streams and has a five-minute default timeout.
+loopback. The `messages` protocol uses `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`,
+optional `ANTHROPIC_HEADERS`, and `ANTHROPIC_BASE_URL` (default `https://api.anthropic.com/v1`).
+The transport streams and has a five-minute default timeout.
 
 Additional deployment-specific headers may be supplied with `--headers` or the
 `OPENAI_HEADERS` JSON string, for example `{"x-project":"example"}`. Generic
-headers cannot override `Authorization`, `Content-Type`, `Host`,
-`Content-Length`, or `Connection`. Keep gateway onboarding details and private
+headers cannot override `Authorization`, `Content-Type`, `Host`, `Content-Length`, or
+`Connection`. The Messages profile also reserves `x-api-key`. Keep gateway onboarding details and private
 credentials out of product configuration and the repository. For example:
 
 ```sh

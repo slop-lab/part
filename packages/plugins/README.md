@@ -18,6 +18,12 @@ Build in the workspace with `npm run build --workspace @slop-lab/part-plugins`.
 MIT licensed. Requires Node.js 24.22.0 or newer for Node-based usage.
 APIs are experimental; pin its exact version and its core dependency.
 
+`@slop-lab/part-plugins/providers/index.js` exports `createProviderModel` for Chat
+Completions, Responses and Anthropic Messages. Pass its result to `createAgent`;
+supply a base URL for a compatible gateway, a credential, and a model or model
+alias. The same entrypoint exports `createChatGPTModel` for a Sign in with ChatGPT
+plan access token. [Provider configuration](https://github.com/slop-lab/part/blob/main/docs/api.md#compatible-model-apis).
+
 `@slop-lab/part-plugins/providers/openai-compatible/index.js` exports `createOpenAICompatibleAdapter`
 for text/function-tool Chat Completions over JSON or SSE. It works with the local
 Node mock and an explicitly configured compatible endpoint. This profile does not

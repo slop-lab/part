@@ -2,13 +2,10 @@
 import { startAcpStdio } from '@slop-lab/part-node/acp/index.js';
 import { connectAcpMcpServers } from '@slop-lab/part-node/acp/mcp.js';
 import { createAcpAgent } from '@slop-lab/part-plugins/acp/index.js';
-import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible/index.js';
-import { createOpenAIResponsesAdapter } from '@slop-lab/part-plugins/providers/openai-responses/index.js';
 import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
 import { schema, stringSchema } from '@slop-lab/part/contracts/index.js';
-import { bearerAuth, createFetchTransport } from '@slop-lab/part/model/index.js';
 import { functionTool } from '@slop-lab/part/tools.js';
-import { openAIEndpoint, readOpenAIProvider, withOpenAIHeaders } from '../openai-provider.mjs';
+import { createExampleOpenAIModel } from '../openai-provider.mjs';
 
 try {
   process.loadEnvFile(new URL('../../.env', import.meta.url));
@@ -16,7 +13,7 @@ try {
   if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
 }
 const provider = process.env.PART_ACP_PROVIDER ?? 'scripted';
-if (!['scripted', 'responses', 'chat'].includes(provider))
+if (provider !== 'scripted' && provider !== 'responses' && provider !== 'chat')
   throw Error('PART_ACP_PROVIDER must be scripted, responses or chat');
 /** @returns {import("@slop-lab/part/reference/index.js").Convenience.ConfiguredModel} */
 function configuredModel() {
@@ -27,39 +24,9 @@ function configuredModel() {
       { text: 'The note was approved and saved in this process memory.' },
       { text: 'The ACP example has completed its scripted turns. Start a new session to repeat.' },
     ]);
-  const { base, key, model, headers } = readOpenAIProvider(process.env);
-  const adapter =
-    provider === 'responses' ? createOpenAIResponsesAdapter() : createOpenAICompatibleAdapter();
-  return {
-    profile: {
-      id: provider,
-      revision: '1',
-      adapterId: adapter.id,
-      transportId: 'part/fetch',
-      authStrategyId: 'bearer',
-      model,
-      endpoint: openAIEndpoint(base, provider === 'responses' ? 'responses' : 'chat/completions'),
-      defaults:
-        provider === 'responses' ? { max_output_tokens: 512 } : { max_completion_tokens: 512 },
-      capabilities: { revision: '1', entries: [] },
-    },
-    adapter,
-    auth: bearerAuth(async () => key),
-    transport: createFetchTransport({
-      allowedOrigins: [base.origin],
-      fetch(url, init = {}) {
-        return fetch(url, {
-          ...init,
-          headers: withOpenAIHeaders(init.headers, headers),
-          redirect: 'error',
-          signal: AbortSignal.any([
-            ...(init.signal ? [init.signal] : []),
-            AbortSignal.timeout(90000),
-          ]),
-        });
-      },
-    }),
-  };
+  return createExampleOpenAIModel(process.env, {
+    protocol: provider === 'responses' ? 'responses' : 'chat',
+  });
 }
 const host = startAcpStdio({
   createHandler: (connection) =>

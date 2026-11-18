@@ -1,5 +1,6 @@
 import { canonical, fail, isJsonObject, ok } from '@slop-lab/part/contracts/index.js';
 import type { Contracts, Model } from '@slop-lab/part/reference/index.js';
+import { createSseReader } from '../sse.js';
 import { decodeOutput } from './output.js';
 
 interface StreamItem {
@@ -16,20 +17,116 @@ interface StreamItem {
 const indexValue = (value: unknown): value is number =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= 10000;
 
-export function createResponsesDecoder(response: {
-  status?: number;
-  headers: Readonly<Record<string, string>>;
-}): Contracts.Result<Model.ResponseDecoder> {
-  if (response.status !== undefined && (response.status < 200 || response.status >= 300))
-    return fail(
-      'openai-responses.http',
-      `Provider returned HTTP ${response.status}`,
-      'unavailable',
-    );
-  const media = (
-    Object.entries(response.headers).find(([key]) => key.toLowerCase() === 'content-type')?.[1] ??
-    'text/event-stream'
-  )
+const lifecycleEvents = new Set([
+  'response.created',
+  'response.queued',
+  'response.in_progress',
+  'response.completed',
+]);
+const failureEvents = new Set([
+  'error',
+  'response.failed',
+  'response.incomplete',
+  'response.cancelled',
+]);
+const reasoningEvents = new Set([
+  'response.reasoning_summary_part.added',
+  'response.reasoning_summary_part.done',
+  'response.reasoning_summary_text.delta',
+  'response.reasoning_summary_text.done',
+  'response.reasoning_text.delta',
+  'response.reasoning_text.done',
+]);
+const itemEvents = new Set([
+  'response.output_item.added',
+  'response.output_item.done',
+  'response.output_text.delta',
+  'response.output_text.done',
+  'response.output_text.annotation.added',
+  'response.function_call_arguments.delta',
+  'response.function_call_arguments.done',
+  'response.content_part.added',
+  'response.content_part.done',
+  ...reasoningEvents,
+]);
+
+type ResponseHeaders = Readonly<Record<string, string>>;
+
+function header(headers: ResponseHeaders, name: string): string | undefined {
+  return Object.entries(headers).find(([key]) => key.toLowerCase() === name)?.[1];
+}
+
+function safeIdentifier(value: unknown): string | undefined {
+  return typeof value === 'string' && /^[a-zA-Z0-9_.\[\]-]{1,128}$/.test(value) ? value : undefined;
+}
+
+function planFailure(
+  response: { status?: number; headers: ResponseHeaders },
+  error: unknown,
+  status?: number,
+) {
+  const requestId = safeIdentifier(
+    header(response.headers, 'x-request-id') ?? header(response.headers, 'openai-request-id'),
+  );
+  const code = isJsonObject(error) ? safeIdentifier(error.code) : undefined;
+  const param = isJsonObject(error) ? safeIdentifier(error.param) : undefined;
+  const failure = fail(
+    status === undefined ? 'openai-responses.failed' : 'openai-responses.http',
+    status === undefined
+      ? 'Provider response failed or was incomplete'
+      : `Provider returned HTTP ${status}`,
+    status === 401 || status === 403 ? 'permission' : 'unavailable',
+  );
+  return {
+    ok: false as const,
+    error: {
+      ...failure.error,
+      details: {
+        ...(status === undefined ? {} : { status }),
+        ...(requestId ? { requestId } : {}),
+        ...(code ? { code } : {}),
+        ...(param ? { param } : {}),
+      },
+    },
+  };
+}
+
+function readErrorResponse(
+  response: { headers: ResponseHeaders },
+  status: number,
+): Model.ResponseDecoder {
+  // Capture bounded diagnostics, leaving provider prose and tokens out of runtime failures.
+  const utf8 = new TextDecoder();
+  let buffer = '';
+  let length = 0;
+  return {
+    push(chunk) {
+      length += chunk.byteLength;
+      if (length > 16_384) return planFailure(response, undefined, status);
+      buffer += utf8.decode(chunk, { stream: true });
+      return ok([]);
+    },
+    finish() {
+      try {
+        const body: unknown = JSON.parse(buffer + utf8.decode());
+        return planFailure(response, isJsonObject(body) ? body.error : undefined, status);
+      } catch {
+        return planFailure(response, undefined, status);
+      }
+    },
+  };
+}
+
+export function createResponsesDecoder(
+  response: { status?: number; headers: ResponseHeaders },
+  chatGPTPlan = false,
+): Contracts.Result<Model.ResponseDecoder> {
+  const { status } = response;
+  if (status !== undefined && (status < 200 || status >= 300)) {
+    if (chatGPTPlan) return ok(readErrorResponse(response, status));
+    return fail('openai-responses.http', `Provider returned HTTP ${status}`, 'unavailable');
+  }
+  const media = (header(response.headers, 'content-type') ?? 'text/event-stream')
     .split(';')[0]!
     .trim()
     .toLowerCase();
@@ -39,7 +136,6 @@ export function createResponsesDecoder(response: {
     utf8 = new TextDecoder('utf-8', { fatal: true });
   const items = new Map<number, StreamItem>();
   let buffer = '',
-    lines: string[] = [],
     terminal: Model.Response | undefined,
     poison: Contracts.Failure | undefined,
     responseId: string | undefined,
@@ -50,20 +146,39 @@ export function createResponsesDecoder(response: {
   function consume(value: unknown): Contracts.Result<readonly Model.ProviderEvent[]> {
     if (!isJsonObject(value) || typeof value.type !== 'string')
       return fail('openai-responses.event', 'Invalid event envelope');
+    const type = value.type;
+    if (['ping', 'keepalive', 'codex.rate_limits', 'codex.response.metadata'].includes(type))
+      return ok([]);
+    if (!lifecycleEvents.has(type) && !failureEvents.has(type) && !itemEvents.has(type)) {
+      // A provider may add auxiliary Responses events. Only known events can
+      // mutate the accumulated output, and the completed snapshot is validated.
+      return /^response\.[a-zA-Z0-9_.-]+$/.test(type)
+        ? ok([])
+        : fail('openai-responses.event', 'Unsupported streaming event', 'unsupported');
+    }
     if (terminal) return fail('openai-responses.trailing', 'Event after terminal response');
     if (value.sequence_number !== undefined) {
       if (!Number.isSafeInteger(value.sequence_number) || Number(value.sequence_number) <= sequence)
         return fail('openai-responses.sequence', 'Invalid event sequence');
       sequence = Number(value.sequence_number);
     }
-    const type = value.type;
-    if (['error', 'response.failed', 'response.incomplete'].includes(type))
+    if (failureEvents.has(type)) {
+      if (chatGPTPlan) {
+        const error =
+          type === 'error'
+            ? value
+            : isJsonObject(value.response)
+              ? value.response.error
+              : undefined;
+        return planFailure(response, error);
+      }
       return fail(
         'openai-responses.failed',
         'Provider response failed or was incomplete',
         'unavailable',
       );
-    if (['response.created', 'response.in_progress', 'response.completed'].includes(type)) {
+    }
+    if (lifecycleEvents.has(type)) {
       const envelope = value.response;
       if (
         !isJsonObject(envelope) ||
@@ -74,7 +189,11 @@ export function createResponsesDecoder(response: {
         return fail('openai-responses.identity', 'Missing or changed response ID');
       responseId = envelope.id;
       if (type !== 'response.completed') {
-        if (envelope.status !== 'in_progress' || envelope.error)
+        const queued =
+          (type === 'response.queued' || type === 'response.created') &&
+          envelope.status === 'queued';
+        const running = type !== 'response.queued' && envelope.status === 'in_progress';
+        if ((!queued && !running) || envelope.error)
           return fail('openai-responses.response', 'Invalid response lifecycle');
         return ok([]);
       }
@@ -106,14 +225,10 @@ export function createResponsesDecoder(response: {
       terminal = decoded.value;
       return ok([]);
     }
-    if (
-      !indexValue(value.output_index) ||
-      (typeof value.item_id !== 'string' && !isJsonObject(value.item))
-    )
-      return fail('openai-responses.event', 'Missing output index or item identity');
     if (type === 'response.output_item.added') {
       const item = value.item;
       if (
+        !indexValue(value.output_index) ||
         !isJsonObject(item) ||
         typeof item.id !== 'string' ||
         !item.id ||
@@ -152,12 +267,16 @@ export function createResponsesDecoder(response: {
       });
       return ok([]);
     }
-    const item = items.get(value.output_index);
-    if (
-      !item ||
-      item.id !== (isJsonObject(value.item) ? value.item.id : value.item_id) ||
-      item.done
-    )
+    const itemId = isJsonObject(value.item) ? value.item.id : value.item_id;
+    const index = indexValue(value.output_index)
+      ? value.output_index
+      : value.output_index === undefined && typeof itemId === 'string'
+        ? [...items].find(([, item]) => item.id === itemId)?.[0]
+        : undefined;
+    if (index === undefined)
+      return fail('openai-responses.event', 'Missing or invalid output index');
+    const item = items.get(index);
+    if (!item || (itemId !== undefined && item.id !== itemId) || item.done)
       return fail('openai-responses.item', 'Unknown, changed or already completed stream item');
     if (type === 'response.output_item.done') {
       if (!isJsonObject(value.item) || value.item.type !== item.type)
@@ -211,76 +330,78 @@ export function createResponsesDecoder(response: {
       }
       return ok([]);
     }
-    if (
-      item.type === 'reasoning' &&
-      [
-        'response.reasoning_summary_part.added',
-        'response.reasoning_summary_part.done',
-        'response.reasoning_summary_text.delta',
-        'response.reasoning_summary_text.done',
-        'response.reasoning_text.delta',
-        'response.reasoning_text.done',
-      ].includes(type)
-    ) {
+    if (type === 'response.output_text.annotation.added') {
+      if (
+        item.type !== 'message' ||
+        !indexValue(value.content_index) ||
+        (value.annotation !== null && !isJsonObject(value.annotation))
+      )
+        return fail('openai-responses.content', 'Invalid text annotation');
+      return ok([]);
+    }
+    if (item.type === 'reasoning' && reasoningEvents.has(type)) {
       // Only the terminal native item is replayable; partial reasoning is never tool input.
       return ok([]);
     }
     return fail('openai-responses.event', 'Unsupported streaming event', 'unsupported');
   }
 
-  function frame(): Contracts.Result<readonly Model.ProviderEvent[]> {
-    const data = lines
-      .filter((line) => line.startsWith('data:'))
-      .map((line) => line.slice(5).replace(/^ /, ''))
-      .join('\n');
-    const event = lines
-      .filter((line) => line.startsWith('event:'))
-      .map((line) => line.slice(6).trim());
-    lines = [];
-    if (!data) return ok([]);
+  const drain = createSseReader('openai-responses', (data, event) => {
     if (doneMarker) return fail('openai-responses.trailing', 'Data after [DONE]');
     if (data === '[DONE]') {
       if (!terminal) return fail('openai-responses.eof', '[DONE] without completed response');
       doneMarker = true;
       return ok([]);
     }
+    const name = event[0];
+    if (
+      event.length === 1 &&
+      (name === 'ping' || name === 'keepalive') &&
+      /^(?:ping|keepalive|\[PING\])$/i.test(data.trim())
+    )
+      return ok([]);
     let value: unknown;
     try {
       value = JSON.parse(data);
     } catch {
       return fail('openai-responses.json', 'Malformed SSE JSON');
     }
-    if (event.length > 1 || (event[0] && (!isJsonObject(value) || event[0] !== value.type)))
-      return fail('openai-responses.event', 'SSE event name disagrees with payload');
-    return consume(value);
-  }
+    const payloadType = isJsonObject(value) ? value.type : undefined;
+    const explicit = name && name !== 'message' ? name : undefined;
+    const decoded =
+      event.length > 1 || (explicit && payloadType !== undefined && explicit !== payloadType)
+        ? fail('openai-responses.event', 'SSE event name disagrees with payload')
+        : consume(
+            isJsonObject(value) && payloadType === undefined && explicit
+              ? { ...value, type: explicit }
+              : value,
+          );
+    if (decoded.ok) return decoded;
+    const eventType = safeIdentifier(payloadType ?? explicit);
+    const requestId = safeIdentifier(
+      header(response.headers, 'x-request-id') ?? header(response.headers, 'openai-request-id'),
+    );
+    return {
+      ok: false,
+      error: {
+        ...decoded.error,
+        details: {
+          ...(isJsonObject(decoded.error.details) ? decoded.error.details : {}),
+          ...(eventType ? { eventType } : {}),
+          ...(requestId ? { requestId } : {}),
+        },
+      },
+    };
+  });
 
-  function drain(flush: boolean): Contracts.Result<readonly Model.ProviderEvent[]> {
-    const events: Model.ProviderEvent[] = [];
-    while (buffer.length) {
-      const index = buffer.search(/[\r\n]/);
-      if (index < 0 || (!flush && index === buffer.length - 1 && buffer[index] === '\r')) break;
-      const line = buffer.slice(0, index),
-        width = buffer[index] === '\r' && buffer[index + 1] === '\n' ? 2 : 1;
-      buffer = buffer.slice(index + width);
-      if (line) lines.push(line);
-      else {
-        const parsed = frame();
-        if (!parsed.ok) return parsed;
-        events.push(...parsed.value);
-      }
-    }
-    if (flush && (buffer.trim() || lines.some((line) => line.startsWith('data:'))))
-      return fail('openai-responses.frame', 'Incomplete SSE frame');
-    return ok(events);
-  }
   return ok({
     push(chunk) {
       if (poison) return { ok: false, error: poison };
       if (finished) return fail('openai-responses.finished', 'Decoder already finished');
       try {
-        buffer += utf8.decode(chunk, { stream: true });
-        const result = streaming ? drain(false) : ok([]);
+        const text = utf8.decode(chunk, { stream: true });
+        if (!streaming) buffer += text;
+        const result = streaming ? drain(text) : ok([]);
         if (!result.ok) poison = result.error;
         return result;
       } catch {
@@ -294,9 +415,9 @@ export function createResponsesDecoder(response: {
       if (finished) return fail('openai-responses.finished', 'Decoder already finished');
       finished = true;
       try {
-        buffer += utf8.decode();
-        if (!streaming) return decodeOutput(JSON.parse(buffer));
-        const drained = drain(true);
+        const text = utf8.decode();
+        if (!streaming) return decodeOutput(JSON.parse(buffer + text));
+        const drained = drain(text, true);
         if (!drained.ok) return drained;
         return terminal ? ok(terminal) : fail('openai-responses.eof', 'Missing response.completed');
       } catch {

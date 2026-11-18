@@ -9,17 +9,17 @@ edaitor or require an editor framework.
 ## Start
 
 ```sh
-npm ci
-npm run preview
+just example
 ```
 
-Open **http://127.0.0.1:4173**. `npm run preview` builds the packages and browser
-assets, then starts a loopback Node server. It does not open a browser automatically.
+Open **http://127.0.0.1:4173**. The recipe installs dependencies as needed, builds
+the packages and browser assets, reads the workspace `.env`, and starts a loopback
+Node server. With npm, run `npm ci` the first time and then `npm run preview`. It does not open a browser automatically.
 No provider account or Chromium installation is needed to use the playground in
 your own browser. Stop the server with Ctrl+C. To choose another port:
 
 ```sh
-PART_PREVIEW_PORT=4174 npm run preview
+PART_PREVIEW_PORT=4174 just example
 ```
 
 The default **Scripted** provider makes no upstream model requests. It uses the
@@ -94,32 +94,41 @@ not added to this example's cross-run visible-text history. Refresh restores ser
 state but does not preserve an unsent browser draft or provider selection.
 
 **Clear session** is available after the active run ends. It clears displayed runs,
-conversation context, note and report access. Server restart clears all sessions.
+conversation context, note and report access. Server restart clears runs, notes and
+reports. ChatGPT connections use a signed browser cookie and durable account storage.
 The example permits 24 runs and 500 command IDs per session, and 16 browser sessions
 per server process. Clearing does not forget command receipts; restart if those
 capacity limits are reached. Late approvals against a closed run are rejected.
 
-## Use an OpenAI-compatible provider
+## Use a configured API provider
 
 Create or update the workspace-root `.env`:
 
 ```dotenv
 OPENAI_API_KEY=your-api-key
-OPENAI_BASE_URL=https://provider.example/v1
+# OPENAI_BASE_URL=https://provider.example/v1
 OPENAI_MODEL=your-model
 # Optional provider-specific headers; every value must be a string:
 # OPENAI_HEADERS={"x-project":"example"}
+# Optional Anthropic Messages provider:
+# ANTHROPIC_API_KEY=your-api-key
+# ANTHROPIC_MODEL=your-model
+# ANTHROPIC_BASE_URL=https://gateway.example/v1
+# ANTHROPIC_HEADERS={"x-project":"example"}
+# Optional initial provider (scripted, chat, responses, or messages):
+# PART_PLAYGROUND_PROVIDER=responses
 ```
 
-Restart the playground, select **OpenAI-compatible · Responses** or
-**OpenAI-compatible · Chat Completions**, and enter a model supported by the endpoint.
+Restart the playground and choose a configured provider in the provider menu.
+A base URL is optional for the official endpoints. The configured model appears
+when you select that provider.
 The validation-failure scenario
 is intentionally Scripted-only. Other examples use their scenario instructions with
 the selected real model; model compliance and results may vary.
 
 Selecting a provider makes no model request. **Send** and **Try this example** do.
 Each run permits at most four model invocations, four tool dispatches and three
-minutes of execution, requesting at most 512 output tokens per invocation. Live fetches
+minutes of execution. API-key providers request at most 512 output tokens per invocation. Live fetches
 have a 90-second timeout and no automatic retries. These controls are not a hard
 provider billing cap. A configured option means credentials are present; it does
 not certify route protocol support or model entitlement. Use `npm run smoke:provider`
@@ -137,6 +146,26 @@ The application binds to `127.0.0.1`, uses same-origin commands and an HttpOnly,
 SameSite cookie, and proxies the public Node HTTP host through a server-only token.
 It has no production user authentication or durable storage. Its loopback defaults
 are intended for a personal local development environment.
+
+## Connect a ChatGPT plan
+
+Select **Connect ChatGPT** from the playground header. After login, use
+**Load ChatGPT models** to show the account’s model list in the connection dialog.
+Choose a model in that list to use it in the playground.
+If the browser cannot reach its loopback callback, paste the full callback URL
+into the connection dialog. The configured API providers remain selectable.
+Set `PART_PLAYGROUND_SIWC=0` to hide this integration.
+
+The example binds authorizations, model catalogs, and grants to its server-owned
+browser session. When you restart the server, the same browser cookie restores
+its connection from the part SIWC SQLite store. Reload the account’s model list to
+use the plan again. The local default is `~/.config/part-siwc-web/playground`; set
+`PART_SIWC_DIRECTORY` to choose a different base directory. **Disconnect** removes
+the saved connection for that browser. The app separates ChatGPT conversation
+history by connection.
+OAuth and model API errors show the stage and, when available, the HTTP status,
+provider code and request ID. See the [multi-user account SDK](api.md#use-the-sdk-with-multiple-users)
+and the [OpenAI plan requirements](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations).
 
 ## Extend the example
 

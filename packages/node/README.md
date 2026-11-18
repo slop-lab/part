@@ -23,6 +23,13 @@ Build in the workspace with `npm run build --workspace @slop-lab/part-node`.
 MIT licensed. Requires Node.js 24.22.0 or newer for Node-based usage.
 APIs are experimental; pin its exact version and its core dependency.
 
+`@slop-lab/part-node/siwc/index.js` provides Sign in with ChatGPT for website identity
+and open-source plan usage. Use it for authorization, verified identity, model discovery,
+credential renewal, and to configure a Codex app-server child process.
+`createChatGPTAccounts` and `createSqliteChatGPTAccountStore` preserve a connection
+per application user across restarts.
+[SDK integration and examples](https://github.com/slop-lab/part/blob/main/docs/api.md#sign-in-with-chatgpt).
+
 Local OpenAI-compatible mocks are available from `@slop-lab/part-node/testing/mock-provider/index.js`,
 with operator tools at `@slop-lab/part-node/testing/mock-provider/tools.js`. Installed packages
 provide `part-mock-provider --help`; interactive sessions wait for working-agent

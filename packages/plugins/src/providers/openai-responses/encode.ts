@@ -2,9 +2,26 @@ import { digest, fail, isJsonObject, ok } from '@slop-lab/part/contracts/index.j
 import type { Contracts, Model } from '@slop-lab/part/reference/index.js';
 import { isReasoningItem } from './output.js';
 
+const unsupportedPlanOptions = [
+  'background',
+  'max_output_tokens',
+  'max_tool_calls',
+  'metadata',
+  'moderation',
+  'multi_agent',
+  'prompt_cache_retention',
+  'safety_identifier',
+  'temperature',
+  'top_logprobs',
+  'top_p',
+  'truncation',
+  'user',
+];
+
 export async function encodeResponses(
   invocation: Model.Invocation,
   profile: Model.Profile,
+  chatGPTPlan = false,
 ): Promise<Contracts.Result<Model.EncodedRequest>> {
   if (invocation.continuation || invocation.tools.some((tool) => tool.execution !== 'runtime'))
     return fail(
@@ -37,7 +54,25 @@ export async function encodeResponses(
       'Reserved fields, stateful requests and background execution are unsupported',
       'unsupported',
     );
+  if (
+    chatGPTPlan &&
+    (options.stream === false || unsupportedPlanOptions.some((key) => Object.hasOwn(options, key)))
+  )
+    return fail(
+      'openai-responses.plan-options',
+      'ChatGPT plan usage requires streaming and only supports a subset of Responses options',
+      'unsupported',
+    );
+  const tools = invocation.tools.map((tool) => ({
+    type: 'function',
+    name: tool.id,
+    description: tool.description,
+    parameters: tool.inputSchema,
+    strict: false,
+  }));
   const input: Contracts.Json[] = [];
+  if (chatGPTPlan && tools.length)
+    input.push({ type: 'additional_tools', role: 'developer', tools });
   for (const fragment of invocation.context.fragments) {
     if (fragment.kind === 'tool-call') {
       const args = fragment.content.find((part) => part.kind === 'json');
@@ -57,7 +92,8 @@ export async function encodeResponses(
       continue;
     }
     let text = '';
-    const role = fragment.role ?? 'user';
+    const role =
+      chatGPTPlan && fragment.role === 'system' ? 'developer' : (fragment.role ?? 'user');
     const flush = () => {
       if (text)
         input.push(
@@ -111,17 +147,7 @@ export async function encodeResponses(
       store: false,
       model: profile.model,
       input,
-      ...(invocation.tools.length
-        ? {
-            tools: invocation.tools.map((tool) => ({
-              type: 'function',
-              name: tool.id,
-              description: tool.description,
-              parameters: tool.inputSchema,
-              strict: false,
-            })),
-          }
-        : {}),
+      ...(!chatGPTPlan && tools.length ? { tools } : {}),
     }),
   );
   return ok({

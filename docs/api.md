@@ -26,6 +26,8 @@ only the needed packages. Bridge interfaces are type-only exports from
 | `@slop-lab/part-plugins/agent/index.js`                                                                                                                  | Typed embedded agent; `expandAgent` exposes manual composition                                                   |
 | `@slop-lab/part-plugins/agent/drivers/basic.js`                                                                                                          | Own model/tool loop and a post-stop validating driver                                                            |
 | `@slop-lab/part/model/index.js`                                                                                                                          | Gateway, request transforms/inspection, fetch transport, explicit authentication strategies                      |
+| `@slop-lab/part-plugins/providers/index.js`                                                                                                              | Model configuration for Chat Completions, Responses, Anthropic Messages and ChatGPT plan usage                   |
+| `@slop-lab/part-node/siwc/index.js`                                                                                                                      | Sign in with ChatGPT, renewable plan sessions and Codex app-server credentials                                   |
 | `@slop-lab/part-plugins/providers/ollama.js`                                                                                                             | Strict Ollama chat NDJSON subset                                                                                 |
 | `@slop-lab/part/tools.js`                                                                                                                                | Installed function bindings, external executor port, six middleware decisions                                    |
 | `@slop-lab/part/context/index.js`                                                                                                                        | Planner/resolver/lowerer/transforms/assembler, source versions/maps and digests                                  |
@@ -86,6 +88,212 @@ authorized stdio MCP tools connector `connectAcpMcpServers`. Structural ports ke
 the Node and portable packages independent. ACP connection shutdown owns and
 cancels its sessions, unlike closing an ordinary runtime observation. See
 [ACP usage, protocol bounds and unsupported capabilities](acp.md).
+
+## Compatible model APIs
+
+`createProviderModel` builds a `ConfiguredModel` for `createAgent`, CAR or a custom composition.
+Set the protocol to match the endpoint. The same factory handles URL construction, auth,
+request timeouts and headers across these protocols.
+
+| Protocol    | Path under the base URL | Default credential header |
+| ----------- | ----------------------- | ------------------------- |
+| `chat`      | `chat/completions`      | `Authorization: Bearer …` |
+| `responses` | `responses`             | `Authorization: Bearer …` |
+| `messages`  | `messages`              | `x-api-key`               |
+
+```js
+import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
+import { createProviderModel } from '@slop-lab/part-plugins/providers/index.js';
+
+const model = createProviderModel({
+  protocol: 'messages',
+  baseURL: 'https://gateway.example/v1',
+  apiKey: () => process.env.PART_API_KEY ?? '',
+  model: 'fast',
+  modelMap: { fast: 'provider-model-id' },
+  headers: { 'x-project': 'support' },
+  defaults: { max_tokens: 512 },
+  timeoutMs: 90_000,
+});
+const agent = createAgent({ model });
+```
+
+Use `modelMap` to translate application model names to endpoint-specific IDs.
+Without a mapping, the selected name is sent unchanged. An API key can be a string
+or a callback that returns the current credential. Omit it for an endpoint without
+authentication, or set `auth: 'bearer'` or `auth: 'x-api-key'` to match your gateway.
+The base URL defaults to the official API for the selected protocol. Custom base URLs with a
+path such as `/api/v1` retain that prefix. Requests reject HTTP redirects.
+
+All three adapters support text and runtime function tools over JSON and SSE. Anthropic
+Messages defaults to `anthropic-version: 2023-06-01` and `max_tokens: 1024`. Set
+`anthropicVersion` or `defaults.max_tokens` as needed. The Responses adapter uses stateless
+requests and supports replay of compatible reasoning items. A gateway that accepts Responses
+but lacks encrypted reasoning can accept `defaults: { include: [] }` to request no optional
+output fields. See [Responses usage and limits](openai-responses.md) and the
+[Anthropic Messages API reference](https://platform.claude.com/docs/en/api/messages).
+
+Build the workspace and run [the compatible provider example](../examples/compatible-provider.mjs)
+with `PART_MODEL` set. Use `PART_BASE_URL` and `PART_API_KEY` for your gateway.
+
+```sh
+npm run build
+PART_MODEL=model-id node examples/compatible-provider.mjs messages 'Say hello.'
+```
+
+## Sign in with ChatGPT
+
+The server-side SDK is available from `@slop-lab/part-node/siwc/index.js`.
+
+### Website identity
+
+Create a client with `createChatGPTSignIn({ clientId, redirectURI, clientSecret })`. Supply
+`clientSecret` for a confidential client provisioned for `client_secret_basic`. Call
+`begin()` in your sign-in route, save its transaction against the initiating browser
+session and redirect to the returned URL. In the callback, atomically consume that
+transaction and call `complete(callbackURL, transaction)`. The SDK checks state and expiry,
+exchanges the code with PKCE, and verifies the ID token against OpenAI’s signing keys.
+Link the verified `issuer`, `clientId` and `subject` to your local account and issue your own
+application session. [OpenAI website integration](https://developers.openai.com/siwc/website).
+
+[The HTTPS website example](../examples/siwc/website.mjs) demonstrates the routes,
+one-time transaction, and application cookie with in-memory stores. Set the registered
+`PART_SIWC_CLIENT_ID` and `PART_SIWC_CALLBACK_URL`, the file paths `PART_SIWC_TLS_CERT`
+and `PART_SIWC_TLS_KEY`, and `PART_SIWC_CLIENT_SECRET` for a confidential client.
+Run `just siwc-website` and open its HTTPS origin. For a deployment
+with multiple instances, use a shared store that supports atomic, expiring transaction consumption.
+
+### ChatGPT plan usage and Codex
+
+For open-source apps, call `signInWithChatGPTLoopback` with your app’s name, a persistent
+host ID and a function that opens the authorization URL. For an existing account, pass its
+saved registration and keep the callback path consistent. `createChatGPTPlanSignIn` exposes
+`begin` and `complete` for apps that manage their own loopback listener. Check
+`hasChatGPTPlanAccess` before starting inference. A verified sign-in without the required
+grant can still be used for identity. Use `requestConsent: true` on a returning sign-in
+when the user explicitly asks to enable plan usage. [OpenAI registration guide](https://developers.openai.com/siwc/token-sharing-open-source/sign-in).
+
+```js
+import { spawn } from 'node:child_process';
+import {
+  createChatGPTSession,
+  hasChatGPTPlanAccess,
+  signInWithChatGPTLoopback,
+} from '@slop-lab/part-node/siwc/index.js';
+import { createChatGPTModel } from '@slop-lab/part-plugins/providers/index.js';
+
+const account = await signInWithChatGPTLoopback({
+  appName: 'my_app',
+  hostId,
+  open: openSystemBrowser,
+  registration: savedRegistration,
+});
+await saveAccount(account);
+
+if (hasChatGPTPlanAccess(account)) {
+  const session = createChatGPTSession({ credentials: account, save: saveAccount });
+  const models = await session.listModels();
+  // Use the selected model ID with createAgent or your runtime.
+  const model = createChatGPTModel({ model: selectedModelId, accessToken: session.accessToken });
+
+  // For a project using Codex app-server, pass credentials in the child environment.
+  const { args, env } = await session.codexAppServer();
+  const codex = spawn('codex', args, { env: { ...process.env, ...env }, stdio: 'pipe' });
+}
+```
+
+`createChatGPTModel` uses the public OpenAI Responses endpoint with `stream: true` and
+`store: false`. It sends system context as developer messages and declares runtime function
+tools through `additional_tools`. The route accepts a subset of Responses options.
+Runtime failures expose the HTTP status, request ID and structured provider error code
+in `error.details` when available.
+[ChatGPT plan route limitations](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations).
+
+`listModels()` returns the signed-in account’s displayable model IDs.
+If you use app-server, initialize the child with your stable app identity in
+`clientInfo`. On renewal, restart it with a new `codexAppServer()` configuration and
+resume the thread by ID. [OpenAI inference guide](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference),
+[OpenAI app-server guide](https://developers.openai.com/siwc/token-sharing-open-source/codex-app-server).
+
+Keep account registrations and credentials in protected server-side or local storage.
+Share a session instance per account and serialize refreshes across processes that share
+credentials. The session refreshes near expiration and calls `save` with the rotated
+credential record before using it. On sign-out, stop the session, revoke the latest
+credentials with `revokeChatGPTCredentials`, and clear the local tokens while retaining
+the registration identity and host ID for reauthorization.
+[OpenAI accounts and sessions](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions).
+
+[The CLI example](../examples/siwc/plan.mjs) persists a host ID and the selected account
+in a private local directory, lists models, and asks a selected model to generate text.
+
+```sh
+just siwc-cli signin
+just siwc-cli models
+PART_SIWC_MODEL=model-id just siwc-cli ask 'Say hello.'
+```
+
+### Use the SDK with multiple users
+
+Create a shared account manager and scope each call to an authenticated application
+user. The ID comes from your server-side application session. Save the verified
+registration from that same user's OAuth transaction with `connect`.
+
+```js
+import {
+  createChatGPTAccounts,
+  createMemoryChatGPTAccountStore,
+} from '@slop-lab/part-node/siwc/index.js';
+import { createChatGPTModel } from '@slop-lab/part-plugins/providers/index.js';
+
+const accounts = createChatGPTAccounts({
+  store: createSqliteChatGPTAccountStore('/absolute/path/to/private/siwc-accounts'),
+});
+const account = accounts.forUser(authenticatedUser.id);
+await account.connect(verifiedRegistration);
+const models = await account.listModels();
+const model = createChatGPTModel({ model: selectedModelId, accessToken: account.accessToken });
+```
+
+Use the same authenticated user ID and storage directory after a restart to
+reuse the connection. The SQLite store keeps one database per user and serializes
+refreshes across processes sharing a local filesystem. On Unix the directory
+must be owner-only. Use `createMemoryChatGPTAccountStore()` for ephemeral sessions.
+For multiple hosts or an existing database, implement `ChatGPTAccountStore.withAccount`
+with per-user serialization and atomic updates of the complete credential record. Keep OAuth transactions single-use and
+bound to the same user session before exchanging their codes. Account managers
+and stores should live on the server. An existing runtime can call `accessToken`,
+`listModels`, `codexAppServer`, or `disconnect` for that user.
+
+The [full playground](playground.md#connect-a-chatgpt-plan) demonstrates this with
+independent browser sessions and an optional ChatGPT provider alongside API-key providers.
+
+### Browser PoC with a pasted callback
+
+Start [the web example](../examples/siwc/plan-web.mjs) from the repository root.
+
+```sh
+just siwc
+```
+
+The recipe installs dependencies when needed and builds the workspace. With npm,
+run `npm ci` the first time, then use `npm run example:siwc`.
+The npm equivalents for the other examples are `npm run example:siwc:cli -- <command>`
+and `npm run example:siwc:website`.
+
+Open `http://127.0.0.1:4174`, select **Continue with ChatGPT**, and open the
+authorization link in a new tab. This example uses open-source dynamic registration.
+If the callback tab shows a connection error, copy its full
+`http://127.0.0.1:…/auth/callback?…` URL and submit it on the PoC page.
+If the callback reaches the local listener, return to the PoC tab and check its status.
+After signing in with plan access, use the page to load models and try a prompt.
+
+When the process runs on a remote machine, forward the UI port to your browser machine
+with `ssh -L 4174:127.0.0.1:4174 user@host`, then use the paste field for the callback.
+The example listens on loopback. Its signed browser session cookie and private SQLite
+account store preserve a connection across server restarts. Set `PART_SIWC_DIRECTORY`
+to change the local storage location.
+The SDK’s `open(url, submitCallback)` hook lets other apps submit a pasted URL for
+the same one-time transaction used by the HTTP listener.
 
 ## Extension contracts
 

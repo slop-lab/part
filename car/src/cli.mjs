@@ -23,10 +23,10 @@ node car/src/cli.mjs recover-lock --state PATH
 
   --port NUMBER             Browser/API port (default: ephemeral)
   --host ADDRESS            Bind address (default: 127.0.0.1)
-  --provider interactive|chat|responses  Default: interactive, no paid model
-  --base-url URL            OpenAI-compatible API URL, or OPENAI_BASE_URL
-  --model NAME              Model name, or OPENAI_MODEL
-  --headers JSON            Optional HTTP headers, or OPENAI_HEADERS
+  --provider interactive|chat|responses|messages  Default: interactive, no paid model
+  --base-url URL            Compatible API URL, or OPENAI_BASE_URL / ANTHROPIC_BASE_URL
+  --model NAME              Model name, or OPENAI_MODEL / ANTHROPIC_MODEL
+  --headers JSON            Optional HTTP headers, or OPENAI_HEADERS / ANTHROPIC_HEADERS
   --edit-mode hash|exact    Select local file edit ACI
   --trace metadata|full     Full explicitly stores model input/request bodies
   --mock-session PATH       Write interactive session exclusively, mode 0600
@@ -39,7 +39,7 @@ node car/src/cli.mjs recover-lock --state PATH
   --check JSON_ARGV         Completion test command (host alias or absolute executable)
 
 Set CAR_TOKEN for a stable API token (at least 16 characters).
-Set OPENAI_API_KEY for chat/responses. Secrets stay server-side.
+Set OPENAI_API_KEY for chat/responses, or ANTHROPIC_API_KEY for messages.
 DIM is never started or contacted. Stop with SIGINT/SIGTERM.
 `;
 
@@ -99,7 +99,12 @@ export async function main(argv) {
   }
   const args = parse(argv);
   const provider = args.provider ?? 'interactive';
-  if (provider !== 'interactive' && provider !== 'chat' && provider !== 'responses')
+  if (
+    provider !== 'interactive' &&
+    provider !== 'chat' &&
+    provider !== 'responses' &&
+    provider !== 'messages'
+  )
     throw new TypeError('Unsupported provider');
   const editMode = args['edit-mode'] ?? 'hash';
   if (editMode !== 'hash' && editMode !== 'exact') throw new TypeError('Unsupported edit mode');
@@ -142,17 +147,22 @@ export async function main(argv) {
           mode: 0o600,
         });
     }
+    const protocol = provider === 'interactive' ? 'chat' : provider;
     const model = createCarModel({
-      ...readCarModelEnvironment(process.env, {
-        ...(mock
-          ? { baseURL: mock.session.baseURL, apiKey: mock.session.apiKey }
-          : args['base-url']
-            ? { baseURL: args['base-url'] }
-            : {}),
-        ...(args.model ? { model: args.model } : mock ? { model: 'car-test' } : {}),
-        ...(args.headers ? { headers: args.headers } : {}),
-      }),
-      protocol: provider === 'responses' ? 'responses' : 'chat',
+      ...readCarModelEnvironment(
+        process.env,
+        {
+          ...(mock
+            ? { baseURL: mock.session.baseURL, apiKey: mock.session.apiKey }
+            : args['base-url']
+              ? { baseURL: args['base-url'] }
+              : {}),
+          ...(args.model ? { model: args.model } : mock ? { model: 'car-test' } : {}),
+          ...(args.headers ? { headers: args.headers } : {}),
+        },
+        protocol,
+      ),
+      protocol,
     });
     if (args['toolset-checkout']) {
       const state = resolve(args.state ?? '');

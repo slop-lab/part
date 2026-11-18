@@ -42,7 +42,16 @@ set `OPENAI_API_KEY` and `OPENAI_MODEL`, and optionally set `OPENAI_BASE_URL`
 guidance, not a claim that paid model access or deployment authentication has
 been verified.
 
-The [browser playground](docs/playground.md) opens at `http://127.0.0.1:4173`.
+For an Anthropic Messages endpoint, use `--provider messages` with `ANTHROPIC_API_KEY`
+and `ANTHROPIC_MODEL`. Set `ANTHROPIC_BASE_URL` for a compatible gateway.
+For integration into your own app, see the [shared provider factory](docs/api.md#compatible-model-apis)
+and the [Sign in with ChatGPT SDK and examples](docs/api.md#sign-in-with-chatgpt).
+Run `just siwc` to start the SIWC web PoC at
+[`http://127.0.0.1:4174`](http://127.0.0.1:4174). The recipe installs dependencies
+when needed and builds the workspace.
+
+Run `just example` to open the [full browser playground](docs/playground.md) at
+`http://127.0.0.1:4173` with providers from `.env` and optional ChatGPT sign-in.
 Try conversation, tools, approval gates, immutable reports, validation failures and
 cancellation, with request/event inspection. Scripted mode needs no key; optional
 OpenAI-compatible Chat Completions and Responses run through a server that keeps

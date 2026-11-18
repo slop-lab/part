@@ -1,19 +1,16 @@
 // @ts-check
-import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible/index.js';
-import { createOpenAIResponsesAdapter } from '@slop-lab/part-plugins/providers/openai-responses/index.js';
 import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
 import { isJson } from '@slop-lab/part/contracts/index.js';
-import { bearerAuth, createFetchTransport } from '@slop-lab/part/model/index.js';
 import { setTimeout } from 'node:timers/promises';
 import {
-  hasOpenAIProvider,
-  openAIEndpoint,
-  readOpenAIProvider,
-  withOpenAIHeaders,
-} from '../openai-provider.mjs';
+  createChatGPTModel,
+  createProviderModel,
+  parseProviderHeaders,
+} from '@slop-lab/part-plugins/providers/index.js';
+import { createExampleOpenAIModel, hasOpenAIProvider } from '../openai-provider.mjs';
 
 /** @param {NodeJS.ProcessEnv} environment */
-export function providerOptions(environment = {}) {
+export function providerOptions(environment = {}, siwc = false, plan = false) {
   return [
     { id: 'scripted', label: 'Scripted · no API key', available: true },
     {
@@ -26,11 +23,15 @@ export function providerOptions(environment = {}) {
       label: 'OpenAI-compatible · Chat Completions',
       available: hasOpenAIProvider(environment),
     },
+    ...(environment.ANTHROPIC_API_KEY && environment.ANTHROPIC_MODEL
+      ? [{ id: 'messages', label: 'Anthropic-compatible · Messages', available: true }]
+      : []),
+    ...(siwc ? [{ id: 'chatgpt', label: 'ChatGPT plan · Responses', available: plan }] : []),
   ];
 }
 /**
  * @typedef {import('@slop-lab/part/reference/index.js').Convenience.ConfiguredModel} ConfiguredModel
- * @param {{provider: string, scenario: string, prompt: string, model: string, environment: NodeJS.ProcessEnv, trace: (kind: string, data: import('@slop-lab/part/reference/index.js').Contracts.Json) => void, delayScale?: number}} options
+ * @param {{provider: string, scenario: string, prompt: string, model: string, environment: NodeJS.ProcessEnv, accessToken?: () => Promise<string>, fetch?: typeof fetch, trace: (kind: string, data: import('@slop-lab/part/reference/index.js').Contracts.Json) => void, delayScale?: number}} options
  * @returns {ConfiguredModel}
  */
 export function createPlaygroundModel({
@@ -39,6 +40,8 @@ export function createPlaygroundModel({
   prompt,
   model,
   environment,
+  accessToken,
+  fetch: request,
   trace,
   delayScale = 1,
 }) {
@@ -97,42 +100,31 @@ export function createPlaygroundModel({
         },
       },
     };
+  } else if (provider === 'chatgpt' && accessToken) {
+    configured = createChatGPTModel({ model, accessToken, timeoutMs: 90_000, fetch: request });
+  } else if (
+    provider === 'messages' &&
+    environment.ANTHROPIC_API_KEY &&
+    environment.ANTHROPIC_MODEL
+  ) {
+    configured = createProviderModel({
+      protocol: 'messages',
+      model,
+      apiKey: environment.ANTHROPIC_API_KEY,
+      baseURL: environment.ANTHROPIC_BASE_URL,
+      headers: parseProviderHeaders(environment.ANTHROPIC_HEADERS),
+      defaults: { max_tokens: 512 },
+      timeoutMs: 90_000,
+      fetch: request,
+    });
   } else {
     if (!providerOptions(environment).some((entry) => entry.id === provider && entry.available))
       throw Error('Provider is not configured');
-    const adapter =
-      provider === 'responses' ? createOpenAIResponsesAdapter() : createOpenAICompatibleAdapter();
-    const { base, key, headers } = readOpenAIProvider(environment);
-    configured = {
-      profile: {
-        id: provider,
-        revision: '1',
-        adapterId: adapter.id,
-        transportId: 'part/fetch',
-        authStrategyId: 'bearer',
-        model,
-        endpoint: openAIEndpoint(base, provider === 'responses' ? 'responses' : 'chat/completions'),
-        defaults:
-          provider === 'responses' ? { max_output_tokens: 512 } : { max_completion_tokens: 512 },
-        capabilities: { revision: '1', entries: [] },
-      },
-      adapter,
-      auth: bearerAuth(async () => key),
-      transport: createFetchTransport({
-        allowedOrigins: [base.origin],
-        fetch(url, init = {}) {
-          return fetch(url, {
-            ...init,
-            headers: withOpenAIHeaders(init.headers, headers),
-            redirect: 'error',
-            signal: AbortSignal.any([
-              ...(init.signal ? [init.signal] : []),
-              AbortSignal.timeout(90000),
-            ]),
-          });
-        },
-      }),
-    };
+    configured = createExampleOpenAIModel(environment, {
+      protocol: provider === 'responses' ? 'responses' : 'chat',
+      model,
+      fetch: request,
+    });
   }
   const transport = configured.transport;
   return {

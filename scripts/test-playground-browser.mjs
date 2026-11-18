@@ -1,19 +1,110 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { generateKeyPairSync, sign } from 'node:crypto';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { startPlayground } from '../examples/playground/server.mjs';
+import { present } from '../fixtures/assertions.mjs';
 
 const serverKey = 'browser-test-server-only-key';
-const server = await startPlayground({
+const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+let planModels = 0;
+const directory = await mkdtemp(join(tmpdir(), 'part-playground-siwc-'));
+/** @type {NonNullable<Parameters<typeof startPlayground>[0]>} */
+const options = {
   port: 0,
   delayScale: 0.15,
   environment: {
     OPENAI_API_KEY: serverKey,
     OPENAI_BASE_URL: 'http://127.0.0.1:9/v1',
     OPENAI_MODEL: 'browser-test-model',
+    PART_SIWC_HOST_ID: 'urn:uuid:browser-test',
+    PART_SIWC_DIRECTORY: directory,
   },
-});
+  async fetch(input, init) {
+    const url = new URL(input instanceof Request ? input.url : input);
+    if (url.pathname.endsWith('/jwks.json'))
+      return Response.json({
+        keys: [{ ...publicKey.export({ format: 'jwk' }), kid: 'browser-test' }],
+      });
+    if (url.pathname.endsWith('/oauth/token')) {
+      assert.ok(init?.body instanceof URLSearchParams);
+      const now = Math.floor(Date.now() / 1000);
+      const data = [
+        { alg: 'RS256', kid: 'browser-test' },
+        {
+          iss: url.origin,
+          sub: 'browser-user',
+          name: 'Browser Test',
+          aud: 'oaiapp_browser',
+          nonce: init.body.get('code'),
+          iat: now,
+          exp: now + 300,
+        },
+      ]
+        .map((entry) => Buffer.from(JSON.stringify(entry)).toString('base64url'))
+        .join('.');
+      return Response.json({
+        id_token:
+          data + '.' + sign('RSA-SHA256', Buffer.from(data), privateKey).toString('base64url'),
+        access_token: 'browser-plan-test-token',
+        expires_in: 3600,
+        token_type: 'Bearer',
+        scope: 'openid resource.invoke chatgpt.tokens.use.direct',
+      });
+    }
+    const bearer = new Headers(init?.headers).get('authorization');
+    if (url.href === 'https://api.openai.com/v1/models') {
+      assert.equal(bearer, 'Bearer browser-plan-test-token');
+      if (++planModels === 1)
+        return Response.json(
+          { error: { code: 'subscription_sharing_usage_limit_exceeded' } },
+          { status: 429, headers: { 'x-request-id': 'req_browser_test' } },
+        );
+      if (planModels === 2) return Response.json({ models: [] });
+      return Response.json({
+        models: [
+          { slug: 'plan-model', display_name: 'Plan model', visibility: 'list' },
+          { slug: 'plan-model-2', display_name: 'Second plan model', visibility: 'list' },
+          { slug: 'hidden-model', display_name: 'Hidden model', visibility: 'hidden' },
+        ],
+      });
+    }
+    assert.equal(url.pathname, '/v1/responses');
+    const encoded = await new Response(init?.body).json();
+    const plan = bearer === 'Bearer browser-plan-test-token';
+    assert.equal(bearer, plan ? 'Bearer browser-plan-test-token' : `Bearer ${serverKey}`);
+    assert.equal(encoded.model, plan ? 'plan-model-2' : 'browser-test-model');
+    const terminal = {
+      type: 'response.completed',
+      response: {
+        id: 'resp_browser_test',
+        object: 'response',
+        status: 'completed',
+        output: [
+          {
+            id: 'msg_browser_test',
+            type: 'message',
+            role: 'assistant',
+            status: 'completed',
+            content: [
+              { type: 'output_text', text: plan ? 'Plan reply' : 'Configured provider reply' },
+            ],
+          },
+        ],
+      },
+    };
+    return new Response(
+      'data: {"type":"codex.rate_limits"}\n\ndata: ' + JSON.stringify(terminal) + '\n\n',
+      {
+        headers: { 'content-type': 'text/event-stream' },
+      },
+    );
+  },
+};
+let server = await startPlayground(options);
 let browser;
 try {
   browser = await chromium.launch({ headless: true });
@@ -163,6 +254,97 @@ try {
     }
   }
   assert.ok((await session()).runs.every((entry) => entry.provider === 'scripted'));
+  await page.getByLabel('Model provider').selectOption('responses');
+  assert.equal(await page.getByLabel('Model name').inputValue(), 'browser-test-model');
+  await page.locator('[data-scenario="conversation"]').click();
+  await page.getByRole('button', { name: 'Try this example' }).click();
+  await phase('completed · responses');
+  assert.equal((await session()).runs.at(-1)?.text, 'Configured provider reply');
+
+  await page.getByRole('button', { name: 'Connect ChatGPT' }).click();
+  await page.getByRole('button', { name: 'Continue with ChatGPT' }).click();
+  const auth = new URL(
+    present(await page.getByRole('link', { name: /Open ChatGPT sign-in/ }).getAttribute('href')),
+  );
+  const callback = new URL(present(auth.searchParams.get('redirect_uri')));
+  callback.searchParams.set('state', present(auth.searchParams.get('state')));
+  callback.searchParams.set('code', present(auth.searchParams.get('nonce')));
+  callback.searchParams.set('client_id', 'oaiapp_browser');
+  await page.getByLabel('Callback URL').fill(callback.href);
+  await page.getByRole('button', { name: 'Complete sign-in' }).click();
+  await page.getByRole('button', { name: 'Load ChatGPT models' }).click();
+  await page
+    .locator('#siwc-status')
+    .filter({ hasText: /HTTP 429.*req_browser_test/ })
+    .waitFor();
+  await page.getByRole('button', { name: 'Load ChatGPT models' }).click();
+  await page
+    .locator('#siwc-status')
+    .filter({ hasText: 'This account returned no displayable models.' })
+    .waitFor();
+  const modelList = page.getByRole('listbox', { name: 'Available ChatGPT models' });
+  assert.equal(await modelList.isVisible(), false);
+  await page.getByRole('button', { name: 'Load ChatGPT models' }).click();
+  await modelList.waitFor();
+  assert.deepEqual(await modelList.locator('option').allTextContents(), [
+    'Plan model',
+    'Second plan model',
+  ]);
+  await page.waitForFunction(
+    () =>
+      document.querySelector('select#provider')?.getAttribute('id') &&
+      /** @type {HTMLSelectElement} */ (document.querySelector('select#provider')).value ===
+        'chatgpt',
+  );
+  assert.equal(await page.getByLabel('Model name').inputValue(), 'plan-model');
+  await modelList.selectOption('plan-model-2');
+  assert.equal(await page.getByLabel('Model name').inputValue(), 'plan-model-2');
+  await page.getByRole('button', { name: 'Close ChatGPT connection' }).click();
+  await page.getByRole('button', { name: 'Try this example' }).click();
+  await phase('completed · chatgpt');
+  assert.equal((await session()).runs.at(-1)?.text, 'Plan reply');
+
+  const isolated = await browser.newPage();
+  await isolated.goto(server.url);
+  await isolated.getByRole('button', { name: 'Connect ChatGPT' }).waitFor();
+  assert.notEqual(await isolated.locator('option[value="chatgpt"]').getAttribute('disabled'), null);
+  assert.equal((await isolated.content()).includes('browser-plan-test-token'), false);
+  await isolated.close();
+  const firstURL = server.url;
+  await page.goto('about:blank');
+  await server.close();
+  server = await startPlayground({ ...options, port: Number(new URL(firstURL).port) });
+  await page.goto(server.url);
+  await page.locator('#connection[data-state="connected"]').waitFor();
+  const cookie = present(
+    (await page.context().cookies()).find(({ name }) => name === 'part_playground'),
+  );
+  const otherContext = await browser.newContext();
+  await otherContext.addCookies([
+    {
+      name: cookie.name,
+      value: `${cookie.value.split('.')[0]}.${'a'.repeat(43)}`,
+      url: server.url,
+    },
+  ]);
+  const otherBrowser = await otherContext.newPage();
+  await otherBrowser.goto(server.url);
+  await otherBrowser.getByRole('button', { name: 'Connect ChatGPT' }).waitFor();
+  await otherContext.close();
+  await page.getByRole('button', { name: 'ChatGPT connected' }).click();
+  await page.getByText('Signed in as Browser Test', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Load ChatGPT models' }).click();
+  await modelList.waitFor();
+  await modelList.selectOption('plan-model-2');
+  await page.getByRole('button', { name: 'Close ChatGPT connection' }).click();
+  await page.getByRole('button', { name: 'Try this example' }).click();
+  await phase('completed · chatgpt');
+  assert.equal((await session()).runs.at(-1)?.text, 'Plan reply');
+  await page.getByRole('button', { name: 'ChatGPT connected' }).click();
+  await page.getByRole('button', { name: 'Disconnect' }).click();
+  await page.getByRole('button', { name: 'Continue with ChatGPT' }).waitFor();
+  assert.notEqual(await page.locator('option[value="chatgpt"]').getAttribute('disabled'), null);
+  await page.getByRole('button', { name: 'Close ChatGPT connection' }).click();
   assert.deepEqual(errors, []);
   if (screenshots)
     await writeFile(
@@ -174,9 +356,10 @@ try {
       ),
     );
   console.log(
-    'Playground Chromium: all six scenarios, approvals/fallbacks, artifact download, cancellation/reconnect, refresh, isolation, draft retention and responsive layouts passed.',
+    'Playground Chromium: all six scenarios, approvals/fallbacks, artifact download, cancellation/reconnect, refresh, isolation, draft retention, responsive layouts, configured provider and isolated SIWC plan flow passed.',
   );
 } finally {
   await browser?.close();
   await server.close();
+  await rm(directory, { recursive: true, force: true });
 }

@@ -5,6 +5,8 @@ import { createHttpPort } from '@slop-lab/part/client/http.js';
 import { fail, ok } from '@slop-lab/part/contracts/index.js';
 import type { Contracts } from '@slop-lab/part/reference/index.js';
 import catalog from './catalog.json' with { type: 'json' };
+import { connectChatGPT } from './siwc.js';
+import type { SiwcState } from './siwc.js';
 import { command, deliveryError, playgroundRenderers } from './renderers.js';
 
 type Event = { kind: string; at: string; data: Contracts.Json };
@@ -166,13 +168,52 @@ for (const scenario of catalog) {
   button.addEventListener('click', () => choose(scenario.id));
   element('examples').append(button);
 }
+const providerModels = new Map<string, string>();
+let previousProvider = '';
+let chatgptModels: SiwcState['models'] = [];
+let closeSignIn: (() => void) | undefined;
 function providerChanged() {
-  const scripted = provider.value === 'scripted';
+  const current = provider.value;
+  if (previousProvider && current !== previousProvider)
+    providerModels.set(previousProvider, model.value);
+  if (current !== previousProvider) model.value = providerModels.get(current) ?? '';
+  previousProvider = current;
+  const scripted = current === 'scripted';
   element('model-label').hidden = scripted;
+  if (current === 'chatgpt') {
+    model.setAttribute('list', 'chatgpt-models');
+    if (!chatgptModels.some(({ id }) => id === model.value))
+      model.value = chatgptModels[0]?.id ?? '';
+  } else model.removeAttribute('list');
   element('provider-hint').textContent = scripted
     ? 'No key. No network model calls.'
-    : 'Live provider · requests use your configured account.';
+    : current === 'chatgpt'
+      ? 'Uses the ChatGPT account connected to this session.'
+      : 'Uses the API provider configured on the server.';
   if (!scripted && selected.id === 'failure') choose('tools');
+}
+
+function updateChatGPT(state: SiwcState, modelId?: string) {
+  chatgptModels = state.models;
+  const list = element('chatgpt-models');
+  list.replaceChildren(
+    ...state.models.map(({ id, name }) => {
+      const option = document.createElement('option');
+      option.value = id;
+      option.label = name;
+      return option;
+    }),
+  );
+  const option = [...provider.options].find(({ value }) => value === 'chatgpt');
+  if (!option) return;
+  option.disabled = !state.plan || !state.models.length;
+  option.textContent = option.disabled
+    ? 'ChatGPT plan · connect and load models'
+    : 'ChatGPT plan · Responses';
+  if (provider.value === 'chatgpt' && option.disabled) provider.value = 'scripted';
+  else if (modelId && !option.disabled) provider.value = 'chatgpt';
+  providerChanged();
+  if (modelId && provider.value === 'chatgpt') model.value = modelId;
 }
 provider.addEventListener('change', providerChanged);
 element('try-example').addEventListener('click', () => {
@@ -288,6 +329,9 @@ void (async () => {
     if (!response.ok) throw Error('Session unavailable');
     const config = (await response.json()) as {
       model: string;
+      preferred: string;
+      anthropicModel: string;
+      siwc: SiwcState | null;
       providers: { id: string; label: string; available: boolean }[];
     };
     for (const entry of config.providers) {
@@ -297,8 +341,15 @@ void (async () => {
       option.disabled = !entry.available;
       provider.append(option);
     }
-    model.value = config.model;
+    providerModels.set('responses', config.model);
+    providerModels.set('chat', config.model);
+    providerModels.set('messages', config.anthropicModel);
+    provider.value = config.preferred;
     providerChanged();
+    if (config.siwc)
+      closeSignIn = connectChatGPT(config.siwc, updateChatGPT, () =>
+        provider.value === 'chatgpt' ? model.value : undefined,
+      );
     choose(selected.id);
     await renderChat();
     await connect();
@@ -313,5 +364,6 @@ const timer = setInterval(() => {
 window.addEventListener('pagehide', () => {
   disposed = true;
   clearInterval(timer);
+  closeSignIn?.();
   void controller.dispose();
 });

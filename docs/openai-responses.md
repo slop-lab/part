@@ -86,9 +86,12 @@ Token usage maps `input_tokens`/`output_tokens`, with provider details preserved
 
 Failed/incomplete responses, malformed or unfinished tool arguments, duplicate
 call/item identities, changed stream snapshots and truncated streams fail without
-returning executable tool calls. Unsupported output items/events fail explicitly.
-This initial profile rejects media, refusals, nonempty annotations/logprobs and
-provider-hosted tools. It also rejects background execution, stored conversations,
+returning executable tool calls. The decoder accepts queued lifecycle events and
+ignores keepalives and auxiliary Responses event types. Recognized output events
+and the final output snapshot are still validated. Text annotations and log
+probabilities are treated as metadata when projecting text. Media, refusals and
+provider-hosted output items remain unsupported. Stream errors expose the relevant
+event type and provider request ID when available. It also rejects background execution, stored conversations,
 `previous_response_id` and runtime continuation handles. Chat Completions options
 such as `messages`, `stream_options` and `max_completion_tokens` cannot be reused;
 use Responses options such as `max_output_tokens` and `reasoning` instead.

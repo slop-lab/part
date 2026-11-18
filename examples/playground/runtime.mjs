@@ -15,6 +15,7 @@ import {
 import { createSuspensions } from '@slop-lab/part/runtime/waits.js';
 import { functionTool } from '@slop-lab/part/tools.js';
 import catalog from './catalog.json' with { type: 'json' };
+import { inferenceError } from '../siwc/browser.mjs';
 import { createPlaygroundModel, providerOptions } from './models.mjs';
 
 /** @import {Contracts, Client, Runtime, Model, Context, Projection} from '@slop-lab/part/reference/index.js' */
@@ -86,6 +87,10 @@ export function createPlaygroundSession({
   environment = /** @type {NodeJS.ProcessEnv} */ ({}),
   delayScale = 1,
   context = localContext(),
+  siwc = /** @type {ReturnType<ReturnType<typeof import('../siwc/browser.mjs').createBrowserSignIn>['forUser']> | undefined} */ (
+    undefined
+  ),
+  fetch = /** @type {typeof globalThis.fetch | undefined} */ (undefined),
 } = {}) {
   const hub = createWatchHub({ revision: 'playground-1', entries: [] });
   const waits = createSuspensions();
@@ -153,10 +158,15 @@ export function createPlaygroundSession({
     if (!validated.ok)
       return reject(request, 'Choose a valid example/provider and enter 1?4,000 characters.');
     const input = validated.value;
+    const account = input.provider === 'chatgpt' ? await siwc?.state() : undefined;
     if (
-      !providerOptions(environment).some((entry) => entry.id === input.provider && entry.available)
+      !providerOptions(environment, !!siwc, !!account?.plan).some(
+        (entry) => entry.id === input.provider && entry.available,
+      )
     )
       return reject(request, 'Choose an available provider.');
+    if (account && !account.models.some(({ id }) => id === input.model))
+      return reject(request, 'Load the connected ChatGPT account’s models and choose one.');
     if (input.scenario === 'failure' && input.provider !== 'scripted')
       return reject(request, 'The deliberate invalid-argument example uses the scripted provider.');
     if (active) return reject(request, 'Stop or finish the current run first.');
@@ -268,7 +278,14 @@ export function createPlaygroundSession({
     try {
       const model = createPlaygroundModel({
         ...input,
-        model: input.model || environment.OPENAI_MODEL || 'gpt-4.1-mini',
+        model:
+          input.model ||
+          (input.provider === 'messages'
+            ? environment.ANTHROPIC_MODEL
+            : environment.OPENAI_MODEL) ||
+          'gpt-4.1-mini',
+        accessToken: siwc && account ? () => siwc.accessToken(account.revision) : undefined,
+        fetch,
         environment,
         delayScale,
         trace,
@@ -352,7 +369,7 @@ export function createPlaygroundSession({
       const createdAgent = created.value;
       agent = createdAgent;
       run.agent = agent;
-      const key = `${input.provider}/${input.model ?? ''}`;
+      const key = `${input.provider}/${account?.revision ?? ''}/${input.model ?? ''}`;
       const previous = history.get(key) ?? [];
       const items = [
         await messageItem('system', [
@@ -417,7 +434,7 @@ export function createPlaygroundSession({
                 message:
                   input.provider === 'scripted'
                     ? outcome.error.message
-                    : 'Provider run did not complete. Inspect the structured code and local provider configuration.',
+                    : inferenceError(outcome.error),
               }
             : null;
           run.text = `${run.text}${run.text ? '\n\n' : ''}${run.phase === 'cancelled' ? 'Run cancelled.' : (run.error?.message ?? 'Run ended without a result.')}`;
@@ -458,6 +475,7 @@ export function createPlaygroundSession({
   return {
     hub,
     context,
+    siwc,
     state,
     /** @param {string} id */
     async artifact(id) {

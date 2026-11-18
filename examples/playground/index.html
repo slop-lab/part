@@ -18,7 +18,8 @@
       <div class="header-right">
         <span class="connection" id="connection" role="status">Connecting</span
         ><button id="reconnect" class="quiet">Reconnect</button
-        ><button id="guide-open" class="quiet">Guide ↗</button>
+        ><button id="siwc-open" class="quiet" hidden>Connect ChatGPT</button>
+        <button id="guide-open" class="quiet">Guide ↗</button>
       </div>
     </header>
     <div class="app-layout">
@@ -65,7 +66,8 @@
               <select id="provider" aria-label="Model provider"></select></label
             ><label id="model-label"
               >Model
-              <input id="model" aria-label="Model name" maxlength="120" value="gpt-6-luna" /></label
+              <input id="model" aria-label="Model name" maxlength="120" list="chatgpt-models" />
+              <datalist id="chatgpt-models"></datalist></label
             ><span id="provider-hint">No key. No network model calls.</span>
           </div>
           <div id="chat"></div>
@@ -116,6 +118,30 @@
         </div>
       </aside>
     </div>
+    <dialog id="siwc-dialog" aria-labelledby="siwc-title">
+      <div class="dialog-heading">
+        <h2 id="siwc-title">ChatGPT connection</h2>
+        <button id="siwc-close" class="quiet" aria-label="Close ChatGPT connection">✕</button>
+      </div>
+      <p id="siwc-account" hidden></p>
+      <p id="siwc-status" role="status"></p>
+      <button id="siwc-begin" class="quiet" data-oai-siwc-button>Continue with ChatGPT</button>
+      <div id="siwc-pending" hidden>
+        <a id="siwc-link" target="_blank" rel="noopener noreferrer">Open ChatGPT sign-in ↗</a>
+        <p>If the callback page cannot connect, copy its full URL into this form.</p>
+        <form id="siwc-callback" autocomplete="off">
+          <label for="siwc-url">Callback URL</label>
+          <input id="siwc-url" type="url" required spellcheck="false" />
+          <button type="submit" class="quiet">Complete sign-in</button>
+        </form>
+      </div>
+      <div id="siwc-model-picker" hidden>
+        <label for="siwc-model-list">Available ChatGPT models</label>
+        <select id="siwc-model-list" size="4"></select>
+      </div>
+      <button id="siwc-models" class="quiet" hidden>Load ChatGPT models</button>
+      <button id="siwc-disconnect" class="quiet" hidden>Disconnect</button>
+    </dialog>
     <dialog id="guide" aria-labelledby="guide-title">
       <div class="dialog-heading">
         <span class="eyebrow">GET STARTED</span
@@ -145,10 +171,9 @@
       </p>
       <h3>Use your provider</h3>
       <p>
-        Set OPENAI_API_KEY, OPENAI_BASE_URL and OPENAI_MODEL in the workspace .env, then restart.
-        Select Chat Completions or Responses and enter a model available to your endpoint. Sending a
-        message makes real provider requests. Each run permits at most four model requests and 512
-        requested output tokens per request.
+        Select an API provider configured in the workspace .env or connect a ChatGPT account. Each
+        run permits up to four model requests. ChatGPT plan requests use the connected account for
+        this browser session.
       </p>
       <p>
         Rich cards and Dark change presentation without restarting runs. Full documentation:

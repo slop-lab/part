@@ -1,25 +1,15 @@
 // @ts-check
 import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
-import { createOpenAICompatibleAdapter } from '@slop-lab/part-plugins/providers/openai-compatible/index.js';
-import { createOpenAIResponsesAdapter } from '@slop-lab/part-plugins/providers/openai-responses/index.js';
 import { schema, stringSchema } from '@slop-lab/part/contracts/index.js';
-import { bearerAuth, createFetchTransport } from '@slop-lab/part/model/index.js';
 import { functionTool } from '@slop-lab/part/tools.js';
 import assert from 'node:assert/strict';
-import {
-  openAIEndpoint,
-  readOpenAIProvider,
-  withOpenAIHeaders,
-} from '../examples/openai-provider.mjs';
+import { createExampleOpenAIModel } from '../examples/openai-provider.mjs';
 
 // Opt-in only: never run as part of the credential-free test suite.
 async function main() {
   const protocol = process.argv[2] ?? 'chat';
-  assert.ok(['chat', 'responses'].includes(protocol), 'Expected chat or responses protocol');
-  const adapter =
-    protocol === 'responses' ? createOpenAIResponsesAdapter() : createOpenAICompatibleAdapter();
-  const path = protocol === 'responses' ? 'responses' : 'chat/completions';
-  const { base, key, model, headers } = readOpenAIProvider(process.env);
+  assert.ok(protocol === 'chat' || protocol === 'responses', 'Expected chat or responses protocol');
+  const model = process.env.OPENAI_MODEL;
   let requests = 0;
   const cases = [];
   for (const scenario of ['text-json', 'text-sse', 'tool-sse']) {
@@ -36,46 +26,21 @@ async function main() {
         maxToolDispatches: 1,
         deadline: new Date(Date.now() + 120000).toISOString(),
       },
-      model: {
-        profile: {
-          id: 'provider-smoke',
-          revision: '1',
-          adapterId: adapter.id,
-          transportId: 'part/fetch',
-          authStrategyId: 'bearer',
-          model,
-          endpoint: openAIEndpoint(base, path),
-          defaults: {
-            stream,
-            ...(protocol === 'responses'
-              ? { max_output_tokens: 256 }
-              : { max_completion_tokens: 256 }),
-          },
-          capabilities: { revision: '1', entries: [] },
+      model: createExampleOpenAIModel(process.env, {
+        protocol,
+        id: 'provider-smoke',
+        stream,
+        maxTokens: 256,
+        async fetch(url, init) {
+          assert.ok(++requests <= 4, 'Smoke request limit exceeded');
+          const response = await fetch(url, init);
+          deliveries.push({
+            status: response.status,
+            contentType: response.headers.get('content-type')?.split(';')[0],
+          });
+          return response;
         },
-        adapter,
-        transport: createFetchTransport({
-          allowedOrigins: [base.origin],
-          async fetch(url, init = {}) {
-            assert.ok(++requests <= 4, 'Smoke request limit exceeded');
-            const response = await fetch(url, {
-              ...init,
-              headers: withOpenAIHeaders(init.headers, headers),
-              redirect: 'error',
-              signal: AbortSignal.any([
-                ...(init.signal ? [init.signal] : []),
-                AbortSignal.timeout(90000),
-              ]),
-            });
-            deliveries.push({
-              status: response.status,
-              contentType: response.headers.get('content-type')?.split(';')[0],
-            });
-            return response;
-          },
-        }),
-        auth: bearerAuth(async () => key),
-      },
+      }),
       ...(scenario === 'tool-sse'
         ? {
             tools: [
@@ -124,6 +89,7 @@ async function main() {
         'completed',
         `${scenario}: ${result.value.phase !== 'completed' ? (result.value.error?.code ?? result.value.phase) : 'completed'}; HTTP ${deliveries.map((entry) => entry.status).join(',')}`,
       );
+      /** @type {import("@slop-lab/part/reference/index.js").Model.Response} */
       const response = result.value.result;
       const text = response.content
         .filter((part) => part.kind === 'text')

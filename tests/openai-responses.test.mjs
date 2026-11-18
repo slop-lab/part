@@ -530,3 +530,52 @@ for (const mode of ['json', 'sse', 'truncated']) {
     }
   });
 }
+
+test('Responses SSE accepts auxiliary events, compatible framing and annotations while validating completed output', () => {
+  const annotation = {
+    type: 'url_citation',
+    start_index: 0,
+    end_index: 5,
+    title: 'Example',
+    url: 'https://example.test',
+  };
+  const output = message('HELLO');
+  output.content[0].annotations = [annotation];
+  const events = [
+    event('response.created', { response: { id: 'resp-1', status: 'queued' } }),
+    event('response.queued', { response: { id: 'resp-1', status: 'queued' } }),
+    event('response.in_progress', { response: { id: 'resp-1', status: 'in_progress' } }),
+    event('response.output_item.added', {
+      output_index: 0,
+      item: { ...output, status: 'in_progress' },
+    }),
+  ];
+  const frames =
+    'event: ping\ndata: [PING]\n\n' +
+    wire([event('codex.rate_limits', {}), event('codex.response.metadata', {})]) +
+    wire(events) +
+    'event: message\ndata: {"type":"response.provider.metadata"}\n\n' +
+    'event: response.output_text.delta\ndata: {"item_id":"msg-1","content_index":0,"delta":"HELLO"}\n\n' +
+    wire([
+      event('response.output_text.annotation.added', {
+        output_index: 0,
+        content_index: 0,
+        annotation,
+      }),
+      event('response.output_item.done', { output_index: 0, item: output }),
+      event('response.completed', { response: completion([output]) }),
+      event('response.provider.metrics', {}),
+    ]);
+  const result = decode(frames, true, true);
+  assert.ok(result.ok, JSON.stringify(result));
+  assert.deepEqual(result.value.content, [{ kind: 'text', text: 'HELLO' }]);
+  assert.deepEqual(result.progress, [{ type: 'text-delta', payload: { text: 'HELLO' } }]);
+
+  const malformed = decode(wire([event('response.output_text.delta', { delta: 'lost' })]), true);
+  assert.ok(!malformed.ok);
+  assert.equal(expectProperty(malformed.error.details, 'eventType'), 'response.output_text.delta');
+  assert.equal(
+    decode('event: ping\ndata: {"type":"response.failed"}\n\n' + frames, true).ok,
+    false,
+  );
+});

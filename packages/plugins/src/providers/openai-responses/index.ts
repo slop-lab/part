@@ -3,10 +3,12 @@ import { createResponsesDecoder } from './decode.js';
 import { encodeResponses } from './encode.js';
 
 /** Stateless HTTP Responses: text, runtime function tools and native reasoning items. */
-export function createOpenAIResponsesAdapter(): Model.Adapter {
+export function createOpenAIResponsesAdapter(
+  options: { chatGPTPlan?: boolean } = {},
+): Model.Adapter {
   return {
     id: 'part/openai-responses',
-    encode: encodeResponses,
-    createDecoder: createResponsesDecoder,
+    encode: (invocation, profile) => encodeResponses(invocation, profile, options.chatGPTPlan),
+    createDecoder: (response) => createResponsesDecoder(response, options.chatGPTPlan),
   };
 }

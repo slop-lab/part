@@ -1,6 +1,8 @@
 import { fail, isJson, isJsonObject, ok } from '@slop-lab/part/contracts/index.js';
 import type { Contracts, Model, Runtime } from '@slop-lab/part/reference/index.js';
 
+import { createSseReader } from '../sse.js';
+
 export function createChatDecoder(response: {
   status?: number;
   headers: Readonly<Record<string, string>>;
@@ -113,44 +115,27 @@ export function createChatDecoder(response: {
     }
     return ok(events);
   }
-  function consumeFrames(flush = false): Contracts.Result<readonly Model.ProviderEvent[]> {
-    const events: Model.ProviderEvent[] = [];
-    while (true) {
-      const boundary = buffer.indexOf('\n\n');
-      if (boundary < 0) break;
-      const frame = buffer.slice(0, boundary);
-      buffer = buffer.slice(boundary + 2);
-      const data = frame
-        .split('\n')
-        .filter((line) => line.startsWith('data:'))
-        .map((line) => line.slice(5).trimStart())
-        .join('\n');
-      if (!data) continue;
-      if (done) return fail('openai-compatible.trailing', 'Data after stream end');
-      if (data === '[DONE]') {
-        done = true;
-        continue;
-      }
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(data);
-      } catch {
-        return fail('openai-compatible.json', 'Malformed stream JSON');
-      }
-      const decoded = consumeValue(parsed);
-      if (!decoded.ok) return decoded;
-      events.push(...decoded.value);
+  const consumeFrames = createSseReader('openai-compatible', (data) => {
+    if (done) return fail('openai-compatible.trailing', 'Data after stream end');
+    if (data === '[DONE]') {
+      done = true;
+      return ok([]);
     }
-    if (flush && buffer.trim()) return fail('openai-compatible.frame', 'Incomplete SSE frame');
-    return ok(events);
-  }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(data);
+    } catch {
+      return fail('openai-compatible.json', 'Malformed stream JSON');
+    }
+    return consumeValue(parsed);
+  });
   return ok({
     push(chunk) {
       if (poison) return { ok: false, error: poison };
       try {
-        buffer += utf8.decode(chunk, { stream: true });
-        buffer = buffer.replaceAll('\r\n', '\n');
-        const result = streaming ? consumeFrames() : ok([]);
+        const text = utf8.decode(chunk, { stream: true });
+        if (!streaming) buffer += text;
+        const result = streaming ? consumeFrames(text) : ok([]);
         if (!result.ok) poison = result.error;
         return result;
       } catch {
@@ -162,8 +147,10 @@ export function createChatDecoder(response: {
     finish() {
       if (poison) return { ok: false, error: poison };
       try {
-        buffer += utf8.decode();
-        const consumed = streaming ? consumeFrames(true) : consumeValue(JSON.parse(buffer));
+        const tail = utf8.decode();
+        const consumed = streaming
+          ? consumeFrames(tail, true)
+          : consumeValue(JSON.parse(buffer + tail));
         if (!consumed.ok) return consumed;
         if (!finish || (streaming && !done))
           return fail('openai-compatible.eof', 'Missing terminal completion or [DONE]');
