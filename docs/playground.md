@@ -78,6 +78,15 @@ The inspector intentionally exposes this session's prompts and tool data for
 experimentation. It is an explicit example projection, separate from the core
 model gateway's default body/credential redaction policy.
 
+### Streaming replies
+
+Streamed text appears in the current assistant message before the model completes.
+The shared Chat component updates once per browser frame and keeps completed
+Markdown blocks in place as the current block grows. A new model call in a tool
+loop starts a fresh preview. Completion replaces it with the verified result;
+cancellation or failure keeps the text already received and displays the outcome.
+When you scroll up, the view holds position and offers **New messages ↓**.
+
 ### Session, refresh and cancellation
 
 A browser-session cookie identifies a server-owned in-memory session. Refresh and
@@ -191,15 +200,18 @@ no provider credentials or execution implementation is bundled into the client.
 
 The normal `npm test` includes four playground runtime tests for command dedupe,
 request/tool history, approve/reject/cancel, argument failure, artifact ownership,
-clear and observer/shutdown semantics. Browser tests use only Scripted, even if your
-workspace `.env` contains real credentials:
+clear and observer/shutdown semantics. The browser suite uses scripted runs and
+mocked provider and SIWC responses:
 
 ```sh
-npx playwright install chromium
-npm run test:browser
+mise run browser:install
+mise exec -- npm run test:browser
 ```
 
-On Linux CI, use `npx playwright install --with-deps chromium`. To save screenshots:
+With an existing Node.js toolchain, run `npm ci`, then
+`npm exec -- playwright install chromium` and `npm run test:browser`.
+On Linux CI, use `npm exec -- playwright install --with-deps chromium` to install
+the browser and its system libraries. To save screenshots:
 
 ```sh
 PART_SCREENSHOTS=/tmp/part-playground-screenshots npm run test:browser

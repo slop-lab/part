@@ -1,0 +1,13 @@
+[tools]
+just = "latest"
+node = "latest"
+pnpm = "11"
+
+[tasks.setup]
+description = "Install the locked npm workspace dependencies"
+run = "npm ci"
+
+[tasks."browser:install"]
+description = "Install the Chromium build required by the workspace's Playwright version"
+depends = ["setup"]
+run = "npm exec -- playwright install chromium"

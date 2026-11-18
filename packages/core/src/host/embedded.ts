@@ -1,6 +1,14 @@
 import { createControl, installAction, installQuery } from '../client/control.js';
 import { createWatchHub } from '../client/watch.js';
-import { fail, jsonSchema, localContext, ok, schema, stringSchema } from '../contracts/index.js';
+import {
+  fail,
+  isJsonObject,
+  jsonSchema,
+  localContext,
+  ok,
+  schema,
+  stringSchema,
+} from '../contracts/index.js';
 import type { Client } from '../reference/client.js';
 import type { Context } from '../reference/context.js';
 import type { Contracts } from '../reference/contracts.js';
@@ -95,26 +103,41 @@ export function createEmbeddedEndpoint(
         artifacts: [],
       });
       hub.upsert(item(userId, 'You', request.input));
-      hub.upsert(
-        item(assistantId, 'Assistant', '', [
-          descriptor('part.run/cancel', nullSchema.ref, jsonSchema.ref, 'immediate'),
-        ]),
-      );
+      const assistant = item(assistantId, 'Assistant', '', [
+        descriptor('part.run/cancel', nullSchema.ref, jsonSchema.ref, 'immediate'),
+      ]);
+      hub.upsert(assistant);
       void (async () => {
+        let text = '';
+        let modelCallId = handle.ref.id;
         const progress = (async () => {
-          let offset = 0;
           for await (const update of handle.observe())
             if (update.kind === 'data') {
-              if (update.type === 'part.model/text') {
-                const payload = update.payload as { text: string };
-                hub.delta({
-                  itemId: assistantId,
-                  partId: 'text',
-                  generation: handle.ref.id,
-                  offset,
-                  text: payload.text,
-                });
-                offset += payload.text.length;
+              if (
+                update.type === 'part.model/text' &&
+                isJsonObject(update.payload) &&
+                typeof update.payload.text === 'string'
+              ) {
+                const payload = update.payload;
+                const delta = update.payload.text;
+                if (!delta) continue;
+                const callId =
+                  typeof payload.modelCallId === 'string' ? payload.modelCallId : modelCallId;
+                if (callId !== modelCallId) {
+                  if (text) hub.upsert(assistant, { clearStreamingParts: true });
+                  text = '';
+                  modelCallId = callId;
+                }
+                if (
+                  hub.delta({
+                    itemId: assistantId,
+                    partId: 'text',
+                    generation: modelCallId,
+                    offset: text.length,
+                    text: delta,
+                  }).ok
+                )
+                  text += delta;
               }
               if (update.type === 'part.tool/result') {
                 const value = update.payload as { toolId: string; outcome: string; effect: string };
@@ -136,20 +159,28 @@ export function createEmbeddedEndpoint(
         })();
         const outcome = await handle.done;
         await progress;
-        const text =
+        const finalText =
           outcome.phase === 'completed'
             ? outcome.result.content
-                .filter((p) => p.kind === 'text')
-                .map((p) => p.text)
+                .filter((part) => part.kind === 'text')
+                .map((part) => part.text)
                 .join('')
-            : outcome.phase === 'failed' || outcome.phase === 'abandoned'
-              ? outcome.error.message
-              : 'Cancelled';
-        hub.upsert({
-          ...item(assistantId, 'Assistant', text),
-          revision: handle.snapshot().revision,
-          payload: { phase: outcome.phase, text, effect: outcome.effect },
-        });
+            : [
+                text,
+                outcome.phase === 'failed' || outcome.phase === 'abandoned'
+                  ? outcome.error.message
+                  : 'Cancelled',
+              ]
+                .filter(Boolean)
+                .join('\n\n');
+        hub.upsert(
+          {
+            ...item(assistantId, 'Assistant', finalText),
+            revision: handle.snapshot().revision,
+            payload: { phase: outcome.phase, text: finalText, effect: outcome.effect },
+          },
+          { clearStreamingParts: true },
+        );
       })();
       return {
         kind: 'accepted' as const,

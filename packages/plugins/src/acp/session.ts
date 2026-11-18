@@ -67,7 +67,7 @@ export async function createAcpSession(
     created.value;
   async function execute(current: Turn, content: Model.ContentPart[]): Promise<Contracts.Json> {
     let failure: unknown,
-      streamed = '';
+      streamed = false;
     const timer = setTimeout(() => current.abort.abort('turn-timeout'), options.turnTimeoutMs);
     const cancel = () => {
       void current.handle?.requestCancel('acp-cancel');
@@ -90,12 +90,15 @@ export async function createAcpSession(
             isJsonObject(event.payload) &&
             typeof event.payload.text === 'string'
           ) {
-            streamed += event.payload.text;
+            streamed = true;
             await update({
               sessionUpdate: 'agent_message_chunk',
               content: { type: 'text', text: event.payload.text },
             });
-          } else if (event.type === 'part.tool/result') await tools.result(event.payload);
+          } else if (event.type === 'part.tool/result') {
+            streamed = false;
+            await tools.result(event.payload);
+          }
         }
       })().catch((error) => {
         failure = error;

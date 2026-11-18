@@ -1,4 +1,4 @@
-import { digest, fail, freeze, ok } from '../contracts/index.js';
+import { digest, fail, freeze, isJsonObject, ok } from '../contracts/index.js';
 import type { Contracts } from '../reference/contracts.js';
 import type { Model } from '../reference/model.js';
 import type { Runtime } from '../reference/runtime.js';
@@ -8,6 +8,28 @@ import type { CostEstimator } from '../runtime/costs.js';
 import { costPolicyKey, costUnits } from '../runtime/costs.js';
 import type { Operations } from '../runtime/operations.js';
 import { createOperations } from '../runtime/operations.js';
+
+function publishProviderEvents(
+  events: readonly Model.ProviderEvent[],
+  modelCallId: string,
+  progress: Runtime.ProgressSink,
+) {
+  let text = '';
+  const flush = () => {
+    if (text) progress.publish('part.model/text', { text, modelCallId });
+    text = '';
+  };
+  for (const event of events) {
+    if (event.type === 'text-delta' || event.type === 'part.model/text') {
+      if (isJsonObject(event.payload) && typeof event.payload.text === 'string')
+        text += event.payload.text;
+    } else {
+      flush();
+      progress.publish(event.type, event.payload);
+    }
+  }
+  flush();
+}
 
 export function createModelGateway(options: {
   profiles: readonly Model.Profile[];
@@ -200,7 +222,7 @@ export function createModelGateway(options: {
                   };
                 const pushed = decoder.value.push(chunk);
                 if (!pushed.ok) return { kind: 'failed', error: pushed.error, effect: 'applied' };
-                for (const event of pushed.value) c.progress.publish(event.type, event.payload);
+                publishProviderEvents(pushed.value, c.scope.id, c.progress);
               }
               const response = decoder.value.finish();
               if (!response.ok) return { kind: 'failed', error: response.error, effect: 'applied' };

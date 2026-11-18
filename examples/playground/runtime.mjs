@@ -108,18 +108,29 @@ export function createPlaygroundSession({
   let note = '',
     closed = false;
   /** @param {string} id @param {string} type @param {string} label @param {string} text @param {Contracts.Json} payload @param {Partial<Projection.Item>} extras */
-  const project = (id, type, label, text, payload = {}, extras = {}) => {
-    hub.upsert({
-      id,
-      type,
-      schemaVersion: 1,
-      revision: crypto.randomUUID(),
-      payload,
-      fallback: { label, text },
-      actions: [],
-      artifacts: [],
-      ...extras,
-    });
+  const project = (
+    id,
+    type,
+    label,
+    text,
+    payload = {},
+    extras = {},
+    clearStreamingParts = false,
+  ) => {
+    hub.upsert(
+      {
+        id,
+        type,
+        schemaVersion: 1,
+        revision: crypto.randomUUID(),
+        payload,
+        fallback: { label, text },
+        actions: [],
+        artifacts: [],
+        ...extras,
+      },
+      { clearStreamingParts },
+    );
   };
   /** @param {Contracts.CommandRequest} request @param {string} message @returns {Contracts.CommandReceipt} */
   const reject = (request, message) => ({
@@ -186,7 +197,7 @@ export function createPlaygroundSession({
     active = run;
     runs.push(run);
     const ref = { owner: 'playground', kind: 'run', id: run.id };
-    const update = () =>
+    const update = (clearStreamingParts = false) =>
       project(
         run.id,
         'part/message',
@@ -207,6 +218,7 @@ export function createPlaygroundSession({
             ? [descriptor('part.run/cancel')]
             : [],
         },
+        clearStreamingParts,
       );
     /** @param {string} kind @param {Contracts.Json} data */
     const trace = (kind, data) => {
@@ -386,6 +398,7 @@ export function createPlaygroundSession({
       project(`${run.id}/user`, 'part/message', 'You', input.prompt, { text: input.prompt });
       update();
       run.done = (async () => {
+        let modelCallId = run.id;
         const progress = (async () => {
           for await (const event of handle.observe()) {
             if (event.kind !== 'data') continue;
@@ -399,14 +412,27 @@ export function createPlaygroundSession({
               )
                 throw Error('Invalid text event');
               const text = payload.text;
-              hub.delta({
-                itemId: run.id,
-                partId: 'text',
-                generation: run.id,
-                offset: run.text.length,
-                text,
-              });
-              run.text += text;
+              if (!text) continue;
+              const callId =
+                'modelCallId' in payload && typeof payload.modelCallId === 'string'
+                  ? payload.modelCallId
+                  : modelCallId;
+              if (callId !== modelCallId) {
+                const replacing = !!run.text;
+                run.text = '';
+                modelCallId = callId;
+                if (replacing) update(true);
+              }
+              if (
+                hub.delta({
+                  itemId: run.id,
+                  partId: 'text',
+                  generation: modelCallId,
+                  offset: run.text.length,
+                  text,
+                }).ok
+              )
+                run.text += text;
             } else if (event.type === 'part.tool/result') trace('dispatch', event.payload);
           }
         })();
@@ -448,8 +474,7 @@ export function createPlaygroundSession({
             usage: run.usage,
           }),
         );
-        hub.remove(run.id);
-        update();
+        update(true);
       })().finally(async () => {
         if (run.approval) waits.cancel(run.approval.id);
         run.approval = null;
@@ -459,8 +484,8 @@ export function createPlaygroundSession({
       // Ensure an unexpected observer/disposal error cannot create an unhandled rejection.
       void run.done.catch(() => {
         run.phase = 'failed';
-        run.text = 'Run observation failed.';
-        update();
+        run.text = [run.text, 'Run observation failed.'].filter(Boolean).join('\n\n');
+        update(true);
       });
       return { kind: 'accepted', commandId: request.commandId, operation: ref, commit: [] };
     } catch {

@@ -372,12 +372,16 @@ request is independent of cancelling the run.
 
 Watch setup registers observation before capturing its watermark. Slow observers
 receive a gap and the controller reconnects to a snapshot. UTF-16 generation/offset
-mismatches do not concatenate arbitrary text. Audience reset clears cached items
-and streaming parts. The reference watch hub owns one already-authorized audience;
+mismatches do not concatenate arbitrary text. Use
+`hub.upsert(item, { clearStreamingParts: true })` to replace an item's streamed
+preview with an authoritative message or to start a fresh model call. Item removal
+also clears that item's parts. Audience reset clears all cached items and streaming
+parts. The reference watch hub owns one already-authorized audience;
 applications must maintain separate hubs or re-project/reset when rights change.
 
-DOM Chat supports safe Markdown/code, cached completed blocks, custom cards,
-theme tokens, pagination, IME/draft safety and owner cancellation. `command` is
+DOM Chat batches stream updates per animation frame and reuses completed Markdown
+blocks. It also supports safe Markdown/code, custom cards, theme tokens, pagination,
+IME/draft safety and owner cancellation. `command` is
 optional for the built-in string start action. `ChatComponents` gives actual DOM
 Message/Fallback/ToolDetails/Composer signatures. Ordered slots include
 `composer.actions`, `message.actions` and `artifact.preview`; Inspector adds

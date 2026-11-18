@@ -3,7 +3,7 @@ import type { Client } from '../reference/client.js';
 import type { Contracts } from '../reference/contracts.js';
 import type { Projection } from '../reference/projection.js';
 import { createProgress } from '../runtime/progress.js';
-import { partKey } from './parts.js';
+import { clearItemParts, partKey } from './parts.js';
 export function createWatchHub(
   capabilities: Contracts.CapabilitySet,
   initialItems: readonly Projection.Item[] = [],
@@ -29,6 +29,7 @@ export function createWatchHub(
     type: string,
     payload: Contracts.Json,
     persistence: Client.EventEnvelope['persistence'] = 'state-backed',
+    clearStreamingParts = false,
   ) => {
     if (sequence >= Number.MAX_SAFE_INTEGER) {
       epoch = crypto.randomUUID();
@@ -48,19 +49,27 @@ export function createWatchHub(
       schemaVersion: 1,
       persistence,
       payload,
+      ...(clearStreamingParts ? { clearStreamingParts: true } : {}),
     };
     progress.publish('frame', { kind: 'event', event } as unknown as Contracts.Json);
   };
   return {
     snapshot,
     close: () => progress.end(),
-    upsert(item: Projection.Item) {
+    upsert(item: Projection.Item, options: { clearStreamingParts?: boolean } = {}) {
       if (!isJson(item)) throw new TypeError('Public item must be JSON');
       items.set(item.id, structuredClone(item));
-      emit('part.item/upsert', item as unknown as Contracts.Json);
+      if (options.clearStreamingParts) clearItemParts(parts, item.id);
+      emit(
+        'part.item/upsert',
+        item as unknown as Contracts.Json,
+        'state-backed',
+        options.clearStreamingParts,
+      );
     },
     remove(id: string) {
       items.delete(id);
+      clearItemParts(parts, id);
       emit('part.item/remove', { id });
     },
     delta(delta: Client.TextDelta) {

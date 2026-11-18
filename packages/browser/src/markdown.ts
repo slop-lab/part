@@ -5,7 +5,10 @@ export function createMarkdownView(document: Document): {
 } {
   const element = document.createElement('div');
   element.dataset.partPart = 'markdown';
-  let previous: { source: string; element: HTMLElement }[] = [];
+  const previous: { source: string; element: HTMLElement }[] = [];
+  let lastText = '';
+  let stableCount = 0;
+  let stableOffset = 0;
   function inline(parent: HTMLElement, text: string) {
     const pattern = /(`[^`\n]+`|\*\*[^*\n]+\*\*|\*[^*\n]+\*|\[[^\]\n]+\]\([^\s)]+\))/g;
     let offset = 0;
@@ -44,20 +47,26 @@ export function createMarkdownView(document: Document): {
     }
     parent.append(document.createTextNode(text.slice(offset)));
   }
-  function blocks(text: string): string[] {
-    const result: string[] = [],
-      current: string[] = [];
+  function blocks(text: string, start: number) {
+    const result: { source: string; through?: number }[] = [];
+    let lines: string[] = [];
     let fence = false;
-    for (const line of text.replaceAll('\r\n', '\n').split('\n')) {
+    let offset = start;
+    const newlines = /\r?\n/g;
+    newlines.lastIndex = start;
+    function add(line: string, through?: number) {
       if (line.startsWith('```')) fence = !fence;
       if (!fence && !line.trim()) {
-        if (current.length) {
-          result.push(current.join('\n'));
-          current.length = 0;
-        }
-      } else current.push(line);
+        if (lines.length) result.push({ source: lines.join('\n'), through });
+        lines = [];
+      } else lines.push(line);
     }
-    if (current.length) result.push(current.join('\n'));
+    for (const newline of text.matchAll(newlines)) {
+      add(text.slice(offset, newline.index), newline.index + newline[0].length);
+      offset = newline.index + newline[0].length;
+    }
+    add(text.slice(offset));
+    if (lines.length) result.push({ source: lines.join('\n') });
     return result;
   }
   function render(source: string): HTMLElement {
@@ -97,13 +106,29 @@ export function createMarkdownView(document: Document): {
   return {
     element,
     update(text) {
-      const next = blocks(text).map((source, index) =>
-        previous[index]?.source === source ? previous[index]! : { source, element: render(source) },
-      );
-      // Completed blocks retain their DOM nodes; only changed blocks are reparsed.
-      for (const entry of previous) if (!next.includes(entry)) entry.element.remove();
-      for (const entry of next) element.append(entry.element);
-      previous = next;
+      if (text === lastText) return;
+      if (!text.startsWith(lastText)) {
+        stableCount = 0;
+        stableOffset = 0;
+      }
+      const tail = blocks(text, stableOffset);
+      const first = stableCount;
+      for (const [offset, block] of tail.entries()) {
+        const index = first + offset;
+        const existing = previous[index];
+        if (existing?.source !== block.source) {
+          const node = render(block.source);
+          if (existing) existing.element.replaceWith(node);
+          else element.append(node);
+          previous[index] = { source: block.source, element: node };
+        }
+        if (block.through !== undefined) {
+          stableCount = index + 1;
+          stableOffset = block.through;
+        }
+      }
+      for (const removed of previous.splice(first + tail.length)) removed.element.remove();
+      lastText = text;
     },
   };
 }

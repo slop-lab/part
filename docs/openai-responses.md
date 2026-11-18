@@ -82,6 +82,11 @@ That event supplies the authoritative output and usage snapshot. Streamed text,
 function arguments, item IDs and completed item snapshots must agree with it.
 UTF-8 and LF/CRLF/CR frames may span arbitrary byte chunks. An optional `[DONE]`
 marker is accepted after the completed event; it cannot replace that event.
+The model gateway normalizes text fragments to `part.model/text` progress events
+with `text` and `modelCallId`. It combines adjacent fragments from the same transport
+chunk. This gives embedded hosts and clients the same event across Chat Completions,
+Responses, Anthropic Messages and Ollama. Direct adapter decoders continue to expose
+their provider event types.
 Token usage maps `input_tokens`/`output_tokens`, with provider details preserved.
 
 Failed/incomplete responses, malformed or unfinished tool arguments, duplicate

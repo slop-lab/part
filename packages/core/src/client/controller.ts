@@ -1,7 +1,7 @@
 import { fail, freeze, ok } from '../contracts/index.js';
 import type { Client } from '../reference/client.js';
 import type { Projection } from '../reference/projection.js';
-import { partKey } from './parts.js';
+import { clearItemParts, partKey } from './parts.js';
 export function createController(port: Client.Port): Client.Controller & {
   getPart(itemId: string, partId: string): Client.StreamPartSnapshot | undefined;
 } {
@@ -109,10 +109,13 @@ export function createController(port: Client.Port): Client.Controller & {
                 if (event.type === 'part.item/upsert') {
                   const item = event.payload as unknown as Projection.Item;
                   items.set(item.id, freeze(structuredClone(item)));
+                  if (event.clearStreamingParts === true) clearItemParts(parts, item.id);
                   state = { ...state, itemIds: [...items.keys()] };
                 }
                 if (event.type === 'part.item/remove') {
-                  items.delete((event.payload as { id: string }).id);
+                  const { id } = event.payload as { id: string };
+                  items.delete(id);
+                  clearItemParts(parts, id);
                   state = { ...state, itemIds: [...items.keys()] };
                 }
                 if (event.type === 'part.text/delta') {

@@ -3,7 +3,7 @@ import { localContext } from '@slop-lab/part/contracts/index.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createPlaygroundSession } from '../examples/playground/runtime.mjs';
-import { expectProperty, present } from '../fixtures/assertions.mjs';
+import { deferred, expectProperty, present } from '../fixtures/assertions.mjs';
 
 /** @template [T=null] @param {string} actionId @param {T} input @param {import("@slop-lab/part/reference/index.js").Contracts.EntityRef} [target] */
 const command = (actionId, input = /** @type {T} */ (null), target) => ({
@@ -192,4 +192,103 @@ test('Closing observation keeps playground work alive; shutdown cancels the owne
   assert.equal(present(session.state().runs.at(-1)).phase, 'cancelled');
   assert.equal(present(session.state().runs.at(-1)).approval, null);
   assert.equal(session.state().note, '');
+});
+
+test('Playground streams each model call separately and replaces partial text with the verified result', async () => {
+  const finish = deferred();
+  const encoder = new TextEncoder();
+  let requests = 0;
+  /** @param {unknown[]} events */
+  const frames = (events) =>
+    encoder.encode(events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(''));
+  /** @param {string} text */
+  const message = (text) => ({
+    id: 'msg',
+    type: 'message',
+    status: 'completed',
+    role: 'assistant',
+    content: [{ type: 'output_text', text }],
+  });
+  /** @param {unknown[]} output */
+  const completion = (output) => ({
+    type: 'response.completed',
+    response: { id: 'resp', object: 'response', status: 'completed', output },
+  });
+  /** @param {string} text */
+  const textEvents = (text) => [
+    {
+      type: 'response.output_item.added',
+      output_index: 0,
+      item: { ...message(''), status: 'in_progress', content: [] },
+    },
+    {
+      type: 'response.output_text.delta',
+      output_index: 0,
+      content_index: 0,
+      item_id: 'msg',
+      delta: text,
+    },
+  ];
+  const session = createPlaygroundSession({
+    environment: { OPENAI_API_KEY: 'inert-key', OPENAI_MODEL: 'fixture' },
+    async fetch() {
+      const headers = { 'content-type': 'text/event-stream' };
+      if (++requests === 1) {
+        const preamble = 'Before the tool.';
+        const call = {
+          id: 'tool',
+          type: 'function_call',
+          call_id: 'call',
+          name: 'uppercase',
+          arguments: '{"text":"hello"}',
+        };
+        return new Response(
+          frames([...textEvents(preamble), completion([message(preamble), call])]),
+          { headers },
+        );
+      }
+      assert.equal(requests, 2);
+      const text = 'Final ☃';
+      return new Response(
+        new ReadableStream({
+          async start(controller) {
+            controller.enqueue(frames(textEvents(text)));
+            await finish.promise;
+            controller.enqueue(frames([completion([message(text)])]));
+            controller.close();
+          },
+        }),
+        { headers },
+      );
+    },
+  });
+  try {
+    const request = command('part.run/start', {
+      scenario: 'tools',
+      provider: 'responses',
+      prompt: 'hello',
+    });
+    const delivery = await session.endpoint.command(request);
+    assert.equal(delivery.kind, 'accepted');
+    const stream = await until(
+      () => session.hub.snapshot(),
+      ({ streamingParts }) => streamingParts.some(({ text }) => text === 'Final ☃'),
+      'the second model call delta',
+    );
+    assert.equal(requests, 2);
+    assert.equal(stream.streamingParts.length, 1);
+    assert.equal(stream.streamingParts[0]?.offset, 'Final ☃'.length);
+    const reconnected = await session.endpoint.watch({ surface: 'chat' }, session.context);
+    assert.ok(reconnected.ok);
+    assert.deepEqual(reconnected.value.bootstrap.streamingParts, stream.streamingParts);
+    await reconnected.value.close();
+    finish.resolve();
+    const state = await ended(session);
+    assert.equal(state.runs[0]?.phase, 'completed');
+    assert.equal(state.runs[0]?.text, 'Final ☃');
+    assert.deepEqual(session.hub.snapshot().streamingParts, []);
+  } finally {
+    finish.resolve();
+    await session.close();
+  }
 });

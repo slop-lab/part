@@ -6,11 +6,19 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { startPlayground } from '../examples/playground/server.mjs';
-import { present } from '../fixtures/assertions.mjs';
+import { deferred, present } from '../fixtures/assertions.mjs';
 
 const serverKey = 'browser-test-server-only-key';
 const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
 let planModels = 0;
+const firstText = '## Streaming heading\n\nConfigured provider';
+const moreText = ' reply';
+const nextChunk = deferred();
+const completeStream = deferred();
+const encoder = new TextEncoder();
+/** @param {unknown[]} events */
+const frames = (events) =>
+  encoder.encode(events.map((event) => 'data: ' + JSON.stringify(event) + '\n\n').join(''));
 const directory = await mkdtemp(join(tmpdir(), 'part-playground-siwc-'));
 /** @type {NonNullable<Parameters<typeof startPlayground>[0]>} */
 const options = {
@@ -89,13 +97,59 @@ const options = {
             type: 'message',
             role: 'assistant',
             status: 'completed',
-            content: [
-              { type: 'output_text', text: plan ? 'Plan reply' : 'Configured provider reply' },
-            ],
+            content: [{ type: 'output_text', text: plan ? 'Plan reply' : firstText + moreText }],
           },
         ],
       },
     };
+    if (!plan) {
+      const item = present(terminal.response.output[0]);
+      let cancelled = false;
+      const body = new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            frames([
+              {
+                type: 'response.output_item.added',
+                output_index: 0,
+                item: { ...item, status: 'in_progress', content: [] },
+              },
+              {
+                type: 'response.output_text.delta',
+                output_index: 0,
+                item_id: item.id,
+                content_index: 0,
+                delta: firstText,
+              },
+            ]),
+          );
+        },
+        async pull(controller) {
+          await nextChunk.promise;
+          if (cancelled) return;
+          controller.enqueue(
+            frames([
+              {
+                type: 'response.output_text.delta',
+                output_index: 0,
+                item_id: item.id,
+                content_index: 0,
+                delta: moreText,
+              },
+            ]),
+          );
+          await completeStream.promise;
+          if (!cancelled) {
+            controller.enqueue(frames([terminal]));
+            controller.close();
+          }
+        },
+        cancel() {
+          cancelled = true;
+        },
+      });
+      return new Response(body, { headers: { 'content-type': 'text/event-stream' } });
+    }
     return new Response(
       'data: {"type":"codex.rate_limits"}\n\ndata: ' + JSON.stringify(terminal) + '\n\n',
       {
@@ -203,6 +257,7 @@ try {
   assert.ok((await session()).active);
   await page.getByRole('button', { name: 'Stop run' }).click();
   await phase('cancelled');
+  assert.match((await session()).runs.at(-1)?.text ?? '', /Step 1[\s\S]*Run cancelled/);
   await page.reload();
   await page.locator('#connection[data-state="connected"]').waitFor();
   await phase('cancelled');
@@ -258,8 +313,33 @@ try {
   assert.equal(await page.getByLabel('Model name').inputValue(), 'browser-test-model');
   await page.locator('[data-scenario="conversation"]').click();
   await page.getByRole('button', { name: 'Try this example' }).click();
+  const thread = page.getByRole('log', { name: 'Conversation' });
+  const heading = thread.getByRole('heading', { name: 'Streaming heading' });
+  await heading.waitFor();
+  assert.equal((await session()).runs.at(-1)?.phase, 'running');
+  await heading.evaluate((node) => node.setAttribute('data-stream-probe', 'preserved'));
+  await page.getByRole('button', { name: 'Reconnect', exact: true }).click();
+  await page.locator('#connection[data-state="connected"]').waitFor();
+  assert.equal(await heading.count(), 1);
+  await thread.getByText('Configured provider', { exact: true }).waitFor();
+  await thread.evaluate((node) => {
+    const scroll = /** @type {HTMLElement} */ (node);
+    scroll.style.maxHeight = '100px';
+    scroll.scrollTop = 0;
+    scroll.dispatchEvent(new Event('scroll'));
+  });
+  nextChunk.resolve();
+  await thread.getByText('Configured provider reply', { exact: true }).waitFor();
+  assert.equal(await heading.getAttribute('data-stream-probe'), 'preserved');
+  assert.equal((await session()).runs.at(-1)?.phase, 'running');
+  const follow = page.getByRole('button', { name: 'New messages ↓', exact: true });
+  await follow.waitFor();
+  assert.equal(await thread.evaluate((node) => node.scrollTop), 0);
+  await follow.click();
+  completeStream.resolve();
   await phase('completed · responses');
-  assert.equal((await session()).runs.at(-1)?.text, 'Configured provider reply');
+  assert.equal(await heading.getAttribute('data-stream-probe'), 'preserved');
+  assert.equal((await session()).runs.at(-1)?.text, firstText + moreText);
 
   await page.getByRole('button', { name: 'Connect ChatGPT' }).click();
   await page.getByRole('button', { name: 'Continue with ChatGPT' }).click();
@@ -359,6 +439,8 @@ try {
     'Playground Chromium: all six scenarios, approvals/fallbacks, artifact download, cancellation/reconnect, refresh, isolation, draft retention, responsive layouts, configured provider and isolated SIWC plan flow passed.',
   );
 } finally {
+  nextChunk.resolve();
+  completeStream.resolve();
   await browser?.close();
   await server.close();
   await rm(directory, { recursive: true, force: true });

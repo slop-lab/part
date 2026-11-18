@@ -18,6 +18,25 @@ Plugins are grouped in one package; individual plugins do not each need a packag
 Core does not import the other packages, and browser/Node adapters communicate
 through core contracts rather than depending on each other or the plugin bundle.
 
+## Development setup
+
+```sh
+mise run setup
+mise exec -- just example
+```
+
+The setup task uses mise's Node.js, Just, and pnpm toolchain and installs the
+workspace packages from `package-lock.json`. CAR exposes pnpm to tools that opt
+into its command allowlist. Git is a system prerequisite for checking out the
+repository and for CAR's Git operations.
+
+Browser tests use Chromium matched to the workspace's Playwright version.
+Run `mise run browser:install` before `mise exec -- npm run test:browser`.
+On Linux, Playwright's `install --with-deps chromium` also installs required system
+libraries. See [browser verification](docs/playground.md#validation).
+
+With an existing Node.js installation, use the npm commands directly.
+
 ```sh
 npm ci
 npm run check # TypeScript, JS/MJS type checks, and package boundaries
@@ -55,8 +74,7 @@ Run `just example` to open the [full browser playground](docs/playground.md) at
 Try conversation, tools, approval gates, immutable reports, validation failures and
 cancellation, with request/event inspection. Scripted mode needs no key; optional
 OpenAI-compatible Chat Completions and Responses run through a server that keeps
-credentials out of the browser. Use `npm run test:browser` after
-`npx playwright install chromium`.
+credentials out of the browser.
 Import subpaths by their emitted filenames, including `.js` and directory `index.js`.
 The build generates `dist/package.json` with a root export when `index.js` exists
 and `"./*": "./*"` for all files, without rewriting workspace metadata.

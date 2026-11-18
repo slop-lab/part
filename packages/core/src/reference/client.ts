@@ -55,6 +55,8 @@ export namespace Client {
     readonly type: string;
     readonly schemaVersion: number;
     readonly persistence: 'state-backed' | 'delta' | 'ephemeral';
+    /** For a part.item/upsert that replaces the item's accumulated streaming parts. */
+    readonly clearStreamingParts?: true;
     readonly causationId?: string;
     readonly correlationId?: string;
     readonly runId?: string;

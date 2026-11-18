@@ -96,22 +96,36 @@ export function createChat(options: ChatOptions): ChatView {
       if (renderers.has(key)) throw new Error(`Duplicate renderer ${key}`);
       renderers.set(key, renderer);
     }
-  const rendered = new Map<string, { item: Projection.Item; element: HTMLElement }>();
+  const rendered = new Map<
+    string,
+    {
+      item: Projection.Item;
+      element: HTMLElement;
+      streamed?: string;
+    }
+  >();
   let visible = options.maxVisibleItems ?? 100,
     disposed = false;
   const markdownViews = new WeakMap<HTMLElement, ReturnType<typeof createMarkdownView>>();
-  const updateMessageText = (element: HTMLElement, text: string) => {
+  const markdownFor = (element: HTMLElement) => {
     const body = element.matches('[data-part-part="message-body"]')
       ? element
       : element.querySelector<HTMLElement>('[data-part-part="message-body"]');
-    const view = body && markdownViews.get(body);
+    return body ? markdownViews.get(body) : undefined;
+  };
+  const updateMessageText = (element: HTMLElement, text: string) => {
+    const view = markdownFor(element);
     if (view) view.update(text);
     else {
       const pre = element.querySelector('pre');
       if (pre) pre.textContent = text;
     }
   };
-  const fallback = (item: Projection.Item): HTMLElement => {
+  const fallback = (
+    item: Projection.Item,
+    text: string,
+    reuse?: ReturnType<typeof createMarkdownView>,
+  ): HTMLElement => {
     if (options.components?.Fallback) {
       try {
         return options.components.Fallback(item, { controller, target: 'chat', itemId: item.id });
@@ -121,10 +135,10 @@ export function createChat(options: ChatOptions): ChatView {
     node.dataset.partPart = 'message-body';
     const label = document.createElement('strong');
     label.textContent = item.fallback.label;
-    const text = createMarkdownView(document);
-    text.update(item.fallback.text ?? '');
-    markdownViews.set(node, text);
-    node.append(label, text.element);
+    const markdown = reuse ?? createMarkdownView(document);
+    markdown.update(text);
+    markdownViews.set(node, markdown);
+    node.append(label, markdown.element);
     for (const action of item.actions) {
       if (action.availability.state !== 'available' || action.input.id !== 'part/null') continue;
       const button = document.createElement('button');
@@ -149,42 +163,48 @@ export function createChat(options: ChatOptions): ChatView {
     const state = controller.getState(),
       ids = state.itemIds.slice(-visible),
       available = new Set(ids);
+    let changed = false;
     for (const [id, entry] of rendered)
       if (!available.has(id)) {
         entry.element.remove();
         rendered.delete(id);
+        changed = true;
       }
     for (const id of ids) {
       const item = controller.getItem(id);
       if (!item) continue;
       const existing = rendered.get(id);
-      const streamed = options.client.getPart?.(id, 'text');
+      const phase =
+        item.payload && typeof item.payload === 'object' && 'phase' in item.payload
+          ? String(item.payload.phase)
+          : undefined;
+      const stream = options.client.getPart?.(id, 'text');
+      const terminal = phase && ['completed', 'failed', 'cancelled', 'abandoned'].includes(phase);
+      const streamed =
+        !terminal && !stream?.completed && item.type === 'part/message' ? stream?.text : undefined;
+      const text = streamed ?? item.fallback.text ?? '';
       if (existing?.item === item) {
-        if (
-          streamed &&
-          !(item.payload && typeof item.payload === 'object' && 'phase' in item.payload)
-        )
-          updateMessageText(existing.element, streamed.text);
+        if (streamed !== existing.streamed) {
+          updateMessageText(existing.element, text);
+          existing.streamed = streamed;
+          changed = true;
+        }
         continue;
       }
       let body: HTMLElement;
+      const reuse =
+        existing && item.type === 'part/message' ? markdownFor(existing.element) : undefined;
       try {
         const renderer = renderers.get(`chat/${item.type}@${item.schemaVersion}`);
         body = renderer
           ? renderer.render(item, { controller, target: 'chat', itemId: id })
           : item.type === 'part/tool' && options.components?.ToolDetails
             ? options.components.ToolDetails(item, { controller, target: 'chat', itemId: id })
-            : fallback(item);
+            : fallback(item, text, reuse);
       } catch {
-        body = fallback(item);
+        body = fallback(item, text, reuse);
       }
-      if (
-        streamed &&
-        item.type === 'part/message' &&
-        !(item.payload && typeof item.payload === 'object' && 'phase' in item.payload)
-      ) {
-        updateMessageText(body, streamed.text);
-      }
+      if (streamed !== undefined) updateMessageText(body, text);
       let message: HTMLElement;
       try {
         message = options.components?.Message
@@ -195,13 +215,7 @@ export function createChat(options: ChatOptions): ChatView {
       }
       message.dataset.partPart = 'message';
       message.dataset.partType = item.type;
-      message.dataset.state =
-        typeof item.payload === 'object' &&
-        item.payload &&
-        !Array.isArray(item.payload) &&
-        'phase' in item.payload
-          ? String(item.payload.phase)
-          : 'ready';
+      message.dataset.state = phase ?? 'ready';
       if (!message.contains(body)) message.append(body);
       for (const slot of ordered.value.filter(
         (slot) =>
@@ -216,25 +230,48 @@ export function createChat(options: ChatOptions): ChatView {
       }
       if (existing) existing.element.replaceWith(message);
       else thread.append(message);
-      rendered.set(id, { item, element: message });
+      rendered.set(id, { item, element: message, streamed });
+      changed = true;
     }
-    // Preserve requested order without reconstructing unchanged message bodies.
+    // Stable message nodes stay in place while the current message streams.
+    let next = thread.firstElementChild;
     for (const id of ids) {
       const entry = rendered.get(id);
-      if (entry) thread.append(entry.element);
+      if (!entry) continue;
+      if (entry.element !== next) {
+        thread.insertBefore(entry.element, next);
+        changed = true;
+      }
+      next = entry.element.nextElementSibling;
     }
     status.textContent = state.connection;
     older.hidden = state.itemIds.length <= visible;
-    scroll.contentChanged();
+    if (changed) {
+      scroll.contentChanged();
+      if (scroll.getState().following) thread.scrollTop = thread.scrollHeight;
+    }
     follow.hidden = !scroll.getState().hasNewContent;
-    if (scroll.getState().following) thread.scrollTop = thread.scrollHeight;
+  };
+  const view = document.defaultView;
+  let frame: number | undefined;
+  let scheduled = false;
+  const scheduleRender = () => {
+    if (disposed || scheduled) return;
+    scheduled = true;
+    const draw = () => {
+      scheduled = false;
+      frame = undefined;
+      render();
+    };
+    if (view?.requestAnimationFrame) frame = view.requestAnimationFrame(draw);
+    else queueMicrotask(draw);
   };
   const unsubscribe = controller.subscribe(
     {
-      select: (state) => ({ state, items: state.itemIds.map((id) => controller.getItem(id)) }),
+      select: (state) => state,
       equal: () => false,
     },
-    render,
+    scheduleRender,
   );
   const submit = async () => {
     send.disabled = true;
@@ -310,6 +347,7 @@ export function createChat(options: ChatOptions): ChatView {
       if (!disposed) {
         disposed = true;
         unsubscribe();
+        if (frame !== undefined) view?.cancelAnimationFrame(frame);
         root.remove();
         if (options.ownsClient) await controller.dispose();
       }

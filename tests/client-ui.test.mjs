@@ -1,6 +1,7 @@
 // @ts-check
 import { createChat } from '@slop-lab/part-browser/dom.js';
 import { createComposer } from '@slop-lab/part-browser/headless.js';
+import { createMarkdownView } from '@slop-lab/part-browser/markdown.js';
 import { createAgent } from '@slop-lab/part-plugins/agent/index.js';
 import { fakeModel } from '@slop-lab/part-plugins/testing/index.js';
 import { createController, createLocalPort, createWatchHub } from '@slop-lab/part/client/index.js';
@@ -254,6 +255,38 @@ test('C01/C10: browser entrypoint excludes storage, executor, provider and crede
       false,
     );
   assert.equal(present(result.outputFiles[0]).text.includes('node:sqlite'), false);
+});
+
+test('incremental Markdown preserves completed blocks across split line endings and code fences', () => {
+  const window = new Window();
+  const document = /** @type {Document} */ (/** @type {unknown} */ (window.document));
+  const streamed = createMarkdownView(document);
+  const fence = '```';
+  const chunks = [
+    '## Title\r',
+    '\n\r',
+    '\n' + fence.slice(0, 2),
+    fence[2] + 'js\n',
+    'line\n\nsecond',
+    '\n' + fence,
+    '\n\n**Done**',
+  ];
+  let text = '';
+  for (const chunk of chunks) {
+    text += chunk;
+    streamed.update(text);
+    const oneShot = createMarkdownView(document);
+    oneShot.update(text);
+    assert.equal(streamed.element.innerHTML, oneShot.element.innerHTML);
+  }
+  const heading = streamed.element.querySelector('h2');
+  assert.ok(heading);
+  streamed.update(text + '!');
+  assert.equal(streamed.element.querySelector('h2'), heading);
+  streamed.update('replacement');
+  assert.equal(streamed.element.querySelector('h2'), null);
+  assert.equal(streamed.element.textContent, 'replacement');
+  window.happyDOM.cancelAsync();
 });
 
 test('G10: themed Chat sends to the real embedded agent, streams text and cancels through the owner action', async () => {
