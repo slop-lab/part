@@ -103,10 +103,10 @@ use Responses options such as `max_output_tokens` and `reasoning` instead.
 
 ## Validation
 
-`tests/openai-responses.test.mjs` covers byte fragmentation, multiple output items,
+`tests/openai-responses.test.ts` covers byte fragmentation, multiple output items,
 argument fragments, terminal/snapshot errors, unsupported content and invalid usage.
 The [fixed tool-flow fixture](../fixtures/openai-responses/tool-flow.fixture.json)
-used by `tests/openai-responses-tool-flow.test.mjs`
+used by `tests/openai-responses-tool-flow.test.ts`
 records exact requests/responses for native reasoning replay through the actual
 agent/gateway/fetch transport and dispatcher, in JSON and SSE modes. A truncated
 variant proves the tool executes zero times without a successful terminal response.

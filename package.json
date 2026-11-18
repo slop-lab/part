@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "npm run build && node --test --test-isolation=none --test-reporter=./scripts/test-reporter.mjs tests/*.test.mjs",
+    "test": "npm run build && node --test --test-isolation=none --test-reporter=./scripts/test-reporter.mjs tests/*.test.ts",
     "check": "npm run check:js && node scripts/check-architecture.mjs && npm run check:qg",
     "check:qg": "qg check --full",
     "example": "npm run build && node examples/basic.mjs",

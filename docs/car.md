@@ -215,7 +215,7 @@ inspection and response to a managed child.
    }
    ```
 
-4. Verify the target transcript. `tests/car-operator.test.mjs` is the executable
+4. Verify the target transcript. `tests/car-operator.test.ts` is the executable
    reference for the exact six-turn sequence and proves request-ID correlation and
    refusal of a conflicting late decision.
 
